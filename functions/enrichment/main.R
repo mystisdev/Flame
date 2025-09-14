@@ -11,6 +11,23 @@ handleEnrichment <- function(enrichmentType) {
             "functional" = input$functional_enrichment_tool,
             "literature" = "aGOtool"
           )
+
+          # If running a single tool, clear results from other tools to prevent accumulation
+          if (currentEnrichmentType == "functional" && length(tools) == 1) {
+            lapply(ENRICHMENT_TOOLS, function(toolName) {
+              if (toolName != tools) {
+                type_tool <- paste("functional", toolName, sep = "_")
+                # Check if this other tool has any results stored
+                if (exists("enrichmentResults") &&
+                    type_tool %in% names(enrichmentResults) &&
+                    nrow(enrichmentResults[[type_tool]]) > 0) {
+                  resetEnrichmentResults("functional", toolName)
+                  hideTab(inputId = "toolTabsPanel", target = toolName)
+                }
+              }
+            })
+          }
+
           currentUserList <<-
             unlist(userInputLists[names(userInputLists) ==
                                     input[[paste0(currentEnrichmentType,
@@ -477,9 +494,16 @@ handleEnrichmentResultClear <- function(enrichmentType, toolName) {
 
 handleMultiClear <- function() {
   resetCombination()
-  lapply(input$functional_enrichment_tool, function(toolName) {
-    resetEnrichmentResults("functional", toolName)
-    hideTab(inputId = "toolTabsPanel", target = toolName)
+  # Clear ALL tools that have results, not just the currently selected ones
+  lapply(ENRICHMENT_TOOLS, function(toolName) {
+    type_tool <- paste("functional", toolName, sep = "_")
+    # Check if this tool has any results stored
+    if (exists("enrichmentResults") &&
+        type_tool %in% names(enrichmentResults) &&
+        nrow(enrichmentResults[[type_tool]]) > 0) {
+      resetEnrichmentResults("functional", toolName)
+      hideTab(inputId = "toolTabsPanel", target = toolName)
+    }
   })
   prepareCombinationTab()
   shinyjs::hide("functional_enrichment_all_clear")
