@@ -67,6 +67,7 @@ DATASOURCES <- list() # gProfiler here, the rest through an init.R function
 DATASOURCES[["GPROFILER"]] <- c("GO:MF", "GO:CC", "GO:BP",
                               "KEGG", "REAC", "WP",
                               "TF", "MIRNA", "CORUM", "HPA", "HP")
+DATASOURCES[["STRING"]] <- c("GO:MF", "GO:CC", "GO:BP", "KEGG", "REAC", "WP", "INTERPRO", "PFAM", "UNIPROT")
 DATASOURCES_CODES <- list()
 DATASOURCES_CODES[["AGOTOOL"]] <- list(
   "GO:MF" = -23, "GO:CC" = -22, "GO:BP" = -21,
@@ -74,6 +75,11 @@ DATASOURCES_CODES[["AGOTOOL"]] <- list(
   "INTERPRO" = -54, "PFAM" = -55, "UNIPROT" = -51,
   "DO" = -26, "BTO" = -25,
   "PUBMED" = -56
+)
+DATASOURCES_CODES[["STRING"]] <- list(
+  "GO:MF" = "Function", "GO:CC" = "Component", "GO:BP" = "Process",
+  "KEGG" = "KEGG", "REAC" = "RCTM", "WP" = "WikiPathways",
+  "INTERPRO" = "InterPro", "PFAM" = "Pfam", "UNIPROT" = "Keyword"
 )
 DATASOURCES_CODES[["WEBGESTALT"]] <- list(
   "GO:MF" = "geneontology_Molecular_Function_noRedundant",
@@ -171,19 +177,22 @@ METRICS[["WEBGESTALT"]] <- list(
   "Top 100" = "top"
 )
 METRICS[["ENRICHR"]] <- list("Adjusted P-value" = "adjusted_pvalue")
+METRICS[["STRING"]] <- list("False discovery rate", "P-value")
 DEFAULT_METRIC_TEXT <- "Default tool metrics"
 
 DEFAULT_METRICS_GENOME <- list(
   "AGOTOOL" = "False discovery rate",
   "GPROFILER" = "fdr",
   "WEBGESTALT" = "BH",
-  "ENRICHR" = "adjusted_pvalue"
+  "ENRICHR" = "adjusted_pvalue",
+  "STRING" = "False discovery rate"
 )
 
 DEFAULT_METRICS_USERBACKGROUND <- list(
   "AGOTOOL" = "P-value",
   "GPROFILER" = "bonferroni",
-  "WEBGESTALT" = "top"  
+  "WEBGESTALT" = "top",
+  "STRING" = "P-value"
 )
 
 ENRICHMENT_DF_COLNAMES <- c(

@@ -6,7 +6,7 @@ DEFAULT_VOLCANO_LOG2FC_THRESHOLD <- 1
 DEFAULT_VOLCANO_LOG2FC_STEP <- 0.001
 
 # Enrichment ####
-ENRICHMENT_TOOLS <- c("aGOtool", "gProfiler", "WebGestalt", "enrichR") # david
+ENRICHMENT_TOOLS <- c("aGOtool", "gProfiler", "WebGestalt", "enrichR", "STRING")
 TAB_NAMES <- list(
   "ALL" = "all",
   "GO:MF" = "gomf", "GO:CC" = "gocc", "GO:BP" = "gobp",
@@ -37,6 +37,7 @@ NAMESPACES[["SPECIAL"]] <- list()
 NAMESPACES[["SPECIAL"]][["amellifera"]] <- c("BEEBASE" = "BEEBASE")
 NAMESPACES[["SPECIAL"]][["dmelanogaster"]] <- c("FLYBASE_GENE_ID" = "FLYBASE_GENE_ID")
 NAMESPACES[["AGOTOOL"]] <- list("ENSEMBL Protein ID" = "ENSP")
+NAMESPACES[["STRING"]] <- list("ENSEMBL Protein ID" = "ENSP")
 UI_TERM_KEYWORD <- list(
   "functional" = "functions", "literature" = "articles"
 )

@@ -119,12 +119,15 @@ handleEnrichmentWithTool <- function() {
   if (existDataSources()) {
     session$sendCustomMessage("handler_hideSourceTabs", currentType_Tool)
     resetEnrichmentResults(currentEnrichmentType, currentEnrichmentTool)
+    # Convert input gene symbols to tool-specific format (e.g., STRING IDs, ENSP IDs, etc.)
     inputGenesConversionTable <- geneConvert(currentUserList)
     if (validInputGenesConversionTable(inputGenesConversionTable)) {
       if(length(currentBackgroundList)==0)
         backgroundGenesConversionTable <- NULL
       else
+        # Convert background genes using same method as input genes
         backgroundGenesConversionTable <- geneConvert(currentBackgroundList)
+      # Pass converted gene IDs to enrichment analysis (not original symbols)
       runEnrichmentAnalysis(inputGenesConversionTable$target, backgroundGenesConversionTable$target)
       if (validEnrichmentResult()) {
         showTab(inputId = "toolTabsPanel", target = currentEnrichmentTool)
@@ -155,16 +158,25 @@ existDataSources <- function() {
 }
 
 geneConvert <- function(geneList) {
+  # Convert gene symbols to tool-specific identifier format required by enrichment APIs
+  # Returns data.frame with columns: input (original), target (converted), name (description)
+
   currentNamespace <<- input[[paste0(currentEnrichmentType, "_enrichment_namespace")]]
   if (currentNamespace == DEFAULT_NAMESPACE_TEXT)
     currentNamespace <<- getDefaultTargetNamespace()
+
   if (currentNamespace != "USERINPUT") {
-    if (currentEnrichmentTool == "aGOtool")
-      inputGenesConversionTable <- stringPOSTConvertENSP(geneList,
-                                                         currentOrganism)
-    else
+    if (currentEnrichmentTool == "aGOtool" || currentEnrichmentTool == "STRING") {
+      # For aGOtool and STRING: Convert to STRING format via STRING's get_string_ids API
+      # Input: ["RPL23", "TPR"] -> Output: ["9606.ENSP00000420311", "9606.ENSP00000360532"]
+      inputGenesConversionTable <- stringPOSTConvertENSP(geneList, currentOrganism)
+    } else {
+      # For gProfiler, WebGestalt, enrichR: Use g:Profiler conversion to target namespace
+      # Examples: ENTREZGENE_ACC, ENSEMBL, etc. (depends on tool requirements)
       inputGenesConversionTable <- gProfilerConvert(geneList, currentNamespace)
+    }
   } else {
+    # USERINPUT: No conversion needed - pass genes through as-is
     inputGenesConversionTable <- data.frame(
       "input" = geneList,
       "target" = geneList,
@@ -179,6 +191,7 @@ getDefaultTargetNamespace <- function() {
   switch(
     currentEnrichmentTool,
     "aGOtool" = "ENSP",
+    "STRING" = "ENSP",
     "gProfiler" = "USERINPUT",
     "WebGestalt" = "ENTREZGENE_ACC",
     "enrichR" = {
@@ -237,6 +250,8 @@ runEnrichmentAnalysis <- function(userInputList, user_reference = NULL) {
     runWebgestalt(userInputList, user_reference)
   } else if (tool == "ENRICHR") {
     runEnrichr(userInputList)
+  } else if (tool == "STRING") {
+    runString(userInputList, currentOrganism, user_reference)
   }
 }
 

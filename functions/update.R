@@ -254,6 +254,8 @@ updateAvailableStringNamespaces <- function() {
 updateBackgroundMode <- function(choice, enrichmentType) {
   if (choice == "genome") {
     shinyjs::hide(paste0(enrichmentType, "_enrichment_background_container"))
+    # Genome background: All enrichment tools are available
+    # ENRICHMENT_TOOLS = ["aGOtool", "gProfiler", "WebGestalt", "enrichR", "STRING"]
     # this is only for enrichmentType = 'functional',
     # since 'literature' only has aGOtool anyway
     updatePickerInput(session, "functional_enrichment_tool",
@@ -261,10 +263,13 @@ updateBackgroundMode <- function(choice, enrichmentType) {
   }
   else {
     shinyjs::show(paste0(enrichmentType, "_enrichment_background_container"))
+    # Custom background: Only tools that support user-provided background lists
+    # enrichR is excluded because runEnrichr() does not accept user_reference parameter
+    # Available tools: aGOtool, gProfiler, WebGestalt, STRING (all have user_reference parameter)
     # this is only for enrichmentType = 'functional',
     # since 'literature' only has aGOtool anyway
     updatePickerInput(session, "functional_enrichment_tool",
-                      choices = c("aGOtool", "gProfiler", "WebGestalt"), selected = DEFAULT_TOOL)
+                      choices = c("aGOtool", "gProfiler", "WebGestalt", "STRING"), selected = DEFAULT_TOOL)
   }
   updateAvailableSignificanceMetrics()
 }

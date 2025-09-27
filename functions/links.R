@@ -85,30 +85,71 @@ attachLinks <- function(sourceId, url, stopChar = "$", gSub = NULL) {
 }
 
 attachKEGGLinks <- function() {
-  tempEnrichmentDF <- 
+  # KEGG organism codes and supported organisms reference:
+  # https://www.kegg.jp/kegg/tables/br08606.html
+  # This table contains all KEGG-supported organisms and their corresponding
+  # 3-4 letter organism codes (kegg_name) used in pathway URLs
+
+  tempEnrichmentDF <-
     enrichmentResults[[currentType_Tool]][grepl(
       "^KEGG$", enrichmentResults[[currentType_Tool]]$Source
     ), ][, c("Source", "Positive Hits", "Term_ID")]
-  
+
   if (nrow(tempEnrichmentDF) > 0) {
     shortName <- ORGANISMS[ORGANISMS$taxid == currentOrganism, ]$short_name
-    conversionTable <- createEntrezAccConversionTable(tempEnrichmentDF, shortName)
-    if (!is.null(conversionTable)) {
-      tempEnrichmentDFWithEntrezAcc <-
-        convertPositiveHitsToEntrezAcc(tempEnrichmentDF, conversionTable)
-      
-      linkOrganism <- ORGANISMS[ORGANISMS$taxid == currentOrganism, ]$kegg_name
-      linksVector <- tempEnrichmentDFWithEntrezAcc$Term_ID
+    keggName <- ORGANISMS[ORGANISMS$taxid == currentOrganism, ]$kegg_name
+
+    if (currentEnrichmentTool == "STRING") {
+      # STRING already provides organism-specific KEGG IDs (e.g., "eco00260", "hsa05224")
+      # No kegg_name needed, STRING already provides the organism kegg name (e.g., "hsa") in the Term_ID
+
+      if (!is.na(shortName)) {
+        # Add gene highlighting using g:Profiler conversion
+        conversionTable <- createEntrezAccConversionTable(tempEnrichmentDF, shortName)
+        if (!is.null(conversionTable)) {
+          tempEnrichmentDFWithEntrezAcc <-
+            convertPositiveHitsToEntrezAcc(tempEnrichmentDF, conversionTable)
+          linksVector <- tempEnrichmentDFWithEntrezAcc$Term_ID
+          geneHighlights <- gsub(",", "+", tempEnrichmentDFWithEntrezAcc$`Positive Hits EntrezAcc`)
+          urlSuffix <- paste0("+", geneHighlights)
+        } else {
+          linksVector <- tempEnrichmentDF$Term_ID
+          urlSuffix <- ""  # No gene highlighting if conversion fails
+        }
+      } else {
+        # No g:Profiler support - pathway links only
+        linksVector <- tempEnrichmentDF$Term_ID
+        urlSuffix <- ""  # No gene highlighting
+      }
+
       enrichmentResults[[currentType_Tool]][grepl(
         "^KEGG$", enrichmentResults[[currentType_Tool]]$Source), ]$Term_ID <<-
         paste0(
           "<a href='https://www.kegg.jp/kegg-bin/show_pathway?",
-          gsub("KEGG:|map", linkOrganism, linksVector), 
-          "+", gsub(",", "+", tempEnrichmentDFWithEntrezAcc$`Positive Hits EntrezAcc`),
-          "' target='_blank'>",
-          linksVector,
-          "</a>"
+          linksVector, urlSuffix,
+          "' target='_blank'>", linksVector, "</a>"
         )
+
+    } else {
+      # Traditional tools (aGOtool, gProfiler, etc.) - need both short_name AND kegg_name
+      if (!is.na(shortName) && !is.na(keggName)) {
+        conversionTable <- createEntrezAccConversionTable(tempEnrichmentDF, shortName)
+        if (!is.null(conversionTable)) {
+          tempEnrichmentDFWithEntrezAcc <-
+            convertPositiveHitsToEntrezAcc(tempEnrichmentDF, conversionTable)
+
+          linksVector <- tempEnrichmentDFWithEntrezAcc$Term_ID
+          enrichmentResults[[currentType_Tool]][grepl(
+            "^KEGG$", enrichmentResults[[currentType_Tool]]$Source), ]$Term_ID <<-
+            paste0(
+              "<a href='https://www.kegg.jp/kegg-bin/show_pathway?",
+              gsub("KEGG:|map", keggName, linksVector),
+              "+", gsub(",", "+", tempEnrichmentDFWithEntrezAcc$`Positive Hits EntrezAcc`),
+              "' target='_blank'>", linksVector, "</a>"
+            )
+        }
+      }
+      # If organism lacks short_name OR kegg_name, no KEGG links are created
     }
   }
 }
