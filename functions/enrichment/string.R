@@ -132,6 +132,9 @@ alterStringSourceKeywords <- function(stringResult) {
   stringResult$Source <- gsub("^Pfam$", "PFAM", stringResult$Source)
   stringResult$Source <- gsub("^Keyword$", "UNIPROT", stringResult$Source)
   stringResult$Source <- gsub("^PMID$", "PUBMED", stringResult$Source)
+  stringResult$Source <- gsub("^DISEASES$", "DO", stringResult$Source)
+  stringResult$Source <- gsub("^TISSUES$", "BTO", stringResult$Source)
+  stringResult$Source <- gsub("^HPO$", "HP", stringResult$Source)
   return(stringResult)
 }
 

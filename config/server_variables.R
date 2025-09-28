@@ -67,7 +67,8 @@ DATASOURCES <- list() # gProfiler here, the rest through an init.R function
 DATASOURCES[["GPROFILER"]] <- c("GO:MF", "GO:CC", "GO:BP",
                               "KEGG", "REAC", "WP",
                               "TF", "MIRNA", "CORUM", "HPA", "HP")
-DATASOURCES[["STRING"]] <- c("GO:MF", "GO:CC", "GO:BP", "KEGG", "REAC", "WP", "INTERPRO", "PFAM", "UNIPROT")
+DATASOURCES[["STRING"]] <- c("GO:MF", "GO:CC", "GO:BP", "KEGG", "REAC", "WP",
+                            "INTERPRO", "PFAM", "UNIPROT", "DO", "BTO", "HP")
 DATASOURCES_CODES <- list()
 DATASOURCES_CODES[["AGOTOOL"]] <- list(
   "GO:MF" = -23, "GO:CC" = -22, "GO:BP" = -21,
@@ -79,7 +80,8 @@ DATASOURCES_CODES[["AGOTOOL"]] <- list(
 DATASOURCES_CODES[["STRING"]] <- list(
   "GO:MF" = "Function", "GO:CC" = "Component", "GO:BP" = "Process",
   "KEGG" = "KEGG", "REAC" = "RCTM", "WP" = "WikiPathways",
-  "INTERPRO" = "InterPro", "PFAM" = "Pfam", "UNIPROT" = "Keyword"
+  "INTERPRO" = "InterPro", "PFAM" = "Pfam", "UNIPROT" = "Keyword",
+  "DO" = "DISEASES", "BTO" = "TISSUES", "HP" = "HPO"
 )
 DATASOURCES_CODES[["WEBGESTALT"]] <- list(
   "GO:MF" = "geneontology_Molecular_Function_noRedundant",
