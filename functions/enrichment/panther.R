@@ -149,31 +149,20 @@ parsePantherResult <- function(responseList) {
 
         # Apply user's significance filtering (same as other tools)
         threshold <- as.numeric(input$functional_enrichment_threshold)
-        cat("DEBUG: User threshold:", threshold, "\n")
-        cat("DEBUG: currentSignificanceMetric:", currentSignificanceMetric, "\n")
-        cat("DEBUG: significanceColumnName:", significanceColumnName, "\n")
 
         # Filter based on user's selected significance metric
         if (currentSignificanceMetric == "False discovery rate") {
           significant_mask <- results[[significanceColumnName]] < threshold
-          cat("DEBUG: Using FDR column, sample values:", head(results[[significanceColumnName]], 5), "\n")
         } else {
           # P-value or Bonferroni - use pValue column
           significant_mask <- results$pValue < threshold
-          cat("DEBUG: Using pValue column, sample values:", head(results$pValue, 5), "\n")
         }
-
-        cat("DEBUG: Significant results before filtering:", nrow(results), "\n")
-        cat("DEBUG: Number passing significance filter:", sum(significant_mask), "\n")
 
         results <- results[significant_mask, ]
 
         if (nrow(results) == 0) {
-          cat("DEBUG: No significant results for dataset", dataset, "\n")
           next  # Skip this dataset if no significant results
         }
-
-        cat("DEBUG: Significant results after filtering:", nrow(results), "\n")
 
         # Select columns we need and rename to FLAME format
         pantherSelected <- data.frame(

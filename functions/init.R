@@ -76,7 +76,7 @@ initializeEnrichmentResults <- function() {
     enrichmentResults <<- c(enrichmentResults, newItem)
   }
   newItem <- list(data.frame())
-  names(newItem) <- paste("literature", "aGoTool", sep = "_")
+  names(newItem) <- paste("literature", "STRING", sep = "_")
   enrichmentResults <<- c(enrichmentResults, newItem)
 }
 
@@ -90,7 +90,7 @@ initializeArenaEdgelist <- function() {
   }
   for (networkId in NETWORK_IDS) {
     newItem <- list(data.frame())
-    names(newItem) <- paste("literature", "aGoTool", networkId, sep = "_")
+    names(newItem) <- paste("literature", "STRING", networkId, sep = "_")
     arenaEdgelist <<- c(arenaEdgelist, newItem)
   }
 }
@@ -104,7 +104,7 @@ hideConversionBoxes <- function() {
     shinyjs::hide(paste("functional", enrichmentTool,
                         "conversionBoxes", sep = "_"))
   })
-  shinyjs::hide("literature_aGOtool_conversionBoxes")
+  shinyjs::hide("literature_STRING_conversionBoxes")
 }
 
 hideVisNetworks <- function() {
@@ -114,7 +114,7 @@ hideVisNetworks <- function() {
     })
   })
   lapply(NETWORK_IDS, function(networkId) {
-    shinyjs::hide(paste("literature", "aGoTool", networkId, sep = "_"))
+    shinyjs::hide(paste("literature", "STRING", networkId, sep = "_"))
   })
 }
 

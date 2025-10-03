@@ -9,7 +9,7 @@ handleEnrichment <- function(enrichmentType) {
           tools <- switch(
             currentEnrichmentType,
             "functional" = input$functional_enrichment_tool,
-            "literature" = "aGOtool"
+            "literature" = "STRING"
           )
 
           # If running a single tool, clear results from other tools to prevent accumulation
@@ -431,11 +431,6 @@ printUnconvertedGenes <- function(convertedInputs, convertedOutputs = NULL) {
 
 printConversionTable <- function(inputConversionTable, backgroundConversionTable = NULL) {
   #first, for the input list
-  cat("DEBUG PRINT CONVERSION: Received table with", nrow(inputConversionTable), "rows\n")
-  if (nrow(inputConversionTable) > 0) {
-    cat("DEBUG PRINT CONVERSION: First target in received table:", inputConversionTable$target[1], "\n")
-  }
-
   shinyOutputId <- paste(currentType_Tool, "conversionTable_input", sep = "_")
   fileName <- paste(currentType_Tool, "conversion_table", sep = "_")
   colnames(inputConversionTable) <- c("Input", "Target", "Name")
@@ -547,7 +542,7 @@ printResultTable <- function(shinyOutputId, tabPosition, datasource) {
       enrichmentResults[[currentType_Tool]][grepl(
         paste0("^", datasource, "$"),
         enrichmentResults[[currentType_Tool]]$Source), ]
-  
+
   if (nrow(transformedResultPartial) > 0) {
     transformedResultPartial$`Positive Hits` <-
       gsub(",", ", ", transformedResultPartial$`Positive Hits`)

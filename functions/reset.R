@@ -46,7 +46,7 @@ resetTables <- function(type, tool) {
       })
     },
     "literature" = {
-      output$literature_aGoTool_table_pubmed <- renderDataTable(c())
+      output$literature_STRING_table_pubmed <- renderDataTable(c())
     }
   )
 }

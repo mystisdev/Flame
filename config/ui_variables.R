@@ -1,7 +1,7 @@
 # Enrichment ####
-DEFAULT_TOOL <- "aGOtool"
+DEFAULT_TOOL <- "STRING"
 DEFAULT_TOOL_UPPER <- toupper(DEFAULT_TOOL)
-AGOTOOL_DATASOURCES_PRINT_LITERATURE <- list("PubMed Publications" = "PUBMED")
+STRING_DATASOURCES_PRINT_LITERATURE <- list("PubMed Publications" = "PUBMED")
 
 # Plots ####
 PLOT_TABNAMES <- c("Network", "Heatmap", "Barchart", "Scatter Plot", "Manhattan")

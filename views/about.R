@@ -17,7 +17,7 @@ aboutPage <- fluidRow(
     
       <ul>
           <li> <a href='https://biit.cs.ut.ee/gprofiler/gost' target='_blank'>gProfiler: Functional Enrichment Analysis</a>
-          <li> <a href='https://agotool.org/' target='_blank'>aGOtool: Protein-centric enrichment analysis and literature search with abundance-bias correction</a>
+          <li> <a href='https://agotool.org/' target='_blank'>aGOtool: Protein-centric enrichment analysis and literature search with abundance-bias correction</a> (deprecated - replaced by STRING for literature enrichment)
           <li> <a href='https://www.webgestalt.org//' target='_blank'>WebGestalt: WEB-based GEne SeT AnaLysis Toolkit, for functional encrichment analysis</a>
           <li> <a href='https://maayanlab.cloud/Enrichr/' target='_blank'>Enrichr: a comprehensive gene set enrichment analysis web server</a>
           <li><a href='https://bib.fleming.gr:8084/app/darling' target='_blank'>Darling: A Web Application for Detecting Disease-Related Biomedical Entity Associations with Literature Mining</a>

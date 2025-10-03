@@ -67,8 +67,10 @@ DATASOURCES <- list() # gProfiler here, the rest through an init.R function
 DATASOURCES[["GPROFILER"]] <- c("GO:MF", "GO:CC", "GO:BP",
                               "KEGG", "REAC", "WP",
                               "TF", "MIRNA", "CORUM", "HPA", "HP")
-DATASOURCES[["STRING"]] <- c("GO:MF", "GO:CC", "GO:BP", "KEGG", "REAC", "WP",
-                            "INTERPRO", "PFAM", "UNIPROT", "DO", "BTO", "HP")
+DATASOURCES[["STRING"]] <- c("GO:MF", "GO:CC", "GO:BP",
+                            "KEGG", "REAC", "WP",
+                            "INTERPRO", "PFAM", "UNIPROT",
+                            "DO", "BTO", "HP", "PUBMED")
 DATASOURCES[["PANTHER"]] <- c("GO:MF", "GO:CC", "GO:BP", "REAC")
 DATASOURCES_CODES <- list()
 DATASOURCES_CODES[["AGOTOOL"]] <- list(
@@ -82,7 +84,8 @@ DATASOURCES_CODES[["STRING"]] <- list(
   "GO:MF" = "Function", "GO:CC" = "Component", "GO:BP" = "Process",
   "KEGG" = "KEGG", "REAC" = "RCTM", "WP" = "WikiPathways",
   "INTERPRO" = "InterPro", "PFAM" = "Pfam", "UNIPROT" = "Keyword",
-  "DO" = "DISEASES", "BTO" = "TISSUES", "HP" = "HPO"
+  "DO" = "DISEASES", "BTO" = "TISSUES", "HP" = "HPO",
+  "PUBMED" = "PMID"
 )
 DATASOURCES_CODES[["PANTHER"]] <- list(
   "GO:MF" = "GO:0003674", "GO:CC" = "GO:0005575", "GO:BP" = "GO:0008150",

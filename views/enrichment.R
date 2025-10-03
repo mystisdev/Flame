@@ -22,10 +22,10 @@ generateEnrichmentControlPanel <- function() {
       ENRICHMENT_TOOLS
     },
     "literature" = {
-      datasourceChoices <- AGOTOOL_DATASOURCES_PRINT_LITERATURE
-      datasourceSelected <- AGOTOOL_DATASOURCES_PRINT_LITERATURE
-      metrics <- "P-value"
-      "aGOtool"
+      datasourceChoices <- STRING_DATASOURCES_PRINT_LITERATURE
+      datasourceSelected <- STRING_DATASOURCES_PRINT_LITERATURE
+      metrics <- list("False discovery rate", "P-value")
+      "STRING"
     }
   )
   
@@ -90,7 +90,7 @@ generateEnrichmentControlPanel <- function() {
           selectInput(
             inputId = paste0(currentEnrichmentType, "_enrichment_namespace"),
             label = "6. Select namespace conversion:",
-            choices = NAMESPACES[["AGOTOOL"]],
+            choices = NAMESPACES[["STRING"]],
             width = "80%"
           ) %>% 
             bsplus::shinyInput_label_embed(
@@ -219,10 +219,12 @@ generateResultsPanel <- function() {
       )
     },
     "literature" = {
+      # For literature enrichment, the tool is always STRING
+      literatureTypeTool <- paste(currentEnrichmentType, "STRING", sep = "_")
       tabsetPanel(
-        id = paste(currentType_Tool, "sources_panel", sep = "_"),
+        id = paste(literatureTypeTool, "sources_panel", sep = "_"),
         tabPanel("PUBMED", tags$br(),
-                 DT::dataTableOutput(paste(currentType_Tool, "table_pubmed", sep = "_")))
+                 DT::dataTableOutput(paste(literatureTypeTool, "table_pubmed", sep = "_")))
       )
     }
   )

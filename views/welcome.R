@@ -16,7 +16,7 @@ welcomePage <- fluidRow(
           <li><b>Combine lists</b> by calculating their unions and intersections with the help of UpSet plots<br />
           <li>Perform <b>functional enrichment</b> analysis on any of the combined lists for more than 14,000 organisms, using four tools (aGOtool, gProfiler, WebGestalt, enrichR)<br />
           <li><b>Combine</b> and <b>compare</b> enrichment results from multiple runs<br />
-          <li>Perform <b>literature enrichment</b> analysis on any of the combined lists, using aGOtool<br />
+          <li>Perform <b>literature enrichment</b> analysis on any of the combined lists, using STRING<br />
           <li>Generate <b>protein-protein interaction</b> networks via STRING<br />
           <li><b>Visualize</b> results with the use of networks, heatmaps, bar charts, scatter plots and searchable tables<br />
           <li>Perform <b>network analysis</b> at the gene-function, function-function and gene-gene association levels<br />
