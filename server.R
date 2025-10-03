@@ -27,6 +27,7 @@ function(input, output, session) {
   source("functions/enrichment/webgestalt.R", local = T)
   source("functions/enrichment/enrichr.R", local = T)
   source("functions/enrichment/string.R", local = T)
+  source("functions/enrichment/panther.R", local = T)
   source("functions/enrichment/combination.R", local = T)
   source("functions/links.R", local = T)
   

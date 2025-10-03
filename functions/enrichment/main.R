@@ -170,6 +170,10 @@ geneConvert <- function(geneList) {
       # For aGOtool and STRING: Convert to STRING format via STRING's get_string_ids API
       # Input: ["RPL23", "TPR"] -> Output: ["9606.ENSP00000420311", "9606.ENSP00000360532"]
       inputGenesConversionTable <- stringPOSTConvertENSP(geneList, currentOrganism)
+    } else if (currentEnrichmentTool == "PANTHER") {
+      # For PANTHER: Use PANTHER's geneinfo API for gene mapping
+      # Input: ["FSD1L", "LTA4H"] -> Output: ["HUMAN|HGNC=13753|UniProtKB=Q9BXM9", "HUMAN|HGNC=6710|UniProtKB=P09960"]
+      inputGenesConversionTable <- pantherPOSTConvert(geneList, currentOrganism)
     } else {
       # For gProfiler, WebGestalt, enrichR: Use g:Profiler conversion to target namespace
       # Examples: ENTREZGENE_ACC, ENSEMBL, etc. (depends on tool requirements)
@@ -183,6 +187,7 @@ geneConvert <- function(geneList) {
       "name" = geneList
     )
   }
+
   return(inputGenesConversionTable)
 }
 
@@ -194,6 +199,7 @@ getDefaultTargetNamespace <- function() {
     "STRING" = "ENSP",
     "gProfiler" = "USERINPUT",
     "WebGestalt" = "ENTREZGENE_ACC",
+    "PANTHER" = "PANTHER_ACC",
     "enrichR" = {
       if (shortName == "scerevisiae" || shortName == "dmelanogaster")
         "USERINPUT"
@@ -218,6 +224,42 @@ stringPOSTConvertENSP <- function(userList, organism) {
     colnames(inputGenesConversionTable) <- c("input", "target", "name")
   } else
     inputGenesConversionTable <- NULL
+  return(inputGenesConversionTable)
+}
+
+pantherPOSTConvert <- function(userList, organism) {
+  url <- "https://pantherdb.org/services/oai/pantherdb/geneinfo"
+  params <- list(
+    "geneInputList" = paste0(userList, collapse = ","),
+    "organism" = organism
+  )
+  request <- httr::POST(url, body = params, encode = "form")
+  if (isPOSTResponseValid(request)) {
+    pantherResponse <- jsonlite::fromJSON(rawToChar(httr::content(request, "raw")))
+
+    # Extract mapped genes from PANTHER response
+    if ("search" %in% names(pantherResponse) && "mapped_genes" %in% names(pantherResponse$search)) {
+      mappedGenes <- pantherResponse$search$mapped_genes$gene
+      if (length(mappedGenes) > 0) {
+        inputGenesConversionTable <- data.frame(
+          input = mappedGenes$mapped_id_list,
+          target = mappedGenes$accession,  # PANTHER accession like "HUMAN|HGNC=6710|UniProtKB=P09960"
+          name = mappedGenes$sf_name,
+          stringsAsFactors = FALSE
+        )
+      } else {
+        inputGenesConversionTable <- data.frame(
+          input = character(0), target = character(0), name = character(0)
+        )
+      }
+    } else {
+      inputGenesConversionTable <- data.frame(
+        input = character(0), target = character(0), name = character(0)
+      )
+    }
+  } else {
+    inputGenesConversionTable <- NULL
+  }
   return(inputGenesConversionTable)
 }
 
@@ -252,6 +294,8 @@ runEnrichmentAnalysis <- function(userInputList, user_reference = NULL) {
     runEnrichr(userInputList)
   } else if (tool == "STRING") {
     runString(userInputList, currentOrganism, user_reference)
+  } else if (tool == "PANTHER") {
+    runPanther(userInputList, currentOrganism, user_reference)
   }
 }
 
@@ -264,7 +308,7 @@ validEnrichmentResult <- function() {
   else {
     renderWarning(paste0(
       stringr::str_to_title(currentEnrichmentType), " enrichment with ",
-      currentEnrichmentTool, " could not return any valid results.")) 
+      currentEnrichmentTool, " could not return any valid results."))
     hideTab(inputId = "toolTabsPanel", target = currentEnrichmentTool)
   }
   return(valid)
@@ -289,6 +333,14 @@ executeNamespaceRollback <- function(inputGenesConversionTable) {
 }
 
 rollBackConvertedNames <- function(enrichmentOutput, inputGenesConversionTable) {
+  # Check if all Positive Hits are empty (tools like PANTHER don't provide gene lists)
+  all_empty <- all(enrichmentOutput$`Positive Hits` == "" | is.na(enrichmentOutput$`Positive Hits`))
+
+  if (all_empty) {
+    # For tools without gene lists, just return the original data unchanged
+    return(enrichmentOutput)
+  }
+
   enrichmentOutput <- tidyr::separate_rows(enrichmentOutput,
                                            `Positive Hits`, sep = ",")
   enrichmentOutput <- merge(enrichmentOutput, inputGenesConversionTable,
@@ -379,6 +431,11 @@ printUnconvertedGenes <- function(convertedInputs, convertedOutputs = NULL) {
 
 printConversionTable <- function(inputConversionTable, backgroundConversionTable = NULL) {
   #first, for the input list
+  cat("DEBUG PRINT CONVERSION: Received table with", nrow(inputConversionTable), "rows\n")
+  if (nrow(inputConversionTable) > 0) {
+    cat("DEBUG PRINT CONVERSION: First target in received table:", inputConversionTable$target[1], "\n")
+  }
+
   shinyOutputId <- paste(currentType_Tool, "conversionTable_input", sep = "_")
   fileName <- paste(currentType_Tool, "conversion_table", sep = "_")
   colnames(inputConversionTable) <- c("Input", "Target", "Name")
@@ -406,6 +463,20 @@ findAndPrintNoHitGenes <- function(convertedInputs) {
 }
 
 findNoHitGenes <- function(convertedInputs) {
+  # PANTHER doesn't provide individual gene lists in Positive_Hits column
+  # If PANTHER returned any enrichment results, assume all converted genes were "found"
+  if (currentEnrichmentTool == "PANTHER") {
+    enrichmentResult <- getGlobalEnrichmentResult(currentEnrichmentType, currentEnrichmentTool)
+    if (nrow(enrichmentResult) > 0) {
+      # PANTHER returned results, so no genes are considered "not found"
+      return(character(0))
+    } else {
+      # PANTHER returned no results, so all input genes are "not found"
+      return(convertedInputs)
+    }
+  }
+
+  # For other tools: use standard logic with Positive_Hits column
   enrichmentResult <- getGlobalEnrichmentResult(currentEnrichmentType, currentEnrichmentTool)
   allHitGenes <- paste(enrichmentResult$`Positive Hits`, collapse = ",")
   allHitGenes <- strsplit(allHitGenes, ",")[[1]]

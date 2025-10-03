@@ -69,6 +69,7 @@ DATASOURCES[["GPROFILER"]] <- c("GO:MF", "GO:CC", "GO:BP",
                               "TF", "MIRNA", "CORUM", "HPA", "HP")
 DATASOURCES[["STRING"]] <- c("GO:MF", "GO:CC", "GO:BP", "KEGG", "REAC", "WP",
                             "INTERPRO", "PFAM", "UNIPROT", "DO", "BTO", "HP")
+DATASOURCES[["PANTHER"]] <- c("GO:MF", "GO:CC", "GO:BP", "REAC")
 DATASOURCES_CODES <- list()
 DATASOURCES_CODES[["AGOTOOL"]] <- list(
   "GO:MF" = -23, "GO:CC" = -22, "GO:BP" = -21,
@@ -82,6 +83,10 @@ DATASOURCES_CODES[["STRING"]] <- list(
   "KEGG" = "KEGG", "REAC" = "RCTM", "WP" = "WikiPathways",
   "INTERPRO" = "InterPro", "PFAM" = "Pfam", "UNIPROT" = "Keyword",
   "DO" = "DISEASES", "BTO" = "TISSUES", "HP" = "HPO"
+)
+DATASOURCES_CODES[["PANTHER"]] <- list(
+  "GO:MF" = "GO:0003674", "GO:CC" = "GO:0005575", "GO:BP" = "GO:0008150",
+  "REAC" = "ANNOT_TYPE_ID_REACTOME_PATHWAY"
 )
 DATASOURCES_CODES[["WEBGESTALT"]] <- list(
   "GO:MF" = "geneontology_Molecular_Function_noRedundant",
@@ -180,6 +185,7 @@ METRICS[["WEBGESTALT"]] <- list(
 )
 METRICS[["ENRICHR"]] <- list("Adjusted P-value" = "adjusted_pvalue")
 METRICS[["STRING"]] <- list("False discovery rate", "P-value")
+METRICS[["PANTHER"]] <- list("False discovery rate", "P-value", "Bonferroni")
 DEFAULT_METRIC_TEXT <- "Default tool metrics"
 
 DEFAULT_METRICS_GENOME <- list(
@@ -187,14 +193,16 @@ DEFAULT_METRICS_GENOME <- list(
   "GPROFILER" = "fdr",
   "WEBGESTALT" = "BH",
   "ENRICHR" = "adjusted_pvalue",
-  "STRING" = "False discovery rate"
+  "STRING" = "False discovery rate",
+  "PANTHER" = "False discovery rate"
 )
 
 DEFAULT_METRICS_USERBACKGROUND <- list(
   "AGOTOOL" = "P-value",
   "GPROFILER" = "bonferroni",
   "WEBGESTALT" = "top",
-  "STRING" = "P-value"
+  "STRING" = "P-value",
+  "PANTHER" = "P-value"
 )
 
 ENRICHMENT_DF_COLNAMES <- c(

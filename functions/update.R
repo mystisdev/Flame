@@ -132,6 +132,12 @@ getNamespaceChoices <- function(toolCapitalNames) {
     shinyjs::enable("functional_enrichment_namespace")
     prefix <- getNamespacePrefix(toolCapitalNames)
     choices <- NAMESPACES[[paste0(prefix, toolCapitalNames)]]
+
+    # If tool doesn't have specific namespaces, use CORE namespaces
+    if (is.null(choices)) {
+      choices <- NAMESPACES[["CORE"]]
+    }
+
     organismShortName <-
       ORGANISMS[ORGANISMS$print_name == input$functional_enrichment_organism, ]$short_name
     if (isSpecialOrganism(organismShortName) && toolCapitalNames == "GPROFILER")
@@ -265,11 +271,11 @@ updateBackgroundMode <- function(choice, enrichmentType) {
     shinyjs::show(paste0(enrichmentType, "_enrichment_background_container"))
     # Custom background: Only tools that support user-provided background lists
     # enrichR is excluded because runEnrichr() does not accept user_reference parameter
-    # Available tools: aGOtool, gProfiler, WebGestalt, STRING (all have user_reference parameter)
+    # Available tools: aGOtool, gProfiler, WebGestalt, STRING, PANTHER (all have user_reference parameter)
     # this is only for enrichmentType = 'functional',
     # since 'literature' only has aGOtool anyway
     updatePickerInput(session, "functional_enrichment_tool",
-                      choices = c("aGOtool", "gProfiler", "WebGestalt", "STRING"), selected = DEFAULT_TOOL)
+                      choices = c("aGOtool", "gProfiler", "WebGestalt", "STRING", "PANTHER"), selected = DEFAULT_TOOL)
   }
   updateAvailableSignificanceMetrics()
 }
