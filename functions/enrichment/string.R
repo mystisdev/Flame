@@ -163,8 +163,7 @@ mapStringTermIds <- function(stringResult) {
   # Fix Reactome Pathway Term IDs
   # Problem: STRING returns "HSA-1643685" but FLAME's attachLinks("REAC", ...)
   # function expects "R-HSA-1643685" format for Reactome links
-  # This matches the format that aGOtool produces (adds R- prefix) and
-  # gProfiler produces (removes REAC: prefix from REAC:R-HSA-1643685)
+  # This matches the format that gProfiler produces (removes REAC: prefix from REAC:R-HSA-1643685)
   # Solution: Add "R-" prefix to STRING's HSA-formatted IDs
   # Examples: "HSA-1643685" -> "R-HSA-1643685"
   if (any(stringResult$Source == "REAC")) {

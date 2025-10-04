@@ -166,8 +166,8 @@ geneConvert <- function(geneList) {
     currentNamespace <<- getDefaultTargetNamespace()
 
   if (currentNamespace != "USERINPUT") {
-    if (currentEnrichmentTool == "aGOtool" || currentEnrichmentTool == "STRING") {
-      # For aGOtool and STRING: Convert to STRING format via STRING's get_string_ids API
+    if (currentEnrichmentTool == "STRING") {
+      # For STRING: Convert to STRING format via STRING's get_string_ids API
       # Input: ["RPL23", "TPR"] -> Output: ["9606.ENSP00000420311", "9606.ENSP00000360532"]
       inputGenesConversionTable <- stringPOSTConvertENSP(geneList, currentOrganism)
     } else if (currentEnrichmentTool == "PANTHER") {
@@ -195,7 +195,6 @@ getDefaultTargetNamespace <- function() {
   shortName <- ORGANISMS[ORGANISMS$taxid == currentOrganism, ]$short_name
   switch(
     currentEnrichmentTool,
-    "aGOtool" = "ENSP",
     "STRING" = "ENSP",
     "gProfiler" = "USERINPUT",
     "WebGestalt" = "ENTREZGENE_ACC",
@@ -284,9 +283,7 @@ validInputGenesConversionTable <- function(inputGenesConversionTable) {
 
 runEnrichmentAnalysis <- function(userInputList, user_reference = NULL) {
   tool <- toupper(currentEnrichmentTool)
-  if (tool == "AGOTOOL") {
-    runAGoTool(userInputList, currentOrganism, user_reference)
-  } else if (tool == "GPROFILER") {
+  if (tool == "GPROFILER") {
     runGprofiler(userInputList, user_reference)
   } else if (tool == "WEBGESTALT") {
     runWebgestalt(userInputList, user_reference)

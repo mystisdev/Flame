@@ -386,14 +386,15 @@ generateHelpFunctionalEnrichmentControlPanel <- function() {
       <li><b>Select</b> if the enrichment analysis is performed against a <b> backround list </b> 
       (submitted by the user) or <b> the whole organism. </b> </li>
       
-      <li><b>Select enrichment tool:</b> </li> 
+      <li><b>Select enrichment tool:</b> </li>
         <ul>
-          <li><b> aGotool</b></li>
           <li><b> gProfiler</b></li>
           <li><b> WebGestalt</b></li>
           <li><b> enrichR</b></li>
+          <li><b> STRING</b></li>
+          <li><b> PANTHER</b></li>
         </ul>
-        You can either select a single tool (default selection) or a combination (up to four).
+        You can either select a single tool (default selection) or a combination (up to five).
         
         <li><b>Select datasources:</b> </li> 
         <ul>
@@ -407,24 +408,26 @@ generateHelpFunctionalEnrichmentControlPanel <- function() {
           <li> Regulatory motifs: TRANSFAC, miRTarBas</li>
         </ul>
       
-      <li><b>Select namespace conversion:</b> 
-            For each enrichment tool, you can select the gene ID type. 
+      <li><b>Select namespace conversion:</b>
+            For each enrichment tool, you can select the gene ID type.
             <ul>
-            <li> aGotool: Ensembl IDs </li>
             <li> gProfiler: Ensembl, Entrez, Uniprot, RefSeq, EMBL, ChEMBL, WikiGene, User Input (default selection) </li>
             <li> WebGestalt: Entrez gene accession identifiers (default selection), User Input </li>
             <li> enrichR: Entrez gene names (default selection), User Input </li>
+            <li> STRING: Ensembl Protein ID </li>
+            <li> PANTHER: PANTHER Accession </li>
             </ul>
             When more than one tool is selected, the default namespaces are used.
         
-     <li><b>Select significance metrics:</b>  
+     <li><b>Select significance metrics:</b>
         Statistical significance is a measure of reliability in the result of an analysis.
         You can select the statistical metric for each enrichment tool: </li>
         <ul>
-        <li> aGotool: p-value, False DIscovery Rate (FDR) </li>
         <li> gProfiler: g:SCS (adjusted p-value), FDR, Bonferroni </li>
         <li> WebGestalt: Bonferroni & five FDR types (BH, BY, Holm, Hochberg, Hommel)</li>
         <li> enrichR: Adjusted p-value </li>
+        <li> STRING: p-value, False Discovery Rate (FDR) </li>
+        <li> PANTHER: p-value, False Discovery Rate (FDR), Bonferroni </li>
         </ul>
         
     <li><b> Select significance threshold: </b></li>
@@ -575,7 +578,7 @@ generateHelpEncrichmentResults <- function() {
       The <b>combination tab</b> in the enrichment analysis results panel now offers 
       the option to create and visualize <b>Function vs Gene interaction networks </b> (“Combo Network” tab) for 
       the combined results, in a similar manner to the networks created for each individual tool. 
-      <b>(1)</b>Users can select which tools (aGOtool, g:Profiler, WebGestalt or EnrichR) to include in the analysis,
+      <b>(1)</b>Users can select which tools (gProfiler, WebGestalt, enrichR, STRING, or PANTHER) to include in the analysis,
       as well as <b>(2)</b> the minimun threshold and <b>(3)</b> the layout algorythm. Clicking on <b>(4)</b> "Visualize Network" tab,
       the network with the selected properties will be created.
       Furthermore, users can also view the properties of each gene-function connection interactively, 
@@ -640,74 +643,6 @@ generateHelpLiteratureEncrichment <- function() {
   ')
 }
 
-generateHelpaGotoolAnalysisTabPanel <- function(){
-  tabPanel(h5("aGotool Analysis"),
-           tags$br(),
-           fluidRow(
-             column(12,box( title = "aGotool Analysis Parameters", collapsible = T, collapsed = F,
-                            solidHeader = T, status = "primary", width = NULL, generateHelpaGotoolInput())),
-             column(12,box(title = "aGotool Analysis Results", collapsible = T, collapsed = T,
-                           solidHeader = T, status = "primary",width = NULL,generateHelpaGotoolOutput()))
-           )
-  )
-}
-
-generateHelpaGotoolInput <- function(){
-  HTML('
-                               <p>
-                               <h3>1. Select the Parameters</h3>
-                      <ol type="1">
-                                 <li><b>Select list.</b> </li> 
-                                 <li><b>Select organism:</b> select organism that matches your input query gene list. A choice among 197 species is given. Default organism is human (Homo sapiens). </li> 
-                                 <li><b>Select datasources:</b> </li> 
-                                    <ul>
-                                      <li> UniProt keywords</li>
-                                      <li> Disease Ontology</li>
-                                      <li> Interpro</li>
-                                      <li> PFAM</li>
-                                    </ul>
-                                 <li><b>Select ID type for output:</b> Define the ID type that will be used in the analysis, as well as in the output.
-                                Results can be reported as Entrez, UniProt, EMBL, ENSEMBL, ChEMBL, WikiGene and RefSeq identifiers. </li> 
-                                 <li><b>Select significance threshold: </b>  Define the type of evaluation threshold.  Two options are given: p-value and  corrected p-value (FDR). </li>
-                                 <li><b>P-value correction cut-off:</b> User-defined p-value threshold provides a possibility to additionally filter results. 
-                                 The threshold defaults to p=0.05, meaning that all significant results are shown. </li>
-                                 </ol></p>
-                                 <div class="col-md-12">
-                                <img src = "help_images/aGoInput.png" style="border: 1px solid black">
-                              </div>
-                   ')
-}
-
-generateHelpaGotoolOutput <- function(){
-  HTML(' <p style = "text-align:justify">The results are displayed in Tables for all enrichment terms (ALL Tab), and for each category separately.
-                      </p>
-                             <p>
-                               <h3>1. Results</h3>
-                              Each results table contains information about the:
-                                <ul>
-                                 <li><b>Source</b> </li> 
-                                 <li><b>Term ID: </b>the unique term identifier. In the table, Term ID is a hyperlink that points to the correspoding data source of the term </li> 
-                                 <li><b>Function: </b>the short name of the function</li> 
-                                  <li><b>p-value: </b>hypergeometric p-value after correction for multiple testing</li> 
-                                   <li><b>Term size: </b>number of genes that are annotated to the term </li> 
-                                    <li><b>Query size: </b> number of genes that were included in the query</li> 
-                                     <li><b>Intersection Size: </b> number of genes in the input query that are annotated to the corresponding term </li> 
-                                      <li><b>Enrichement Score%: </b>Intersection Size/Term size*100% </li>
-                                       <li><b>Positive Hits: </b>a comma separated list of genes from the query that are annotated to the corresponding term</li> 
-                                 </ul>
-                                 </p>
-                                  <p>
-                                 
-                                  <br>
-                                <img src = "help_images/paramaGo.png" style="border: 1px solid black">
-                                </p>
-                                <br>
-                                 <p>
-                                <img src = "help_images/aGoOutput.png" style="border: 1px solid black">
-                                </p>
-                                
-                   ')
-}
 
 
 

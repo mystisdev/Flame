@@ -92,12 +92,11 @@ generateEnrichmentControlPanel <- function() {
             label = "6. Select namespace conversion:",
             choices = NAMESPACES[["STRING"]],
             width = "80%"
-          ) %>% 
+          ) %>%
             bsplus::shinyInput_label_embed(
             bsplus::shiny_iconlink("circle-info") %>%
               bsplus::bs_embed_popover(
                 title = "Default tool namespace conversions:
-aGOtool: ENSEMBL Protein ID
 gProfiler: User Input
 WebGestalt: Entrez Gene Accession
 enrichR: Entrez Gene Name
@@ -167,7 +166,7 @@ generateEnrichmentResultsPanel <- function() {
       )
     )
   } else { # "literature"
-    return(generateToolPanel("aGOtool"))
+    return(generateToolPanel("STRING"))
   }
 }
 

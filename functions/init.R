@@ -31,16 +31,16 @@ initialiazeOrganismSelectors <- function() {
   print(nrow(ORGANISMS))
   selected <- "Homo sapiens (Human) [NCBI Tax. ID: 9606]"
   gProfiler_printNames <- ORGANISMS[!is.na(ORGANISMS$short_name), ]$print_name
-  aGoTool_printNames <- ORGANISMS[ORGANISMS$taxid %in% TOOL_ORGANISMS$aGOtool, ]$print_name
-  print(length(aGoTool_printNames))
+  STRING_printNames <- ORGANISMS[ORGANISMS$taxid %in% TOOL_ORGANISMS$STRING, ]$print_name
+  print(length(STRING_printNames))
   updateSelectizeInput(session, 'textmining_organism',
-                       choices = aGoTool_printNames, selected = selected, server = T)
+                       choices = STRING_printNames, selected = selected, server = T)
   updateSelectizeInput(session, 'functional_enrichment_organism',
                        choices = ORGANISMS$print_name, selected = selected, server = T)
   updateSelectizeInput(session, 'literature_enrichment_organism',
-                       choices = aGoTool_printNames, selected = selected, server = T)
+                       choices = STRING_printNames, selected = selected, server = T)
   updateSelectizeInput(session, 'string_network_organism',
-                       choices = aGoTool_printNames, selected = selected, server = T)
+                       choices = STRING_printNames, selected = selected, server = T)
   updateSelectizeInput(session, 'gconvert_organism',
                        choices = gProfiler_printNames, selected = selected, server = T)
   updateSelectizeInput(session, 'gorth_organism',

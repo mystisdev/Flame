@@ -14,7 +14,6 @@ updateListBoxes <- function() {
   updateSelectInput(session, "selectUpset", choices = names(userInputLists))
   updateSelectInput(session, "gconvert_select", choices = names(userInputLists))
   updateSelectInput(session, "gorth_select", choices = names(userInputLists))
-  updateSelectInput(session, "aGOtoolSelect", choices = names(userInputLists))
   updateSelectInput(session, "literatureSelect", choices = names(userInputLists))
   updateSelectInput(session, "STRINGnetworkSelect", choices = names(userInputLists))
   updateBackgroundListChoices("functional")
@@ -245,7 +244,7 @@ updateAvailableStringNamespaces <- function() {
     )) {
       shinyjs::enable("STRING_namespace")
       updateSelectInput(session, "STRING_namespace",
-                        choices = NAMESPACES[["AGOTOOL"]],
+                        choices = NAMESPACES[["STRING"]],
                         selected = "ENSP")
     } else {
       shinyjs::disable("STRING_namespace")
@@ -261,9 +260,9 @@ updateBackgroundMode <- function(choice, enrichmentType) {
   if (choice == "genome") {
     shinyjs::hide(paste0(enrichmentType, "_enrichment_background_container"))
     # Genome background: All enrichment tools are available
-    # ENRICHMENT_TOOLS = ["aGOtool", "gProfiler", "WebGestalt", "enrichR", "STRING"]
+    # ENRICHMENT_TOOLS = ["gProfiler", "WebGestalt", "enrichR", "STRING", "PANTHER"]
     # this is only for enrichmentType = 'functional',
-    # since 'literature' only has aGOtool anyway
+    # since 'literature' only has STRING anyway
     updatePickerInput(session, "functional_enrichment_tool",
                       choices = ENRICHMENT_TOOLS, selected = DEFAULT_TOOL)
   }
@@ -271,11 +270,11 @@ updateBackgroundMode <- function(choice, enrichmentType) {
     shinyjs::show(paste0(enrichmentType, "_enrichment_background_container"))
     # Custom background: Only tools that support user-provided background lists
     # enrichR is excluded because runEnrichr() does not accept user_reference parameter
-    # Available tools: aGOtool, gProfiler, WebGestalt, STRING, PANTHER (all have user_reference parameter)
+    # Available tools: gProfiler, WebGestalt, STRING, PANTHER (all have user_reference parameter)
     # this is only for enrichmentType = 'functional',
-    # since 'literature' only has aGOtool anyway
+    # since 'literature' only has STRING anyway
     updatePickerInput(session, "functional_enrichment_tool",
-                      choices = c("aGOtool", "gProfiler", "WebGestalt", "STRING", "PANTHER"), selected = DEFAULT_TOOL)
+                      choices = c("gProfiler", "WebGestalt", "STRING", "PANTHER"), selected = DEFAULT_TOOL)
   }
   updateAvailableSignificanceMetrics()
 }

@@ -31,7 +31,7 @@ Flame is a web application (R/Shiny + JavaScript) for comprehensive enrichment a
 
 * **Multiple Input Types**: Gene/protein lists, SNPs, free text, or expression results (volcano plots).
 * **Set Operations**: Union and intersection of lists with UpSet plots.
-* **Functional Enrichment**: Supports aGOtool, gProfiler, WebGestalt, and enrichR across 14,000+ organisms.
+* **Functional Enrichment**: Supports gProfiler, WebGestalt, enrichR, STRING, and PANTHER across 14,000+ organisms.
 * **Literature Enrichment**: Powered by STRING.
 * **Network Integration**: Generate STRING protein–protein interaction networks.
 * **Visualization Options**: Networks, heatmaps, bar charts, scatter plots, and searchable tables.

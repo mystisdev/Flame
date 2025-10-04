@@ -131,7 +131,7 @@ attachKEGGLinks <- function() {
         )
 
     } else {
-      # Traditional tools (aGOtool, gProfiler, etc.) - need both short_name AND kegg_name
+      # Traditional tools (gProfiler, etc.) - need both short_name AND kegg_name
       if (!is.na(shortName) && !is.na(keggName)) {
         conversionTable <- createEntrezAccConversionTable(tempEnrichmentDF, shortName)
         if (!is.null(conversionTable)) {
@@ -158,26 +158,14 @@ createEntrezAccConversionTable <- function(tempEnrichmentDF, shortName) {
   inputToConvert <- unique(unlist(strsplit(paste(
     tempEnrichmentDF[grepl("^KEGG$", tempEnrichmentDF$Source), ]$`Positive Hits`,
     collapse = ","), ",")))
-  if (isUnconvertedENSPNamespace())
-    inputToConvert <- sapply(strsplit(inputToConvert , "\\."), "[[", 2)
-  
+
   conversionTable <- calculateConversionTable(inputToConvert, shortName)
-  
-  if (isUnconvertedENSPNamespace())
-    conversionTable$input <- paste0(currentOrganism, ".", conversionTable$input)
   
   if (!is.null(conversionTable)) {
     conversionTable <- dplyr::distinct(conversionTable[, c("input", "target")])
     colnames(conversionTable)[1] <- "Positive Hits"
   }
   return(conversionTable)
-}
-
-isUnconvertedENSPNamespace <- function() {
-  return(
-    currentEnrichmentTool == "aGOtool" &&
-      input$functional_enrichment_inputConversion == "Converted input names"
-  )
 }
 
 calculateConversionTable <- function(inputToConvert, shortName) {

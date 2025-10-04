@@ -73,13 +73,6 @@ DATASOURCES[["STRING"]] <- c("GO:MF", "GO:CC", "GO:BP",
                             "DO", "BTO", "HP", "PUBMED")
 DATASOURCES[["PANTHER"]] <- c("GO:MF", "GO:CC", "GO:BP", "REAC")
 DATASOURCES_CODES <- list()
-DATASOURCES_CODES[["AGOTOOL"]] <- list(
-  "GO:MF" = -23, "GO:CC" = -22, "GO:BP" = -21,
-  "KEGG" = -52, "REAC" = -57, "WP" = -58,
-  "INTERPRO" = -54, "PFAM" = -55, "UNIPROT" = -51,
-  "DO" = -26, "BTO" = -25,
-  "PUBMED" = -56
-)
 DATASOURCES_CODES[["STRING"]] <- list(
   "GO:MF" = "Function", "GO:CC" = "Component", "GO:BP" = "Process",
   "KEGG" = "KEGG", "REAC" = "RCTM", "WP" = "WikiPathways",
@@ -171,7 +164,6 @@ NAMESPACES[["FLY_ENRICHR"]] <-
 )
 DEFAULT_NAMESPACE_TEXT <- "Default tool namespace conversions"
 METRICS <- list()
-METRICS[["AGOTOOL"]] <- list("False discovery rate", "P-value")
 METRICS[["GPROFILER"]] <- list(
   "g:SCS threshold" = "gSCS",
   "False discovery rate" = "fdr",
@@ -192,7 +184,6 @@ METRICS[["PANTHER"]] <- list("False discovery rate", "P-value", "Bonferroni")
 DEFAULT_METRIC_TEXT <- "Default tool metrics"
 
 DEFAULT_METRICS_GENOME <- list(
-  "AGOTOOL" = "False discovery rate",
   "GPROFILER" = "fdr",
   "WEBGESTALT" = "BH",
   "ENRICHR" = "adjusted_pvalue",
@@ -201,7 +192,6 @@ DEFAULT_METRICS_GENOME <- list(
 )
 
 DEFAULT_METRICS_USERBACKGROUND <- list(
-  "AGOTOOL" = "P-value",
   "GPROFILER" = "bonferroni",
   "WEBGESTALT" = "top",
   "STRING" = "P-value",
@@ -209,10 +199,9 @@ DEFAULT_METRICS_USERBACKGROUND <- list(
 )
 
 ENRICHMENT_DF_COLNAMES <- c(
-  "Source", "Term_ID", "Function", "P-value", "Term Size", 
+  "Source", "Term_ID", "Function", "P-value", "Term Size",
   "Query size", "Intersection Size", "Positive Hits"
 )
-AGOTOOL_API_LINK <- "https://agotool.org/api_orig"
 
 # Plots ####
 ALL_PLOT_IDS <- c(NETWORK_IDS, HEATMAP_IDS, "barchart", "scatterPlot")
