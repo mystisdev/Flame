@@ -61,7 +61,7 @@ attachDBLinks <- function() { # Transfac HPA CORUMLinks, unavailable
   attachLinks("WP", "https://www.wikipathways.org/index.php/Pathway:")
   attachLinks("BTO", "https://www.ebi.ac.uk/ols/ontologies/bto/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2FBTO_", gSub = "BTO:")
   attachLinks("MIRNA", "https://www.mirbase.org/textsearch.shtml?q=", gSub = "MIRNA:")
-  attachLinks("HP", "https://mseqdr.org/hpo_browser.php?", gSub = "HP:")
+  attachLinks("HP", "https://monarchinitiative.org/")
   attachLinks("ORPHA", "https://www.orpha.net/consor/cgi-bin/OC_Exp.php?Lng=GB&Expert=", gSub = "ORPHA:")
   
   attachKEGGLinks()
