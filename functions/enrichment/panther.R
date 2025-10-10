@@ -58,7 +58,8 @@ sendPantherRequest <- function(userInputList, taxid, user_reference = NULL) {
         organism = taxid,
         annotDataSet = dataset,
         correction = correction,
-        enrichmentTestType = "FISHER"
+        enrichmentTestType = "FISHER",
+        mappedInfo = "COMP_LIST"  # Request gene-term associations
       )
     } else {
       # Custom background analysis
@@ -70,7 +71,8 @@ sendPantherRequest <- function(userInputList, taxid, user_reference = NULL) {
         refOrganism = taxid,
         annotDataSet = dataset,
         correction = correction,
-        enrichmentTestType = "FISHER"
+        enrichmentTestType = "FISHER",
+        mappedInfo = "COMP_LIST"  # Request gene-term associations
       )
     }
 
@@ -92,6 +94,28 @@ isPantherResponseValid <- function(responseList) {
     }
   }
   return(isValid)
+}
+
+extractPantherGeneList <- function(input_list_column) {
+  # Safely extract gene symbols from PANTHER's input_list column
+  # input_list_column is a data.frame column where each element is a data.frame
+  # with mapped_ids and mapped_panther_ids
+
+  if (is.null(input_list_column) || length(input_list_column) == 0) {
+    return("")
+  }
+
+  # Extract mapped_ids from each row's input_list data.frame
+  gene_lists <- sapply(seq_len(nrow(input_list_column)), function(i) {
+    row_data <- input_list_column[i, ]
+    if (!is.null(row_data$mapped_ids) && !is.na(row_data$mapped_ids)) {
+      return(as.character(row_data$mapped_ids))
+    } else {
+      return("")
+    }
+  })
+
+  return(gene_lists)
 }
 
 parsePantherResult <- function(responseList) {
@@ -164,6 +188,13 @@ parsePantherResult <- function(responseList) {
           next  # Skip this dataset if no significant results
         }
 
+        # Extract gene lists from input_list column (if available from mappedInfo=COMP_LIST)
+        positive_hits <- if ("input_list" %in% names(results)) {
+          extractPantherGeneList(results$input_list)
+        } else {
+          rep("", nrow(results))  # Fallback to empty strings if no gene data
+        }
+
         # Select columns we need and rename to FLAME format
         pantherSelected <- data.frame(
           Source = results$flame_source,
@@ -173,7 +204,7 @@ parsePantherResult <- function(responseList) {
           Term_Size = results$number_in_reference,
           Query_size = results$query_size,
           Intersection_Size = results$number_in_list,
-          Positive_Hits = "", # PANTHER doesn't provide gene lists in overrep results
+          Positive_Hits = positive_hits,
           stringsAsFactors = FALSE
         )
 
