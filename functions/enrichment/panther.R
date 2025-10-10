@@ -97,19 +97,26 @@ isPantherResponseValid <- function(responseList) {
 }
 
 extractPantherGeneList <- function(input_list_column) {
-  # Safely extract gene symbols from PANTHER's input_list column
+  # Extract PANTHER protein IDs from PANTHER's input_list column
+  #
   # input_list_column is a data.frame column where each element is a data.frame
-  # with mapped_ids and mapped_panther_ids
+  # with mapped_ids (gene symbols) and mapped_panther_ids (PANTHER accessions)
+  #
+  # We extract mapped_panther_ids (NOT mapped_ids) to maintain
+  # consistency with other tools:
+  # - All tools store converted IDs in Positive Hits (STRING IDs, ENSP IDs, etc.)
+  # - This allows rollBackConvertedNames() to properly convert back to gene symbols
+  # - This allows findNoHitGenes() to correctly identify genes without annotations
 
   if (is.null(input_list_column) || length(input_list_column) == 0) {
     return("")
   }
 
-  # Extract mapped_ids from each row's input_list data.frame
+  # Extract mapped_panther_ids (PANTHER protein accessions) from each row
   gene_lists <- sapply(seq_len(nrow(input_list_column)), function(i) {
     row_data <- input_list_column[i, ]
-    if (!is.null(row_data$mapped_ids) && !is.na(row_data$mapped_ids)) {
-      return(as.character(row_data$mapped_ids))
+    if (!is.null(row_data$mapped_panther_ids) && !is.na(row_data$mapped_panther_ids)) {
+      return(as.character(row_data$mapped_panther_ids))
     } else {
       return("")
     }

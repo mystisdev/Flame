@@ -316,21 +316,33 @@ getGlobalEnrichmentResult <- function(enrichmentType, toolName) {
 }
 
 executeNamespaceRollback <- function(inputGenesConversionTable) {
+  # Determine whether to roll back converted IDs to original input names
   rollBackNamesFlag <- ifelse(input[[paste0(currentEnrichmentType,
                                             "_enrichment_inputConversion")]] ==
                                 "Original input names", T, F)
+
   if (rollBackNamesFlag) {
+    # Convert Positive Hits back from tool-specific IDs to original gene symbols
     enrichmentResults[[currentType_Tool]] <<-
       rollBackConvertedNames(enrichmentResults[[currentType_Tool]],
                              inputGenesConversionTable)
-    noHitGenesCheckList <- currentUserList
-  } else
+
+    # For no-hit calculation: use original gene symbols that successfully converted
+    # Use only converted genes (inputGenesConversionTable$input),
+    # NOT all user inputs, to distinguish between:
+    # - "Unconverted Inputs" = genes that failed conversion
+    # - "No-hit Inputs" = genes that converted but don't appear in any enriched term
+    noHitGenesCheckList <- inputGenesConversionTable$input
+  } else {
+    # For no-hit calculation: use tool-specific IDs (not rolled back)
     noHitGenesCheckList <- inputGenesConversionTable$target
+  }
+
   return(noHitGenesCheckList)
 }
 
 rollBackConvertedNames <- function(enrichmentOutput, inputGenesConversionTable) {
-  # Check if all Positive Hits are empty (tools like PANTHER don't provide gene lists)
+  # Check if all Positive Hits are empty (safety check for tools without gene lists)
   all_empty <- all(enrichmentOutput$`Positive Hits` == "" | is.na(enrichmentOutput$`Positive Hits`))
 
   if (all_empty) {
@@ -388,6 +400,10 @@ decideToolSelectedDatasources <- function() {
 }
 
 printUnconvertedGenes <- function(convertedInputs, convertedOutputs = NULL) {
+  # Display genes that failed conversion to target namespace
+  # Note: This is different from "No-hit Inputs" which are genes that
+  # successfully converted but don't appear in any enriched term
+
   shinyOutputId <- paste(currentType_Tool,
                          "notConverted_input", sep = "_")
   unconvertedInputs <- currentUserList[!currentUserList %in% convertedInputs$input]
@@ -455,24 +471,27 @@ findAndPrintNoHitGenes <- function(convertedInputs) {
 }
 
 findNoHitGenes <- function(convertedInputs) {
-  # PANTHER doesn't provide individual gene lists in Positive_Hits column
-  # If PANTHER returned any enrichment results, assume all converted genes were "found"
-  if (currentEnrichmentTool == "PANTHER") {
-    enrichmentResult <- getGlobalEnrichmentResult(currentEnrichmentType, currentEnrichmentTool)
-    if (nrow(enrichmentResult) > 0) {
-      # PANTHER returned results, so no genes are considered "not found"
-      return(character(0))
-    } else {
-      # PANTHER returned no results, so all input genes are "not found"
-      return(convertedInputs)
-    }
-  }
+  # Find genes that successfully converted but don't appear in any enriched term
+  #
+  # convertedInputs: List of genes that successfully converted (either original symbols
+  #                  or tool-specific IDs, depending on rollback setting)
+  #
+  # Logic:
+  # 1. Collect all genes appearing in Positive Hits across ALL enriched terms
+  # 2. Compare convertedInputs against these "hit" genes
+  # 3. Return genes that converted successfully but aren't in any term
+  #
+  # Note: This is different from "Unconverted Inputs" which are genes that
+  # failed at the conversion step entirely
 
-  # For other tools: use standard logic with Positive_Hits column
   enrichmentResult <- getGlobalEnrichmentResult(currentEnrichmentType, currentEnrichmentTool)
+
+  # Collect all genes from Positive Hits column across all enriched terms
   allHitGenes <- paste(enrichmentResult$`Positive Hits`, collapse = ",")
   allHitGenes <- strsplit(allHitGenes, ",")[[1]]
   allHitGenes <- unique(allHitGenes)
+
+  # Find genes that converted but don't appear in any enriched term
   noHitGenes <- convertedInputs[!convertedInputs %in% allHitGenes]
   return(noHitGenes)
 }
