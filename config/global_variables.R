@@ -10,8 +10,9 @@ ENRICHMENT_TOOLS <- c("gProfiler", "WebGestalt", "enrichR", "STRING", "PANTHER")
 TAB_NAMES <- list(
   "ALL" = "all",
   "GO:MF" = "gomf", "GO:CC" = "gocc", "GO:BP" = "gobp",
+  "GOSLIM:MF" = "goslimmf", "GOSLIM:CC" = "goslimcc", "GOSLIM:BP" = "goslimbp",
   "KEGG" = "kegg", "REAC" = "reac", "WP" = "wp", "PANTHER" = "panther",
-  "INTERPRO" = "interpro", "PFAM" = "pfam", "UNIPROT" = "uniprot",
+  "INTERPRO" = "interpro", "PFAM" = "pfam", "UNIPROT" = "uniprot", "PANTHERPC" = "pantherpc",
   "DO" = "do", "DISGENET" = "disgenet", "OMIM" = "omim", "GLAD4U_DISEASE" = "glad4udisease", "ORPHA" = "orpha",
   "DRUGBANK" = "drugbank", "GLAD4U_DRUG" = "glad4udrug",
   "BTO" = "brenda", "WBBT" = "wbbt", "TF" = "tf",
@@ -59,8 +60,9 @@ GENE_NODE_COLOR <- "#d1e1d9"
 LITERATURE_NODE_COLOR <- "#cc9f9f"
 DATASOURCE_COLORS <- c(
   "GO:MF" = "#dc3912", "GO:BP" = "#ff9900", "GO:CC" = "#109618",
+  "GOSLIM:MF" = "#e85d4a", "GOSLIM:BP" = "#ffb84d", "GOSLIM:CC" = "#4db34d",
   "KEGG" = "#dd4477", "REAC" = "#3366cc", "WP" = "#0099c6", "PANTHER" = "#634341",
-  "INTERPRO" = "#8a5103", "PFAM" = "#b3b000", "UNIPROT" = "#55edeb",
+  "INTERPRO" = "#8a5103", "PFAM" = "#b3b000", "UNIPROT" = "#55edeb", "PANTHERPC" = "#8b6f47",
   "DO" = "#f7c8fa", "DISGENET" = "#c0f0a1", "OMIM" = "#edebaf",
   "GLAD4U_DISEASE" = "#9f86d9", "ORPHA" = "#03fcc6", "DRUGBANK" = "#7d4a74", "GLAD4U_DRUG" = "#4a9091",
   "BTO" = "#f0d871", "WBBT" = "#9cb59c", "TF" = "#5574a6", "MIRNA" = "#22aa99",

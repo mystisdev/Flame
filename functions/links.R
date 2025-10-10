@@ -48,22 +48,36 @@ attachVariantTableLinks <- function(df) {
 }
 
 attachDBLinks <- function() { # Transfac HPA CORUMLinks, unavailable
-  attachLinks("GO", "https://www.ebi.ac.uk/QuickGO/term/", stopChar = NULL)
+  # Gene Ontology - stopChar=":" prevents matching "GOSLIM:*"
+  attachLinks("GO", "https://www.ebi.ac.uk/QuickGO/term/", stopChar = ":")
+  # GO Slim terms use same GO term IDs, just curated subset
+  attachLinks("GOSLIM", "https://www.ebi.ac.uk/QuickGO/term/", stopChar = ":")
+
+  # Protein domains and classifications
   attachLinks("INTERPRO", "https://www.ebi.ac.uk/interpro/entry/InterPro/")
   attachLinks("PFAM", "https://www.ebi.ac.uk/interpro/entry/pfam/")
   attachLinks("UNIPROT", "https://www.uniprot.org/keywords/")
+  attachLinks("PANTHERPC", "https://pantherdb.org/panther/category.do?categoryAcc=")
+
+  # Pathways
   attachLinks("PANTHER", "http://www.pantherdb.org/pathway/pathDetail.do?clsAccession=")
+  attachLinks("REAC", "https://reactome.org/content/detail/")
+  attachLinks("WP", "https://www.wikipathways.org/index.php/Pathway:")
+
+  # Disease and phenotype ontologies
   attachLinks("DO", "http://www.informatics.jax.org/disease/")
+  attachLinks("HP", "https://monarchinitiative.org/")
+  attachLinks("ORPHA", "https://www.orpha.net/consor/cgi-bin/OC_Exp.php?Lng=GB&Expert=", gSub = "ORPHA:")
   attachLinks("WBP", "https://wormbase.org/species/all/phenotype/")
   attachLinks("WBBT", "https://wormbase.org/species/all/anatomy_term/")
   attachLinks("MGI", "https://www.informatics.jax.org/vocab/mp_ontology/")
-  attachLinks("REAC", "https://reactome.org/content/detail/")
-  attachLinks("WP", "https://www.wikipathways.org/index.php/Pathway:")
+
+  # Tissue ontologies
   attachLinks("BTO", "https://www.ebi.ac.uk/ols/ontologies/bto/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2FBTO_", gSub = "BTO:")
+
+  # Regulatory elements
   attachLinks("MIRNA", "https://www.mirbase.org/textsearch.shtml?q=", gSub = "MIRNA:")
-  attachLinks("HP", "https://monarchinitiative.org/")
-  attachLinks("ORPHA", "https://www.orpha.net/consor/cgi-bin/OC_Exp.php?Lng=GB&Expert=", gSub = "ORPHA:")
-  
+
   attachKEGGLinks()
 }
 

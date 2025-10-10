@@ -29,7 +29,10 @@ DATASOURCES_PRINT <- list(
   'Gene Ontology' = list(
     "Molecular Function (GO:MF)" = "GO:MF",
     "Cellular Component (GO:CC)" = "GO:CC",
-    "Biological Process (GO:BP)" = "GO:BP"
+    "Biological Process (GO:BP)" = "GO:BP",
+    "GO Slim - Molecular Function" = "GOSLIM:MF",
+    "GO Slim - Cellular Component" = "GOSLIM:CC",
+    "GO Slim - Biological Process" = "GOSLIM:BP"
   ),
   'Biological Pathways' = list(
     "KEGG" = "KEGG", "Reactome" = "REAC",
@@ -42,6 +45,7 @@ DATASOURCES_PRINT <- list(
   'Proteins' = list(
     "Interpro" = "INTERPRO", "PFAM" = "PFAM",
     "UniProt keywords" = "UNIPROT",
+    "PANTHER Protein Class" = "PANTHERPC",
     "CORUM"= "CORUM"
   ),
   'Phenotypes' = list(
@@ -71,7 +75,9 @@ DATASOURCES[["STRING"]] <- c("GO:MF", "GO:CC", "GO:BP",
                             "KEGG", "REAC", "WP",
                             "INTERPRO", "PFAM", "UNIPROT",
                             "DO", "BTO", "HP", "PUBMED")
-DATASOURCES[["PANTHER"]] <- c("GO:MF", "GO:CC", "GO:BP", "REAC")
+DATASOURCES[["PANTHER"]] <- c("GO:MF", "GO:CC", "GO:BP", "REAC",
+                              "GOSLIM:MF", "GOSLIM:CC", "GOSLIM:BP",
+                              "PANTHER", "PANTHERPC")
 DATASOURCES_CODES <- list()
 DATASOURCES_CODES[["STRING"]] <- list(
   "GO:MF" = "Function", "GO:CC" = "Component", "GO:BP" = "Process",
@@ -82,7 +88,12 @@ DATASOURCES_CODES[["STRING"]] <- list(
 )
 DATASOURCES_CODES[["PANTHER"]] <- list(
   "GO:MF" = "GO:0003674", "GO:CC" = "GO:0005575", "GO:BP" = "GO:0008150",
-  "REAC" = "ANNOT_TYPE_ID_REACTOME_PATHWAY"
+  "GOSLIM:MF" = "ANNOT_TYPE_ID_PANTHER_GO_SLIM_MF",
+  "GOSLIM:CC" = "ANNOT_TYPE_ID_PANTHER_GO_SLIM_CC",
+  "GOSLIM:BP" = "ANNOT_TYPE_ID_PANTHER_GO_SLIM_BP",
+  "REAC" = "ANNOT_TYPE_ID_REACTOME_PATHWAY",
+  "PANTHER" = "ANNOT_TYPE_ID_PANTHER_PATHWAY",
+  "PANTHERPC" = "ANNOT_TYPE_ID_PANTHER_PC"
 )
 DATASOURCES_CODES[["WEBGESTALT"]] <- list(
   "GO:MF" = "geneontology_Molecular_Function_noRedundant",

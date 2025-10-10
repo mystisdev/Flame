@@ -204,10 +204,17 @@ isPantherResultValid <- function(pantherParsedResult) {
 alterPantherSourceKeywords <- function(pantherResult) {
   # Map PANTHER's data source names to FLAME's standard names
   # This ensures consistency with existing FLAME categories
+  # NOTE: Most conversions happen in mapPantherDatasetToFlameSource
+  # This function acts as a defensive fallback
+
+  # Full GO terms (defensive - should already be converted)
   pantherResult$Source <- gsub("^GO:0003674$", "GO:MF", pantherResult$Source)
   pantherResult$Source <- gsub("^GO:0008150$", "GO:BP", pantherResult$Source)
   pantherResult$Source <- gsub("^GO:0005575$", "GO:CC", pantherResult$Source)
+
+  # Reactome pathway (defensive - should already be converted)
   pantherResult$Source <- gsub("^ANNOT_TYPE_ID_REACTOME_PATHWAY$", "REAC", pantherResult$Source)
+
   return(pantherResult)
 }
 
@@ -248,7 +255,12 @@ mapDataSourcesToPantherDatasets <- function(selectedDataSources) {
     "GO:MF" = "GO:0003674",
     "GO:BP" = "GO:0008150",
     "GO:CC" = "GO:0005575",
-    "REAC" = "ANNOT_TYPE_ID_REACTOME_PATHWAY"
+    "GOSLIM:MF" = "ANNOT_TYPE_ID_PANTHER_GO_SLIM_MF",
+    "GOSLIM:BP" = "ANNOT_TYPE_ID_PANTHER_GO_SLIM_BP",
+    "GOSLIM:CC" = "ANNOT_TYPE_ID_PANTHER_GO_SLIM_CC",
+    "REAC" = "ANNOT_TYPE_ID_REACTOME_PATHWAY",
+    "PANTHER" = "ANNOT_TYPE_ID_PANTHER_PATHWAY",
+    "PANTHERPC" = "ANNOT_TYPE_ID_PANTHER_PC"
   )
 
   pantherDatasets <- c()
@@ -258,7 +270,7 @@ mapDataSourcesToPantherDatasets <- function(selectedDataSources) {
     }
   }
 
-  # If no valid datasets selected, default to all Type A categories
+  # If no valid datasets selected, default to all categories
   if (length(pantherDatasets) == 0) {
     pantherDatasets <- unlist(datasetMapping)
   }
@@ -272,7 +284,12 @@ mapPantherDatasetToFlameSource <- function(dataset) {
     "GO:0003674" = "GO:MF",
     "GO:0008150" = "GO:BP",
     "GO:0005575" = "GO:CC",
-    "ANNOT_TYPE_ID_REACTOME_PATHWAY" = "REAC"
+    "ANNOT_TYPE_ID_PANTHER_GO_SLIM_MF" = "GOSLIM:MF",
+    "ANNOT_TYPE_ID_PANTHER_GO_SLIM_BP" = "GOSLIM:BP",
+    "ANNOT_TYPE_ID_PANTHER_GO_SLIM_CC" = "GOSLIM:CC",
+    "ANNOT_TYPE_ID_REACTOME_PATHWAY" = "REAC",
+    "ANNOT_TYPE_ID_PANTHER_PATHWAY" = "PANTHER",
+    "ANNOT_TYPE_ID_PANTHER_PC" = "PANTHERPC"
   )
 
   if (dataset %in% names(mapping)) {
