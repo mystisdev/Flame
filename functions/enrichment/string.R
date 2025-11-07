@@ -47,7 +47,8 @@ sendStringRequest <- function(userInputList, taxid, user_reference = NULL) {
     )
   }
 
-  response <- httr::GET(url, query = params)
+  # Use POST instead of GET to avoid 414 Request-URI Too Large errors with large gene lists
+  response <- httr::POST(url, body = params)
   return(response)
 }
 
