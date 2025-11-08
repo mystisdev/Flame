@@ -195,6 +195,21 @@ parsePantherResult <- function(responseList) {
           next  # Skip this dataset if no significant results
         }
 
+        # Filter out unclassified terms
+        # PANTHER returns "UNCLASSIFIED" terms with null term_id that
+        # provide no functional information. These appear across all
+        # annotation categories and can have significant p-values.
+        unclassified_mask <- is.na(results$term_id) |
+          is.na(results$term_label) |
+          results$term_label == "" |
+          toupper(results$term_label) == "UNCLASSIFIED"
+
+        results <- results[!unclassified_mask, ]
+
+        if (nrow(results) == 0) {
+          next  # Skip this dataset if no valid results after filtering
+        }
+
         # Extract gene lists from input_list column (if available from mappedInfo=COMP_LIST)
         positive_hits <- if ("input_list" %in% names(results)) {
           extractPantherGeneList(results$input_list)
