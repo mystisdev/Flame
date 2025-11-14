@@ -9,6 +9,7 @@ initializeServerApp <- function() {
   initialiazeOrganismSelectors()
   initializeDatasources()
   initializeVolcanoPanel()
+  initializeReductionPanel()
   initializeEnrichmentResults()
   initializeArenaEdgelist()
   initializeSTRINGData()
@@ -28,11 +29,9 @@ toggleUpsetTab <- function() {
 
 initialiazeOrganismSelectors <- function() {
   ORGANISMS <- ORGANISMS[order(ORGANISMS$print_name),]
-  print(nrow(ORGANISMS))
   selected <- "Homo sapiens (Human) [NCBI Tax. ID: 9606]"
   gProfiler_printNames <- ORGANISMS[!is.na(ORGANISMS$short_name), ]$print_name
   STRING_printNames <- ORGANISMS[ORGANISMS$taxid %in% TOOL_ORGANISMS$STRING, ]$print_name
-  print(length(STRING_printNames))
   updateSelectizeInput(session, 'textmining_organism',
                        choices = STRING_printNames, selected = selected, server = T)
   updateSelectizeInput(session, 'functional_enrichment_organism',
@@ -67,6 +66,18 @@ initializeVolcanoPanel <- function() {
 initializeVolcanoMetricsConversionText <- function() {
   updateVolcanoMetricsConversionText(DEFAULT_VOLCANO_LOG10PVALUE_THRESHOLD,
                                      DEFAULT_VOLCANO_LOG2FC_THRESHOLD)
+}
+
+initializeReductionPanel <- function() {
+  output$reductionSelectionInfo <- renderText({
+    "Pick the box or lasso from the plot toolbar and then select items. Double-click to reset view."
+  })
+  output$reductionPlotStatus <- renderText({
+    ""
+  })
+  shinyjs::hide("reductionSelectionInfo")
+  hideTab("inputPlots", "2D Reduction Plot")
+  shinyjs::hide("reductionPanel")
 }
 
 initializeEnrichmentResults <- function() {

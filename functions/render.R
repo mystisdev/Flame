@@ -22,11 +22,12 @@ renderShinyDataTable <- function(shinyOutputId, outputData,
                                  filter = "none") {
   output[[shinyOutputId]] <- DT::renderDataTable(
     outputData,
-    server = F, 
+    server = F,
     extensions = 'Buttons',
     caption = caption,
     options = list(
-      scrollY = scrollY, 
+      scrollY = scrollY,
+      scrollX = TRUE,
       scroller = T,
       "dom" = 'Blfiprt',
       buttons = list(
@@ -108,6 +109,202 @@ renderLine <- function(y0, y1, x0, x1) {
     x1 = x1,
     line = list(color = "red")
   )
+}
+
+renderReduction <- function() {
+  gene_col <- input$reduction_gene_col
+  x_col <- input$reduction_x_axis
+  y_col <- input$reduction_y_axis
+  color_col <- input$reduction_color
+  size_col <- input$reduction_size
+
+  # Exclude genes with missing gene names or coordinates
+  plot_data <- currentReduction[
+    !is.na(currentReduction[[gene_col]]) & currentReduction[[gene_col]] != "" &
+    !is.na(currentReduction[[x_col]]) &
+    !is.na(currentReduction[[y_col]]), ]
+
+  # Build hover text
+  hover_text <- paste0("<b>", gene_col, "</b>: ", plot_data[[gene_col]])
+  for (col_name in names(plot_data)) {
+    if (col_name != gene_col) {
+      col_data <- plot_data[[col_name]]
+      formatted_data <- if (is.numeric(col_data)) {
+        ifelse(is.na(col_data), "NA", round(col_data, 2))
+      } else {
+        ifelse(is.na(col_data), "NA", as.character(col_data))
+      }
+      hover_text <- paste0(hover_text, "\n", col_name, ": ", formatted_data)
+    }
+  }
+  plot_data$hover_text <- hover_text
+
+  use_color <- !is.null(color_col) && color_col != ""
+  use_size <- !is.null(size_col) && size_col != ""
+
+  # Determine color type and prepare palette
+  is_categorical_color <- FALSE
+  color_palette <- NULL
+  if (use_color) {
+    color_data <- plot_data[[color_col]]
+    is_categorical_color <- is.character(color_data) || is.factor(color_data) ||
+                           length(unique(color_data[!is.na(color_data)])) <= REDUCTION_CATEGORICAL_THRESHOLD
+
+    if (is_categorical_color) {
+      n_colors <- length(unique(color_data[!is.na(color_data)]))
+      colors_set <- RColorBrewer::brewer.pal(min(max(3, n_colors), 8), "Set2")
+      color_palette <- if (n_colors > 8) colorRampPalette(colors_set)(n_colors) else colors_set
+    }
+  }
+
+  # Pre-transform size data
+  if (use_size) {
+    size_data_scaled <- log10(plot_data[[size_col]] + 1)
+    size_range <- range(size_data_scaled, na.rm = TRUE)
+
+    plot_data$size_scaled <- if (size_range[2] > size_range[1]) {
+      REDUCTION_SIZE_RANGE[1] + (REDUCTION_SIZE_RANGE[2] - REDUCTION_SIZE_RANGE[1]) *
+        (size_data_scaled - size_range[1]) / (size_range[2] - size_range[1])
+    } else {
+      rep(REDUCTION_DEFAULT_SIZE, length(size_data_scaled))
+    }
+    plot_data$size_scaled[is.na(plot_data[[size_col]])] <- REDUCTION_NA_SIZE
+  }
+
+  output$reductionPlot <- renderPlotly({
+    p <- plot_ly(source = "ReductionPlot")
+
+    # Categorical color - plot each category separately with legend
+    if (use_color && is_categorical_color) {
+      color_categories <- unique(plot_data[[color_col]])
+      color_categories <- color_categories[!is.na(color_categories)]
+
+      # Plot valid colors
+      for (c_idx in seq_along(color_categories)) {
+        subset_data <- plot_data[
+          plot_data[[color_col]] == color_categories[c_idx] &
+          !is.na(plot_data[[color_col]]), ]
+
+        if (nrow(subset_data) > 0) {
+          p <- p %>% add_trace(
+            data = subset_data,
+            x = ~get(x_col), y = ~get(y_col),
+            type = "scatter", mode = "markers",
+            marker = list(
+              color = color_palette[c_idx],
+              size = if (use_size) subset_data$size_scaled else REDUCTION_DEFAULT_SIZE,
+              line = list(width = 0),
+              opacity = REDUCTION_MARKER_OPACITY
+            ),
+            text = ~hover_text, hoverinfo = "text",
+            customdata = ~get(gene_col),
+            name = as.character(color_categories[c_idx]),
+            showlegend = TRUE
+          )
+        }
+      }
+
+      # Plot NA color (use grey, keep default circle shape)
+      subset_data <- plot_data[is.na(plot_data[[color_col]]), ]
+
+      if (nrow(subset_data) > 0) {
+        p <- p %>% add_trace(
+          data = subset_data,
+          x = ~get(x_col), y = ~get(y_col),
+          type = "scatter", mode = "markers",
+          marker = list(
+            color = REDUCTION_NA_COLOR,
+            size = if (use_size) subset_data$size_scaled else REDUCTION_DEFAULT_SIZE,
+            line = list(width = 0),
+            opacity = REDUCTION_MARKER_OPACITY
+          ),
+          text = ~hover_text, hoverinfo = "text",
+          customdata = ~get(gene_col),
+          name = "NA",
+          showlegend = TRUE
+        )
+      }
+    # Continuous color or no color mapping
+    } else {
+      if (use_color && !is_categorical_color) {
+        # Plot points with valid color values
+        subset_data <- plot_data[!is.na(plot_data[[color_col]]), ]
+
+        if (nrow(subset_data) > 0) {
+          marker_config <- list(
+            color = subset_data[[color_col]],
+            colorscale = REDUCTION_COLORSCALE_CONTINUOUS,
+            colorbar = list(title = color_col),
+            showscale = TRUE,
+            size = if (use_size) subset_data$size_scaled else REDUCTION_DEFAULT_SIZE,
+            line = list(width = 0),
+            opacity = REDUCTION_MARKER_OPACITY
+          )
+
+          p <- p %>% add_trace(
+            data = subset_data,
+            x = ~get(x_col), y = ~get(y_col),
+            type = "scatter", mode = "markers",
+            marker = marker_config,
+            text = ~hover_text, hoverinfo = "text",
+            customdata = ~get(gene_col),
+            showlegend = FALSE
+          )
+        }
+
+        # Plot NA color values (use grey, keep default circle shape)
+        subset_data <- plot_data[is.na(plot_data[[color_col]]), ]
+
+        if (nrow(subset_data) > 0) {
+          p <- p %>% add_trace(
+            data = subset_data,
+            x = ~get(x_col), y = ~get(y_col),
+            type = "scatter", mode = "markers",
+            marker = list(
+              color = REDUCTION_NA_COLOR,
+              size = if (use_size) subset_data$size_scaled else REDUCTION_DEFAULT_SIZE,
+              line = list(width = 0),
+              opacity = REDUCTION_MARKER_OPACITY
+            ),
+            text = ~hover_text, hoverinfo = "text",
+            customdata = ~get(gene_col),
+            name = paste0(color_col, ": NA"),
+            showlegend = TRUE
+          )
+        }
+      } else {
+        # No color mapping - plot all points
+        marker_config <- list(
+          size = if (use_size) plot_data$size_scaled else REDUCTION_DEFAULT_SIZE,
+          line = list(width = 0),
+          opacity = REDUCTION_MARKER_OPACITY
+        )
+
+        p <- p %>% add_trace(
+          data = plot_data,
+          x = ~get(x_col), y = ~get(y_col),
+          type = "scatter", mode = "markers",
+          marker = marker_config,
+          text = ~hover_text, hoverinfo = "text",
+          customdata = ~get(gene_col),
+          showlegend = FALSE
+        )
+      }
+    }
+
+    # Configure legend title
+    legend_title <- if (use_color && is_categorical_color) {
+      color_col
+    }
+
+    p %>% layout(
+      xaxis = list(title = x_col),
+      yaxis = list(title = y_col),
+      dragmode = "lasso",
+      hovermode = "closest",
+      legend = if (!is.null(legend_title)) list(title = list(text = legend_title)) else list()
+    )
+  })
 }
 
 renderEnrichmentTable <- function(shinyOutputId, input_table,

@@ -54,6 +54,14 @@ generateHelpFileInputTabPanel <- function() {
       column(
         12,
         box(
+          title = "2D Reduction", collapsible = T, collapsed = T,
+          solidHeader = T, status = "primary", width = NULL,
+          generateHelpReduction()
+        )
+      ),
+      column(
+        12,
+        box(
           title ="View" , collapsible = T, collapsed = T,
           solidHeader = T, status = "primary", width = NULL,
           generateHelpFileInputViewData()
@@ -215,6 +223,55 @@ generateHelpVolcano <- function() {
    </div>
 
   
+    ')
+}
+
+generateHelpReduction <- function() {
+  HTML('
+   <p>
+   <b>2D Reduction Input</b><br />
+   FLAME allows you to upload gene data with 2D coordinates from dimensionality reduction analyses (PCA, t-SNE, UMAP, etc.) and interactively visualize and select genes for enrichment analysis.
+   </p>
+
+      <div>
+      <div class = "wholeRow">
+        <div class = "helpImage_div">
+           <p style = "text-align: center; font-style: italic;">
+           Screenshot placeholder
+           </p>
+        </div>
+      </div>
+
+      <div class = "wholeRow">
+        <p style = "text-align: justify">
+       <b>(1)</b> Upload a file containing gene data with coordinates. The file must include:
+       <ul>
+         <li><b>Required:</b> A <code>symbol</code> column for gene names</li>
+         <li><b>Required:</b> At least 2 numeric columns for X/Y coordinates (e.g., PC1, PC2, UMAP1, UMAP2)</li>
+         <li><b>Optional:</b> Additional columns for coloring or sizing points (e.g., cluster, expression level, gene type)</li>
+       </ul>
+       Acceptable file formats are tab-delimited (.tsv, .txt) or comma-separated (.csv).
+       <br /><br />
+       <b>(2)</b> After uploading, the data table appears and a "2D Reduction" tab becomes available in the View and Filter Options section.
+       <br /><br />
+       <b>(3)</b> In the 2D Reduction tab, select which columns to use for:
+       <ul>
+         <li><b>X axis</b> and <b>Y axis</b>: Choose from available numeric columns (required)</li>
+         <li><b>Color by</b>: Categorical columns show distinct colors; continuous columns show gradients (optional)</li>
+         <li><b>Size by</b>: Point sizes scale with values (optional)</li>
+       </ul>
+       <br />
+       <b>(4)</b> Click "Generate Plot" to create the interactive 2D reduction plot.
+       <br /><br />
+       <b>(5)</b> Use the lasso or box selection tools to select genes of interest directly on the plot.
+       <br /><br />
+       <b>(6)</b> Click "Add to lists" to create a new gene list from your selection, which can then be used for enrichment analysis.
+       <br /><br />
+       <b>Note:</b> Click "Clear" to reset column selections. You can generate multiple plots with different settings and create multiple gene lists from different selections.
+        </p>
+      </div>
+   </div>
+
     ')
 }
 

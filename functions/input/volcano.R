@@ -28,9 +28,9 @@ readVolcanoInput <- function() {
   fileType <- tolower(substr(volcanoFile$name, nchar(volcanoFile$name) - 2,
                              nchar(volcanoFile$name)))
   if (fileType == "tsv" || fileType == "txt")
-    volcanoInput <- read.delim(volcanoFile$datapath, header = T)
+    volcanoInput <- read.delim(volcanoFile$datapath, header = TRUE)
   else if (fileType == "csv")
-    volcanoInput <- read.csv(volcanoFile$datapath, header = T)
+    volcanoInput <- read.csv(volcanoFile$datapath, header = TRUE)
   return(volcanoInput)
 }
 
@@ -40,20 +40,20 @@ readVolcanoExample <- function() {
 }
 
 isValidVolcanoInput <- function(volcanoInput) {
-  isValid <- F
+  isValid <- FALSE
   if (areInvalidVolcanoColumns(volcanoInput))
     return(isValid)
   if (isInvalidObjectSize(volcanoInput, prefix = "volcano"))
     return(isValid)
-  isValid <- T
+  isValid <- TRUE
   return(isValid)
 }
 
 areInvalidVolcanoColumns <- function(volcanoInput) {
-  areInvalid <- F
+  areInvalid <- FALSE
   if (!all(tolower(colnames(volcanoInput)) %in% c("symbol", "logfc", "pvalue")) ||
     length(colnames(volcanoInput)) != 3) {
-    areInvalid <- T
+    areInvalid <- TRUE
     renderWarning("Need 3 columns: symbol, logFC and pvalue")
   }
   return(areInvalid)
@@ -114,9 +114,9 @@ handleVolcanoSubmit <- function() {
 }
 
 existVolcanoSelectedItems <- function() {
-  existItems <- T
+  existItems <- TRUE
   if (length(volcanoSelectedItems) == 0) {
-    existItems <- F
+    existItems <- FALSE
     renderWarning("Hover on the volcano plot,
                   choose the box or lasso and select at least one item first.")
   }

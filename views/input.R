@@ -11,7 +11,8 @@ generateInputPage <- function() {
           generateUploadPanel(),
           generateVariantPanel(),
           generateTextMiningPanel(),
-          generateVolcanoPanel()
+          generateVolcanoPanel(),
+          generateReductionPanel()
         )
       )
     ),
@@ -21,7 +22,8 @@ generateInputPage <- function() {
       id = "inputPlots",
       generateViewPanel(),
       generateUpsetPlotPanel(),
-      generateVolcanoPlotPanel()
+      generateVolcanoPlotPanel(),
+      generateReductionPlotPanel()
     )
   )
 }
@@ -157,6 +159,32 @@ generateVolcanoPanel <- function() {
       column(
         8,
         dataTableOutput(outputId = "volcanoViewer")
+      )
+    )
+  )
+}
+
+generateReductionPanel <- function() {
+  tabPanel(
+    title = "2D Reduction",
+    icon = icon("braille"),
+    tags$br(),
+    fluidRow(
+      column(
+        4,
+        fileInput("reductionUpload", "Upload 2D reduction data:", multiple = FALSE,
+                  accept = c(".tsv", ".csv", ".txt")) %>%
+          bsplus::shinyInput_label_embed(
+            bsplus::shiny_iconlink("circle-info") %>%
+              bsplus::bs_embed_popover(
+                title = "Upload file with at least: 1 column for gene identifiers + 2 numeric columns for coordinates (e.g., PC1, PC2). Additional columns for color/size (optional)."
+              )
+          ),
+        actionButton("reduction_addExample", "Example", icon("bookmark")),
+      ),
+      column(
+        8,
+        dataTableOutput(outputId = "reductionViewer")
       )
     )
   )
@@ -318,6 +346,76 @@ generateVolcanoPlotPanel <- function() {
           tags$br(),
           tags$br(),
           verbatimTextOutput("volcanoSelected")
+        )
+      )
+    )
+  )
+}
+
+generateReductionPlotPanel <- function() {
+  tabPanel(
+    title = "2D Reduction Plot",
+    icon = icon("braille"),
+    tags$br(),
+    fluidRow(
+      column(
+        9,
+        textOutput("reductionSelectionInfo"),
+        plotlyOutput("reductionPlot", height = "750px")
+      ),
+      column(
+        3,
+        tags$div(
+          id = "reductionPanel",
+          tags$h4("Plot Controls"),
+          selectInput(
+            inputId = "reduction_gene_col",
+            label = "Gene column:",
+            choices = c(""),
+            selected = "",
+            width = "100%"
+          ),
+          selectInput(
+            inputId = "reduction_x_axis",
+            label = "X axis:",
+            choices = c(""),
+            selected = "",
+            width = "100%"
+          ),
+          selectInput(
+            inputId = "reduction_y_axis",
+            label = "Y axis:",
+            choices = c(""),
+            selected = "",
+            width = "100%"
+          ),
+          selectInput(
+            inputId = "reduction_color",
+            label = "Color by:",
+            choices = c(""),
+            selected = "",
+            width = "100%"
+          ),
+          selectInput(
+            inputId = "reduction_size",
+            label = "Size by:",
+            choices = c(""),
+            selected = "",
+            width = "100%"
+          ),
+          tags$br(),
+          actionButton("reductionGenerate", "Generate Plot",
+                       icon("palette"), class = "submit_button"),
+          actionButton("reductionClear", "Clear",
+                       icon("broom"), class = "submit_button"),
+          actionButton("reduction_submit", "Add to lists", icon("paper-plane")),
+          tags$br(),
+          tags$br(),
+          tags$div(
+            style = "color: #666; font-size: 0.9em; margin-bottom: 10px;",
+            textOutput("reductionPlotStatus")
+          ),
+          verbatimTextOutput("reductionSelected")
         )
       )
     )

@@ -1,7 +1,8 @@
 # Input
 userInputLists <- list()
-checkedListNames <- list() # in combination with js_listNames 
+checkedListNames <- list() # in combination with js_listNames
 volcanoSelectedItems <- c()
+reductionSelectedItems <- c()
 
 # Enrichment
 enrichmentResults <- list()
@@ -18,6 +19,7 @@ STRINGNetworkData <- list()
 currentVariantResults <- data.frame()
 currentTextminingResult <- c()
 currentVolcano <- data.frame()
+currentReduction <- data.frame()
 currentUpsetMode <- ""
 currentConversionResult <- data.frame()
 currentOrthologyResult <- data.frame()

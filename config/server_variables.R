@@ -11,6 +11,17 @@ GENE_LIST_PREFIX <- "gene_list"
 # Volcano
 VOLCANO_COLORS <- c("default" = "#000000",
                     "overexpressed" = "#eb6e6c", "underexpressed" = "#64e4ed")
+# 2D Reduction
+REDUCTION_PREFIX <- "reduction"
+REDUCTION_NA_COLOR <- "#4D4D4D"  # Dark grey for NA values
+REDUCTION_COLORSCALE_CONTINUOUS <- list(
+  c(0, "#2166AC"), c(0.5, "#F7F7F7"), c(1, "#B2182B")  # Blue-white-red gradient
+)
+REDUCTION_DEFAULT_SIZE <- 6  # Default marker size in pixels
+REDUCTION_SIZE_RANGE <- c(3, 9)  # Min and max size for scaled markers
+REDUCTION_NA_SIZE <- 1  # Size for NA values (below minimum)
+REDUCTION_CATEGORICAL_THRESHOLD <- 20  # Max unique values to treat as categorical color (used in render.R)
+REDUCTION_MARKER_OPACITY <- 0.7
 
 # Organisms ####
 ORGANISMS <- readRDS("./organisms/organismsDF.RDS")

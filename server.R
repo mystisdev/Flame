@@ -16,6 +16,7 @@ function(input, output, session) {
   source("functions/input/text_mining.R", local = T)
   source("functions/input/snps.R", local = T)
   source("functions/input/volcano.R", local = T)
+  source("functions/input/reduction.R", local = T)
   source("functions/input/api.R", local = T)
   source("functions/input/conversion.R", local = T)
   
@@ -197,7 +198,50 @@ function(input, output, session) {
   observeEvent(input$volcano_ok, {
     handleVolcanoListAccept()
   }, ignoreInit = T)
-  
+
+  # ~2D Reduction ####
+  observeEvent(input$reductionUpload, {
+    handleReductionInput(readReductionInput)
+  }, ignoreInit = T)
+
+  observeEvent(input$reduction_addExample, {
+    handleReductionInput(readReductionExample)
+  }, ignoreInit = T)
+
+  observeEvent(input$reductionGenerate, {
+    handleReductionGenerate()
+  }, ignoreInit = T)
+
+  observeEvent(input$reductionClear, {
+    handleReductionClear()
+  }, ignoreInit = T)
+
+  observeEvent(event_data("plotly_selected", source = "ReductionPlot"), {
+    triggeredEvent <- event_data("plotly_selected", source = "ReductionPlot")
+    reductionSelectedItems <<- triggeredEvent$customdata
+    renderShinyText("reductionSelected",
+                    paste(reductionSelectedItems, collapse = ", "))
+  }, ignoreInit = T)
+
+  observeEvent(input$reduction_submit, {
+    handleReductionSubmit()
+  }, ignoreInit = T)
+
+  observeEvent(input$reduction_ok, {
+    handleReductionListAccept()
+  }, ignoreInit = T)
+
+  # Update dropdown choices when any dropdown changes
+  observeEvent(c(
+    input$reduction_gene_col,
+    input$reduction_x_axis,
+    input$reduction_y_axis,
+    input$reduction_color,
+    input$reduction_size
+  ), {
+    updateReductionDropdownChoices()
+  }, ignoreInit = T)
+
   # ENRICHMENT ####
   observeEvent(input$functional_enrichment_organism, {
     handleFunctionalEnrichmentOrganismSelection()
