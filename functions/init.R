@@ -21,7 +21,8 @@ initializeServerApp <- function() {
 toggleUpsetTab <- function() {
   if (length(userInputLists) > 1) {
     showTab("inputPlots", "UpSet Plot")
-    updateTabsetPanel(session, "inputPlots", selected = "UpSet Plot")
+    # Trigger pulse animation on the tab instead of forcing focus
+    session$sendCustomMessage("handler_pulseUpsetTab", list())
   }
   else
     hideTab("inputPlots", "UpSet Plot")
