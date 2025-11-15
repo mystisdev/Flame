@@ -264,9 +264,47 @@ label:has(> #selectAll) {
   text-align: right;
 }
 
-.conversionBox > pre, #volcanoSelected {
-  max-height: 500px;
+.conversionBox > pre, #volcanoSelected, #reductionSelected {
+  max-height: 200px;
   white-space: pre-wrap;
+}
+
+/* Section headers for plot panels */
+.section-header {
+  font-size: 0.95em;
+  font-weight: 600;
+  color: #2998b1;
+  margin-top: 15px;
+  margin-bottom: 8px;
+  padding-bottom: 5px;
+  border-bottom: 2px solid #ffee6e;
+}
+
+/* Plot information content box */
+.plot-info-content {
+  padding: 8px 10px;
+  background-color: #f9f9f9;
+  border-radius: 4px;
+  margin-bottom: 12px;
+  border: 1px solid #e0e0e0;
+}
+
+.plot-info-content #reductionPlotStatus {
+  color: #555;
+  font-size: 0.9em;
+  font-weight: 500;
+  margin: 0;
+}
+
+.plot-info-content:empty {
+  display: none;
+}
+
+/* Reduce visual weight of input labels in 2D reduction plot controls */
+#reductionPanel label {
+  font-size: 0.85em;
+  font-weight: 500;
+  color: #555;
 }
 
 #string_viewer {

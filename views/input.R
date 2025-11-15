@@ -367,7 +367,7 @@ generateReductionPlotPanel <- function() {
         3,
         tags$div(
           id = "reductionPanel",
-          tags$h4("Plot Controls"),
+          tags$h5("Plot Controls", class = "section-header"),
           selectInput(
             inputId = "reduction_gene_col",
             label = "Gene column:",
@@ -411,10 +411,12 @@ generateReductionPlotPanel <- function() {
           actionButton("reduction_submit", "Add to lists", icon("paper-plane")),
           tags$br(),
           tags$br(),
+          tags$h5("Plot Information", class = "section-header"),
           tags$div(
-            style = "color: #666; font-size: 0.9em; margin-bottom: 10px;",
+            class = "plot-info-content",
             textOutput("reductionPlotStatus")
           ),
+          tags$h5("Selected Genes", class = "section-header"),
           verbatimTextOutput("reductionSelected")
         )
       )
