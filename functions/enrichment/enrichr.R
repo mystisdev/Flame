@@ -213,7 +213,7 @@ splitEnrichrWPTerms <- function(enrichrResult) {
 splitEnrichrPantherTerms <- function(enrichrResult) {
   terms <- c()
   ids <- c()
-  items <- enrichrResult[grep("^PANTHER$", enrichrResult$database), ]$Term
+  items <- enrichrResult[grep("^PANTHER Pathways$", enrichrResult$database), ]$Term
   if (!identical(items, character(0))) {
     splitList <- strsplit(items, " Homo sapiens ")
     terms <- sapply(splitList, "[[", 1)
