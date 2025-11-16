@@ -22,6 +22,7 @@ aboutPage <- fluidRow(
           <li><a href='https://bib.fleming.gr:8084/app/darling' target='_blank'>Darling: A Web Application for Detecting Disease-Related Biomedical Entity Associations with Literature Mining</a>
           <li> <a href='http://bib.fleming.gr:3838/OnTheFly/' target='_blank'>OnTheFly<sup>2.0</sup>: Extract Biological Information from Documents</a>
           <li> <a href='https://string-db.org/' target='_blank'>STRING-DB: A database of protein-protein interactions, offering network visualization options</a>
+          <li> <a href='https://genecodis.genyo.es/' target='_blank'>GeneCodis: Gene Annotation Co-occurrence Discovery</a>
       </ul>
       <h3> Cite <i>Flame</i> </h3>
       <p style='font-size:15px'>If you find Flame useful in your work please cite:</p>

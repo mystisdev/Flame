@@ -450,8 +450,9 @@ generateHelpFunctionalEnrichmentControlPanel <- function() {
           <li><b> enrichR</b></li>
           <li><b> STRING</b></li>
           <li><b> PANTHER</b></li>
+          <li><b> GeneCodis</b></li>
         </ul>
-        You can either select a single tool (default selection) or a combination (up to five).
+        You can either select a single tool (default selection) or a combination (up to six).
         
         <li><b>Select datasources:</b> </li> 
         <ul>

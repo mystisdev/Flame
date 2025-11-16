@@ -60,13 +60,15 @@ attachDBLinks <- function() { # Transfac HPA CORUMLinks, unavailable
   attachLinks("PANTHERPC", "https://pantherdb.org/panther/category.do?categoryAcc=")
 
   # Pathways
-  attachLinks("PANTHER", "http://www.pantherdb.org/pathway/pathDetail.do?clsAccession=")
+  attachLinks("PANTHER Pathways", "http://www.pantherdb.org/pathway/pathDetail.do?clsAccession=")
   attachLinks("REAC", "https://reactome.org/content/detail/")
   attachLinks("WP", "https://www.wikipathways.org/index.php/Pathway:")
+  attachLinks("BioPlanet", "https://tripod.nih.gov/bioplanet/detail.jsp?pid=", urlSuffix = "&target=pathway")
 
   # Disease and phenotype ontologies
   attachLinks("DO", "http://www.informatics.jax.org/disease/")
   attachLinks("HP", "https://monarchinitiative.org/")
+  attachLinks("OMIM", "https://www.omim.org/entry/")
   attachLinks("ORPHA", "https://www.orpha.net/consor/cgi-bin/OC_Exp.php?Lng=GB&Expert=", gSub = "ORPHA:")
   attachLinks("WBP", "https://wormbase.org/species/all/phenotype/")
   attachLinks("WBBT", "https://wormbase.org/species/all/anatomy_term/")
@@ -76,12 +78,18 @@ attachDBLinks <- function() { # Transfac HPA CORUMLinks, unavailable
   attachLinks("BTO", "https://www.ebi.ac.uk/ols/ontologies/bto/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2FBTO_", gSub = "BTO:")
 
   # Regulatory elements
+  attachLinks("TF", "http://gene-regulation.com/cgi-bin/pub/databases/transfac/search.cgi?species=Homo_sapiens&factor=")
+  attachLinks("CollecTRI", "https://www.genecards.org/cgi-bin/carddisp.pl?gene=")
   attachLinks("MIRNA", "https://www.mirbase.org/textsearch.shtml?q=", gSub = "MIRNA:")
+
+  # Pharmacogenomics and drug perturbations
+  attachLinks("PharmGKB", "https://www.clinpgx.org/chemical/")
+  # LINCS: No external links available - terms displayed as plain text
 
   attachKEGGLinks()
 }
 
-attachLinks <- function(sourceId, url, stopChar = "$", gSub = NULL) {
+attachLinks <- function(sourceId, url, stopChar = "$", gSub = NULL, urlSuffix = "") {
   linksVector <-
     enrichmentResults[[currentType_Tool]][grepl(
       paste0("^", sourceId, stopChar), enrichmentResults[[currentType_Tool]]$Source), ]$Term_ID
@@ -92,7 +100,7 @@ attachLinks <- function(sourceId, url, stopChar = "$", gSub = NULL) {
     enrichmentResults[[currentType_Tool]][grepl(
       paste0("^", sourceId, stopChar), enrichmentResults[[currentType_Tool]]$Source), ]$Term_ID <<-
       paste0(
-        "<a href='", url, gSubLinksVector, "' target='_blank'>",
+        "<a href='", url, gSubLinksVector, urlSuffix, "' target='_blank'>",
         linksVector, "</a>"
       )
   }
@@ -145,25 +153,41 @@ attachKEGGLinks <- function() {
         )
 
     } else {
-      # Traditional tools (gProfiler, etc.) - need both short_name AND kegg_name
-      if (!is.na(shortName) && !is.na(keggName)) {
-        conversionTable <- createEntrezAccConversionTable(tempEnrichmentDF, shortName)
-        if (!is.null(conversionTable)) {
-          tempEnrichmentDFWithEntrezAcc <-
-            convertPositiveHitsToEntrezAcc(tempEnrichmentDF, conversionTable)
+      # Traditional tools (gProfiler, GeneCodis, etc.)
+      if (!is.na(keggName)) {
+        # Need keggName for organism-specific pathway URLs
 
-          linksVector <- tempEnrichmentDFWithEntrezAcc$Term_ID
-          enrichmentResults[[currentType_Tool]][grepl(
-            "^KEGG$", enrichmentResults[[currentType_Tool]]$Source), ]$Term_ID <<-
-            paste0(
-              "<a href='https://www.kegg.jp/kegg-bin/show_pathway?",
-              gsub("KEGG:|map", keggName, linksVector),
-              "+", gsub(",", "+", tempEnrichmentDFWithEntrezAcc$`Positive Hits EntrezAcc`),
-              "' target='_blank'>", linksVector, "</a>"
-            )
+        # Try gene highlighting if organism supported by gProfiler
+        if (!is.na(shortName)) {
+          conversionTable <- createEntrezAccConversionTable(tempEnrichmentDF, shortName)
+          if (!is.null(conversionTable)) {
+            # Conversion succeeded - create links WITH gene highlighting
+            tempEnrichmentDFWithEntrezAcc <-
+              convertPositiveHitsToEntrezAcc(tempEnrichmentDF, conversionTable)
+            linksVector <- tempEnrichmentDFWithEntrezAcc$Term_ID
+            urlSuffix <- paste0("+", gsub(",", "+", tempEnrichmentDFWithEntrezAcc$`Positive Hits EntrezAcc`))
+          } else {
+            # Conversion failed - create links WITHOUT highlighting
+            linksVector <- tempEnrichmentDF$Term_ID
+            urlSuffix <- ""
+          }
+        } else {
+          # No gProfiler support - create links WITHOUT highlighting
+          linksVector <- tempEnrichmentDF$Term_ID
+          urlSuffix <- ""
         }
+
+        # Create KEGG links (with or without gene highlighting)
+        enrichmentResults[[currentType_Tool]][grepl(
+          "^KEGG$", enrichmentResults[[currentType_Tool]]$Source), ]$Term_ID <<-
+          paste0(
+            "<a href='https://www.kegg.jp/kegg-bin/show_pathway?",
+            gsub("KEGG:|map", keggName, linksVector),
+            urlSuffix,
+            "' target='_blank'>", linksVector, "</a>"
+          )
       }
-      # If organism lacks short_name OR kegg_name, no KEGG links are created
+      # If organism lacks kegg_name, no KEGG links created (can't construct URL)
     }
   }
 }
@@ -189,10 +213,17 @@ calculateConversionTable <- function(inputToConvert, shortName) {
       "input" = inputToConvert,
       "target" = inputToConvert
     )
-  else
-    conversionTable <- gprofiler2::gconvert(inputToConvert,
-                                            organism = shortName,
-                                            target = "ENTREZGENE_ACC")
+  else {
+    # Try to convert using gProfiler
+    # If organism not supported by gProfiler, return NULL (KEGG links will work without gene highlighting)
+    conversionTable <- tryCatch({
+      gprofiler2::gconvert(inputToConvert,
+                          organism = shortName,
+                          target = "ENTREZGENE_ACC")
+    }, error = function(e) {
+      return(NULL)
+    })
+  }
   return(conversionTable)
 }
 

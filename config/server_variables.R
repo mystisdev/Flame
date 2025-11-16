@@ -47,7 +47,7 @@ DATASOURCES_PRINT <- list(
   ),
   'Biological Pathways' = list(
     "KEGG" = "KEGG", "Reactome" = "REAC",
-    "WikiPathways" = "WP", "PANTHER" = "PANTHER"
+    "WikiPathways" = "WP", "PANTHER Pathways" = "PANTHER Pathways", "BioPlanet" = "BioPlanet"
   ),
   'Diseases' = list(
     "Disease Ontology" = "DO", "DisGeNET" = "DISGENET",
@@ -71,10 +71,12 @@ DATASOURCES_PRINT <- list(
   ),
   'Drugs' = list(
     "DrugBank" = "DRUGBANK",
-    "GLAD4U" = "GLAD4U_DRUG"
+    "GLAD4U" = "GLAD4U_DRUG",
+    "PharmGKB" = "PharmGKB",
+    "LINCS" = "LINCS"
   ),
   'Regulatory motifs in DNA' = list(
-    "TRANSFAC" = "TF", "miRTarBase" = "MIRNA"
+    "TRANSFAC" = "TF", "CollecTRI TFs" = "CollecTRI", "miRTarBase" = "MIRNA"
   )
 )
 DATASOURCES_DEFAULT_SELECTED <- list("GO:MF", "GO:CC", "GO:BP", "KEGG")
@@ -88,7 +90,39 @@ DATASOURCES[["STRING"]] <- c("GO:MF", "GO:CC", "GO:BP",
                             "DO", "BTO", "HP", "PUBMED")
 DATASOURCES[["PANTHER"]] <- c("GO:MF", "GO:CC", "GO:BP", "REAC",
                               "GOSLIM:MF", "GOSLIM:CC", "GOSLIM:BP",
-                              "PANTHER", "PANTHERPC")
+                              "PANTHER Pathways", "PANTHERPC")
+DATASOURCES[["GENECODIS"]] <- c("GO:MF", "GO:CC", "GO:BP",
+                                "KEGG", "REAC", "WP", "PANTHER Pathways",
+                                "HP", "OMIM", "MGI",
+                                "BioPlanet", "PharmGKB", "LINCS",
+                                "CollecTRI", "MIRNA")  # Homo sapiens (taxid: 9606)
+DATASOURCES[["MMUSCULUS_GENECODIS"]] <- c("GO:MF", "GO:CC", "GO:BP",
+                                          "KEGG", "REAC", "WP", "PANTHER Pathways",
+                                          "MGI", "CollecTRI", "MIRNA")  # Mus musculus (taxid: 10090)
+DATASOURCES[["RNORVEGICUS_GENECODIS"]] <- c("GO:MF", "GO:CC", "GO:BP",
+                                            "KEGG", "REAC", "WP", "PANTHER Pathways",
+                                            "MGI", "CollecTRI", "MIRNA")  # Rattus norvegicus (taxid: 10116)
+DATASOURCES[["CELEGANS_GENECODIS"]] <- c("GO:MF", "GO:CC", "GO:BP",
+                                         "KEGG", "REAC", "WP", "PANTHER Pathways")  # Caenorhabditis elegans (taxid: 6239)
+DATASOURCES[["DMELANOGASTER_GENECODIS"]] <- c("GO:MF", "GO:CC", "GO:BP",
+                                              "KEGG", "REAC", "WP", "PANTHER Pathways")  # Drosophila melanogaster (taxid: 7227)
+DATASOURCES[["DRERIO_GENECODIS"]] <- c("GO:MF", "GO:CC", "GO:BP",
+                                       "KEGG", "REAC", "WP", "PANTHER Pathways",
+                                       "MGI")  # Danio rerio (taxid: 7955)
+DATASOURCES[["CLFAMILIARIS_GENECODIS"]] <- c("GO:MF", "GO:CC", "GO:BP",
+                                             "KEGG", "REAC", "WP", "PANTHER Pathways")  # Canis lupus familiaris (taxid: 9615)
+DATASOURCES[["GGALLUS_GENECODIS"]] <- c("GO:MF", "GO:CC", "GO:BP",
+                                        "KEGG", "REAC", "WP", "PANTHER Pathways")  # Gallus gallus (taxid: 9031)
+DATASOURCES[["BTAURUS_GENECODIS"]] <- c("GO:MF", "GO:CC", "GO:BP",
+                                        "KEGG", "REAC", "WP", "PANTHER Pathways")  # Bos taurus (taxid: 9913)
+DATASOURCES[["SSCROFA_GENECODIS"]] <- c("GO:MF", "GO:CC", "GO:BP",
+                                        "KEGG", "REAC")  # Sus scrofa (taxid: 9823)
+DATASOURCES[["ATHALIANA_GENECODIS"]] <- c("GO:MF", "GO:CC", "GO:BP",
+                                          "KEGG", "WP", "PANTHER Pathways")  # Arabidopsis thaliana (taxid: 3702)
+DATASOURCES[["OSATIVA_GENECODIS"]] <- c("GO:MF", "GO:CC", "GO:BP", "KEGG")  # Oryza sativa Japonica Group (taxid: 39947)
+DATASOURCES[["SCEREVISIAE_GENECODIS"]] <- c("GO:MF", "GO:CC", "GO:BP",
+                                            "KEGG", "REAC", "WP", "PANTHER Pathways")  # Saccharomyces cerevisiae S288C (taxid: 559292)
+DATASOURCES[["ECOLI_GENECODIS"]] <- c("GO:MF", "GO:CC", "GO:BP", "KEGG")  # Escherichia coli str. K-12 substr. MG1655 (taxid: 511145)
 DATASOURCES_CODES <- list()
 DATASOURCES_CODES[["STRING"]] <- list(
   "GO:MF" = "Function", "GO:CC" = "Component", "GO:BP" = "Process",
@@ -103,8 +137,15 @@ DATASOURCES_CODES[["PANTHER"]] <- list(
   "GOSLIM:CC" = "ANNOT_TYPE_ID_PANTHER_GO_SLIM_CC",
   "GOSLIM:BP" = "ANNOT_TYPE_ID_PANTHER_GO_SLIM_BP",
   "REAC" = "ANNOT_TYPE_ID_REACTOME_PATHWAY",
-  "PANTHER" = "ANNOT_TYPE_ID_PANTHER_PATHWAY",
+  "PANTHER Pathways" = "ANNOT_TYPE_ID_PANTHER_PATHWAY",
   "PANTHERPC" = "ANNOT_TYPE_ID_PANTHER_PC"
+)
+DATASOURCES_CODES[["GENECODIS"]] <- list(
+  "GO:MF" = "GO_MF", "GO:CC" = "GO_CC", "GO:BP" = "GO_BP",
+  "KEGG" = "KEGG", "REAC" = "Reactome", "WP" = "WikiPathways",
+  "PANTHER Pathways" = "Panther", "HP" = "HPO", "OMIM" = "OMIM", "MGI" = "MGI",
+  "BioPlanet" = "BioPlanet", "PharmGKB" = "PharmGKB", "LINCS" = "LINCS",
+  "CollecTRI" = "CollecTRI", "MIRNA" = "miRTarBase"
 )
 DATASOURCES_CODES[["WEBGESTALT"]] <- list(
   "GO:MF" = "geneontology_Molecular_Function_noRedundant",
@@ -113,7 +154,7 @@ DATASOURCES_CODES[["WEBGESTALT"]] <- list(
   "KEGG" = "pathway_KEGG",
   "REAC" = "pathway_Reactome",
   "WP" = "pathway_Wikipathway",
-  "PANTHER" = "pathway_Panther",
+  "PANTHER Pathways" = "pathway_Panther",
   "DISGENET" = "disease_Disgenet",
   "OMIM" = "disease_OMIM",
   "GLAD4U_DISEASE" = "disease_GLAD4U",
@@ -128,7 +169,7 @@ DATASOURCES_CODES[["ENRICHR"]] <- list(
   "KEGG" = "KEGG_2016", # "KEGG_2021_Human" -> doesn't return Ids
   "REAC" = "Reactome_2022",
   "WP" = "WikiPathway_2021_Human",
-  "PANTHER" = "Panther_2016",
+  "PANTHER Pathways" = "Panther_2016",
   "HP" = "Human_Phenotype_Ontology"
 )
 DATASOURCES_CODES[["MOUSE_ENRICHR"]] <- list(
@@ -203,6 +244,7 @@ METRICS[["WEBGESTALT"]] <- list(
 METRICS[["ENRICHR"]] <- list("Adjusted P-value" = "adjusted_pvalue")
 METRICS[["STRING"]] <- list("False discovery rate", "P-value")
 METRICS[["PANTHER"]] <- list("False discovery rate", "P-value", "Bonferroni")
+METRICS[["GENECODIS"]] <- list("False discovery rate" = "fdr")
 DEFAULT_METRIC_TEXT <- "Default tool metrics"
 
 DEFAULT_METRICS_GENOME <- list(
@@ -210,14 +252,16 @@ DEFAULT_METRICS_GENOME <- list(
   "WEBGESTALT" = "BH",
   "ENRICHR" = "adjusted_pvalue",
   "STRING" = "False discovery rate",
-  "PANTHER" = "False discovery rate"
+  "PANTHER" = "False discovery rate",
+  "GENECODIS" = "fdr"
 )
 
 DEFAULT_METRICS_USERBACKGROUND <- list(
   "GPROFILER" = "bonferroni",
   "WEBGESTALT" = "top",
   "STRING" = "P-value",
-  "PANTHER" = "P-value"
+  "PANTHER" = "P-value",
+  "GENECODIS" = "fdr"
 )
 
 ENRICHMENT_DF_COLNAMES <- c(

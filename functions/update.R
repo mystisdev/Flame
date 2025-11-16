@@ -80,6 +80,9 @@ getChoicesUnion <- function(toolCapitalNames) {
     if (tool == "ENRICHR") {
       prefix <- getEnrichrVariablePrefix()
     }
+    if (tool == "GENECODIS") {
+      prefix <- getGeneCodisVariablePrefix()
+    }
     choices <- c(choices, DATASOURCES[[paste0(prefix, tool)]])
   }
   choices <- filterDatasourcePrintChoices(unique(choices))
@@ -274,7 +277,7 @@ updateBackgroundMode <- function(choice, enrichmentType) {
     # this is only for enrichmentType = 'functional',
     # since 'literature' only has STRING anyway
     updatePickerInput(session, "functional_enrichment_tool",
-                      choices = c("gProfiler", "WebGestalt", "STRING", "PANTHER"), selected = DEFAULT_TOOL)
+                      choices = c("gProfiler", "WebGestalt", "STRING", "PANTHER", "GeneCodis"), selected = DEFAULT_TOOL)
   }
   updateAvailableSignificanceMetrics()
 }

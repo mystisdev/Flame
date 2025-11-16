@@ -372,7 +372,7 @@ renderShinyVisNetwork <- function(networkId, nodes, edges, layout) {
       visGroups(groupname = "KEGG", color = DATASOURCE_COLORS["KEGG"][[1]], shape = "diamond") %>%
       visGroups(groupname = "REAC", color = DATASOURCE_COLORS["REAC"][[1]], shape = "diamond") %>%
       visGroups(groupname = "WP", color = DATASOURCE_COLORS["WP"][[1]], shape = "diamond") %>%
-      visGroups(groupname = "PANTHER", color = DATASOURCE_COLORS["PANTHER"][[1]], shape = "diamond") %>%
+      visGroups(groupname = "PANTHER Pathways", color = DATASOURCE_COLORS["PANTHER Pathways"][[1]], shape = "diamond") %>%
       visGroups(groupname = "DO", color = DATASOURCE_COLORS["DO"][[1]], shape = "triangleDown") %>%
       visGroups(groupname = "DISGENET", color = DATASOURCE_COLORS["DISGENET"][[1]], shape = "triangleDown") %>%
       visGroups(groupname = "OMIM", color = DATASOURCE_COLORS["OMIM"][[1]], shape = "triangleDown") %>%
@@ -385,6 +385,7 @@ renderShinyVisNetwork <- function(networkId, nodes, edges, layout) {
       visGroups(groupname = "BTO", color = DATASOURCE_COLORS["BTO"][[1]], shape = "triangle") %>%
       visGroups(groupname = "WBBT", color = DATASOURCE_COLORS["WBBT"][[1]], shape = "triangle") %>%
       visGroups(groupname = "TF", color = DATASOURCE_COLORS["TF"][[1]], shape = "triangle") %>%
+      visGroups(groupname = "CollecTRI", color = DATASOURCE_COLORS["CollecTRI"][[1]], shape = "triangle") %>%
       visGroups(groupname = "MIRNA", color = DATASOURCE_COLORS["MIRNA"][[1]], shape = "triangle") %>%
       visGroups(groupname = "CORUM", color = DATASOURCE_COLORS["CORUM"][[1]], shape = "triangle") %>%
       visGroups(groupname = "HPA", color = DATASOURCE_COLORS["HPA"][[1]], shape = "square") %>%

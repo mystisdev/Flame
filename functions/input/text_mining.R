@@ -41,7 +41,7 @@ handleTextMining <- function() {
     }
   }, error = function(e) {
     cat(paste("Functional enrichment analysis error:  ", e))
-    renderError("Error during enrichment. Try again in a while.")
+    renderError(e$message)
   }, finally = {
     removeModal()
   })

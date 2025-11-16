@@ -51,10 +51,7 @@ handleEnrichment <- function(enrichmentType) {
             currentType_Tool <<-
               paste(currentEnrichmentType, currentEnrichmentTool, sep = "_")
             currentSignificanceMetric <<- decideToolMetric()
-            start_time <- proc.time()
             handleEnrichmentWithTool()
-            end_time <- proc.time()
-            print((end_time - start_time)[3])
           })
           
           prepareCombinationTab()
@@ -63,7 +60,7 @@ handleEnrichment <- function(enrichmentType) {
     }
   }, error = function(e) {
     cat(paste("Functional enrichment analysis error:  ", e))
-    renderError("Error during enrichment. Try again in a while.")
+    renderError(e$message)
   }, finally = {
     removeModal()
   })
@@ -174,6 +171,14 @@ geneConvert <- function(geneList) {
       # For PANTHER: Use PANTHER's geneinfo API for gene mapping
       # Input: ["FSD1L", "LTA4H"] -> Output: ["HUMAN|HGNC=13753|UniProtKB=Q9BXM9", "HUMAN|HGNC=6710|UniProtKB=P09960"]
       inputGenesConversionTable <- pantherPOSTConvert(geneList, currentOrganism)
+    } else if (currentEnrichmentTool == "GeneCodis") {
+      # For GeneCodis: No conversion needed - accepts multiple ID formats and auto-recognizes them
+      # Pass genes through as-is (like USERINPUT)
+      inputGenesConversionTable <- data.frame(
+        "input" = geneList,
+        "target" = geneList,
+        "name" = geneList
+      )
     } else {
       # For gProfiler, WebGestalt, enrichR: Use g:Profiler conversion to target namespace
       # Examples: ENTREZGENE_ACC, ENSEMBL, etc. (depends on tool requirements)
@@ -199,6 +204,7 @@ getDefaultTargetNamespace <- function() {
     "gProfiler" = "USERINPUT",
     "WebGestalt" = "ENTREZGENE_ACC",
     "PANTHER" = "PANTHER_ACC",
+    "GeneCodis" = "USERINPUT",
     "enrichR" = {
       if (shortName == "scerevisiae" || shortName == "dmelanogaster")
         "USERINPUT"
@@ -293,6 +299,8 @@ runEnrichmentAnalysis <- function(userInputList, user_reference = NULL) {
     runString(userInputList, currentOrganism, user_reference)
   } else if (tool == "PANTHER") {
     runPanther(userInputList, currentOrganism, user_reference)
+  } else if (tool == "GENECODIS") {
+    runGeneCodis(userInputList, currentOrganism, user_reference)
   }
 }
 
@@ -351,7 +359,7 @@ rollBackConvertedNames <- function(enrichmentOutput, inputGenesConversionTable) 
   }
 
   enrichmentOutput <- tidyr::separate_rows(enrichmentOutput,
-                                           `Positive Hits`, sep = ",")
+                                           `Positive Hits`, sep = ",\\s*")
   enrichmentOutput <- merge(enrichmentOutput, inputGenesConversionTable,
                             by.x = "Positive Hits", by.y = "target")
   enrichmentOutput <-
@@ -551,25 +559,29 @@ printFunctionalResultTable <- function() {
 }
 
 printResultTable <- function(shinyOutputId, tabPosition, datasource) {
-  if (datasource == "all" || datasource == "pubmed")
+  if (datasource == "all" || datasource == "pubmed") {
     transformedResultPartial <- enrichmentResults[[currentType_Tool]]
-  else
+  } else {
+    pattern <- paste0("^", datasource, "$")
+    matches <- grepl(pattern, enrichmentResults[[currentType_Tool]]$Source)
     transformedResultPartial <-
-      enrichmentResults[[currentType_Tool]][grepl(
-        paste0("^", datasource, "$"),
-        enrichmentResults[[currentType_Tool]]$Source), ]
+      enrichmentResults[[currentType_Tool]][matches, ]
+  }
 
   if (nrow(transformedResultPartial) > 0) {
     transformedResultPartial$`Positive Hits` <-
       gsub(",", ", ", transformedResultPartial$`Positive Hits`)
+
     session$sendCustomMessage("handler_showSourceTab",
                               list(prefix = currentType_Tool,
                                    tabPosition = tabPosition))
+
     caption = "Enrichment Results"
     fileName <- paste(currentType_Tool, datasource, sep = "_")
     mode <- "Positive Hits"
     hiddenColumns <- c(0, 11, 12)
     expandableColumn <- 11
+
     renderEnrichmentTable(shinyOutputId, transformedResultPartial,
                           caption, fileName, mode,
                           hiddenColumns, expandableColumn)

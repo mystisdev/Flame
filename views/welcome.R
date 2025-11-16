@@ -14,7 +14,7 @@ welcomePage <- fluidRow(
         <ul>
           <li>Upload <b>multiple</b> gene/protein lists, SNPs, free text or gene expression results (Volcano plot)<br />
           <li><b>Combine lists</b> by calculating their unions and intersections with the help of UpSet plots<br />
-          <li>Perform <b>functional enrichment</b> analysis on any of the combined lists for more than 14,000 organisms, using five tools (gProfiler, WebGestalt, enrichR, STRING, PANTHER)<br />
+          <li>Perform <b>functional enrichment</b> analysis on any of the combined lists for more than 14,000 organisms, using six tools (gProfiler, WebGestalt, enrichR, STRING, PANTHER, GeneCodis)<br />
           <li><b>Combine</b> and <b>compare</b> enrichment results from multiple runs<br />
           <li>Perform <b>literature enrichment</b> analysis on any of the combined lists, using STRING<br />
           <li>Generate <b>protein-protein interaction</b> networks via STRING<br />

@@ -101,7 +101,8 @@ gProfiler: User Input
 WebGestalt: Entrez Gene Accession
 enrichR: Entrez Gene Name
 STRING: ENSEMBL Protein ID
-PANTHER: PANTHER Accession"
+PANTHER: PANTHER Accession
+GeneCodis: User Input"
               )
           )
         ),
