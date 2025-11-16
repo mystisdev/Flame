@@ -44,7 +44,11 @@ createGlobalComboTable <- function() {
   combinationResult <<- combinationResult[, c("Source", "Term_ID", "Function",
                                               "Term_ID_noLinks", "Tool", "P-value")]
   combinationResult$Tool <<- sapply(strsplit(combinationResult$Tool, "_"), "[[", 2)
+  # Deduplicate (Term_ID, Tool) pairs before grouping: PANTHER returns the same GO term
+  # under both regular GO (GO:BP) and GO Slim (GOSLIM:BP) with identical Term_IDs.
+  # Without this, grouping by Term_ID creates "PANTHER, PANTHER" in Tools column and rank=7 instead of 6
   termToolMatching <- combinationResult %>%
+    distinct(Term_ID_noLinks, Tool, .keep_all = TRUE) %>%
     group_by(Term_ID_noLinks) %>%
     summarise(Tools = toString(Tool)) %>%
     ungroup()
