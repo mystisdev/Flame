@@ -309,11 +309,12 @@ renderReduction <- function() {
 
 renderEnrichmentTable <- function(shinyOutputId, input_table,
                                   caption, fileName, mode,
-                                  hiddenColumns, expandableColumn){
+                                  hiddenColumns, expandableColumn, filter = 'none'){
   output[[shinyOutputId]] <- DT::renderDataTable(
     server = F,
     cbind(' ' = '&oplus;', input_table),
-    escape = F, 
+    escape = F,
+    filter = filter,  # Enable column-specific filtering controls (default: none)
     extensions = c('Buttons'),
     caption = caption,
     options = list(

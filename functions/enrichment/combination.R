@@ -103,6 +103,10 @@ handleComboSourceSelect <- function() {
     filteredCombinationResult <- filterComboTable(combinationResult)
     filteredCombinationResult <-
       filteredCombinationResult[order(-filteredCombinationResult$Rank), ]
+
+    # Convert Source to factor for dropdown filtering (instead of text search)
+    filteredCombinationResult$Source <- as.factor(filteredCombinationResult$Source)
+
     renderShinyDataTable(
       "combo_table", filteredCombinationResult, caption = "Term-tool combinations",
       fileName = "combination", hiddenColumns = c(3), filter = "top"
@@ -154,6 +158,10 @@ handleComboUpsetClick <- function() {
       colnames(elements) <- "Term_ID_noLinks"
       elements <- plyr::join(elements, combinationResult, type = "left",
                              by = "Term_ID_noLinks")
+
+      # Convert Source to factor for dropdown filtering (instead of text search)
+      elements$Source <- as.factor(elements$Source)
+
       renderShinyDataTable("combo_upsetClick_table", elements,
                            caption = "UpSet Clicked Terms",
                            fileName = "combo_upsetClick", hiddenColumns = c(0),

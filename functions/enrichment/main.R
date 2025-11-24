@@ -582,9 +582,14 @@ printResultTable <- function(shinyOutputId, tabPosition, datasource) {
     hiddenColumns <- c(0, 11, 12)
     expandableColumn <- 11
 
+    # Convert Source to factor for dropdown filtering (instead of text search)
+    transformedResultPartial$Source <- as.factor(transformedResultPartial$Source)
+
+    # Enable top-row filtering to allow users to filter by datasource, p-value range, etc,
+    # but especially 'term size' for better control over too small and too large terms
     renderEnrichmentTable(shinyOutputId, transformedResultPartial,
                           caption, fileName, mode,
-                          hiddenColumns, expandableColumn)
+                          hiddenColumns, expandableColumn, filter = 'top')
   }
 }
 
