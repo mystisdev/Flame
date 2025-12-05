@@ -197,7 +197,8 @@ caption {
 }
 
 .heatmapOutput > .plotly,
-.barchartOutput > .plotly{
+.barchartOutput > .plotly,
+.dotPlotOutput > .plotly{
   height: auto !important;
 }
 

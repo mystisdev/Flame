@@ -23,6 +23,12 @@ REDUCTION_NA_SIZE <- 1  # Size for NA values (below minimum)
 REDUCTION_CATEGORICAL_THRESHOLD <- 20  # Max unique values to treat as categorical color (used in render.R)
 REDUCTION_MARKER_OPACITY <- 0.7
 
+# Dot Plot ####
+DOTPLOT_SIZE_MIN <- 4
+DOTPLOT_SIZE_MAX <- 25
+DOTPLOT_ENTRY_HEIGHT_PX <- 22
+DOTPLOT_COLORSCALE <- "Viridis"  # Built-in Plotly scale
+
 # Organisms ####
 ORGANISMS <- readRDS("./organisms/organismsDF.RDS")
 TOOL_ORGANISMS <- readRDS("./organisms/toolOrganismsList.RDS")
@@ -270,7 +276,7 @@ ENRICHMENT_DF_COLNAMES <- c(
 )
 
 # Plots ####
-ALL_PLOT_IDS <- c(NETWORK_IDS, HEATMAP_IDS, "barchart", "scatterPlot")
+ALL_PLOT_IDS <- c(NETWORK_IDS, HEATMAP_IDS, "barchart", "scatterPlot", "dotPlot")
 DEFAULT_SLIDER_VALUE <- 50
 MAX_SLIDER_VALUE <- 200
 SINGLE_BAR_HEIGHT_PX <- 18

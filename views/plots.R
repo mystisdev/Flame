@@ -28,6 +28,7 @@ generatePlotPanel <- function(tabName) {
     ),
     "Barchart" = generatePlotPanelOrDiv("barchart"),
     "Scatter Plot" = generatePlotPanelOrDiv("scatterPlot"),
+    "Dot Plot" = generatePlotPanelOrDiv("dotPlot"),
     "Manhattan" = {
       if (currentEnrichmentTool == "gProfiler")
         generateManhattanPanel()
@@ -71,7 +72,7 @@ generatePlotPanelOrDiv <- function(plotId) {
   
   uiTermKeyword <- stringr::str_to_title(UI_TERM_KEYWORD[[currentEnrichmentType]])
   # conditions
-  if (plotId %in% c("barchart", "scatterPlot"))
+  if (plotId %in% c("barchart", "scatterPlot", "dotPlot"))
     returnType <- "tags$div"
   if (plotId %in% c("network1", "heatmap1"))
     title <- paste0(uiTermKeyword, " Vs Genes")
@@ -121,11 +122,21 @@ generatePlotPanelOrDiv <- function(plotId) {
       class = "barchartOutput",
       plotlyOutput(paste(currentType_Tool, "barchart", sep = "_"))
     )
+  if (plotId == "dotPlot")
+    plotOutputDiv <- tags$div(
+      class = "dotPlotOutput",
+      plotlyOutput(paste(currentType_Tool, "dotPlot", sep = "_"))
+    )
   if (plotId %in% c("network3", "heatmap3", "scatterPlot")) {
     actionButtonColumns <- 12
     plotDrawFormatControl <- NULL
   }
-    
+
+  # Mode choices: add "Gene Ratio" for dotPlot
+  modeChoices <- c("-log10Pvalue", "Enrichment Score")
+  if (plotId == "dotPlot")
+    modeChoices <- c("-log10Pvalue", "Enrichment Score", "Gene Ratio")
+
   return(
     # returnType is either "tabPanel" or "tags$div"
     eval(parse(text = returnType))( 
@@ -157,12 +168,12 @@ generatePlotPanelOrDiv <- function(plotId) {
             )
         ),
         column(
-          4, 
+          4,
           radioButtons(
             inputId = paste(currentType_Tool, plotId, "mode", sep = "_"),
             label = paste0("Order retrieved ",
                            UI_TERM_KEYWORD[[currentEnrichmentType]], " by:"),
-            choices = c("-log10Pvalue", "Enrichment Score"),
+            choices = modeChoices,
             inline = TRUE
           )
         )

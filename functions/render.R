@@ -501,7 +501,58 @@ renderScatterPlot <- function(shinyOutputId, scatterData) {
   })
 }
 
-renderManhattanPlot <- function() { 
+renderDotPlot <- function(shinyOutputId, dotPlotData, drawFormatColumn, height) {
+  # Square root scaling for dot sizes
+  minIntersection <- min(dotPlotData$`Intersection Size`)
+  maxIntersection <- max(dotPlotData$`Intersection Size`)
+
+  if (maxIntersection == minIntersection) {
+    dotPlotData$scaledSize <- (DOTPLOT_SIZE_MIN + DOTPLOT_SIZE_MAX) / 2
+  } else {
+    dotPlotData$scaledSize <- DOTPLOT_SIZE_MIN +
+      (DOTPLOT_SIZE_MAX - DOTPLOT_SIZE_MIN) *
+      (sqrt(dotPlotData$`Intersection Size`) - sqrt(minIntersection)) /
+      (sqrt(maxIntersection) - sqrt(minIntersection))
+  }
+
+  output[[shinyOutputId]] <- renderPlotly({
+    plot_ly(
+      data = dotPlotData,
+      x = ~`Gene Ratio`,
+      y = dotPlotData[[drawFormatColumn]],
+      type = 'scatter',
+      mode = 'markers',
+      marker = list(
+        size = ~scaledSize,
+        color = ~`-log10Pvalue`,
+        colorscale = DOTPLOT_COLORSCALE,
+        colorbar = list(
+          title = "-log10(P-value)",
+          tickformat = ".1f",
+          len = 0.6,
+          thickness = 15
+        ),
+        line = list(color = 'rgba(0,0,0,0.3)', width = 1)
+      ),
+      hoverinfo = "text",
+      hovertext = ~paste0(
+        "TERM_ID: ", Term_ID_noLinks,
+        "\nFUNCTION: ", Function,
+        "\nGene Ratio: ", round(`Gene Ratio`, 3),
+        "\nIntersection Size: ", `Intersection Size`,
+        "\nTerm Size: ", `Term Size`,
+        "\nQuery Size: ", `Query size`,
+        "\n-log10Pvalue: ", `-log10Pvalue`,
+        "\nEnrichment Score %: ", `Enrichment Score %`
+      ),
+      height = height,
+      source = "DotPlot"
+    ) %>%
+      layout(xaxis = list(title = "Gene Ratio"))
+  })
+}
+
+renderManhattanPlot <- function() {
   output$manhattan <- renderPlotly({
     gprofiler2::gostplot(
       gprofilerResult,

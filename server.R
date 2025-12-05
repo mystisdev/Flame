@@ -37,6 +37,7 @@ function(input, output, session) {
   source("functions/plots/heatmaps.R", local = T)
   source("functions/plots/barchart.R", local = T)
   source("functions/plots/scatter.R", local = T)
+  source("functions/plots/dotplot.R", local = T)
   source("functions/plots/manhattan.R", local = T)
   source("functions/plots/arena3d.R", local = T)
   
@@ -361,6 +362,16 @@ function(input, output, session) {
       observeEvent(input[[paste(enrichmentType, toolName,
                                 "scatterPlot_button", sep = "_")]], {
         handleScatterPlot(enrichmentType, toolName)
+      }, ignoreInit = T)
+    })
+  })
+
+  # ~~Dot Plot ####
+  lapply(ENRICHMENT_TYPES, function(enrichmentType) {
+    lapply(ENRICHMENT_TOOLS, function(toolName) {
+      observeEvent(input[[paste(enrichmentType, toolName,
+                                "dotPlot_button", sep = "_")]], {
+        handleDotPlot(enrichmentType, toolName)
       }, ignoreInit = T)
     })
   })
