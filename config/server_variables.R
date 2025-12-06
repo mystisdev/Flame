@@ -11,6 +11,7 @@ GENE_LIST_PREFIX <- "gene_list"
 # Volcano
 VOLCANO_COLORS <- c("default" = "#000000",
                     "overexpressed" = "#eb6e6c", "underexpressed" = "#64e4ed")
+VOLCANO_PREFIX <- "volcano"
 # 2D Reduction
 REDUCTION_PREFIX <- "reduction"
 REDUCTION_NA_COLOR <- "#4D4D4D"  # Dark grey for NA values

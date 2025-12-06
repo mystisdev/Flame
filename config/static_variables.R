@@ -19,6 +19,7 @@ STRINGNetworkData <- list()
 currentVariantResults <- data.frame()
 currentTextminingResult <- c()
 currentVolcano <- data.frame()
+volcanoPlotData <- data.frame()  # Prepared data for volcano rendering (standardized column names)
 currentReduction <- data.frame()
 currentUpsetMode <- ""
 currentConversionResult <- data.frame()

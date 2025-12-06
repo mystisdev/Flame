@@ -1,6 +1,5 @@
 initializeServerApp <- function() {
   toggleUpsetTab()
-  hideTab("inputPlots", "Volcano Plot")
   session$sendCustomMessage("handler_setListLimit", LISTNAME_NCHAR_LIMIT)
   lapply(ENRICHMENT_TOOLS, function(toolName) {
     session$sendCustomMessage("handler_hideSourceTabs",
@@ -59,7 +58,11 @@ initializeVolcanoPanel <- function() {
   output$volcanoSelectionInfo <- renderText({
     "Pick the box or lasso from the plot toolbar and then select items. Double-click to reset view."
   })
+  output$volcanoPlotStatus <- renderText({
+    ""
+  })
   shinyjs::hide("volcanoSelectionInfo")
+  hideTab("inputPlots", "Volcano Plot")
   initializeVolcanoMetricsConversionText()
   shinyjs::hide("volcanoPanel")
 }

@@ -182,10 +182,6 @@ function(input, output, session) {
                                        input$volcano_fc_slider)
   }, ignoreInit = T)
   
-  observeEvent(input$volcanoRedraw, {
-    handleVolcanoRedraw()
-  }, ignoreInit = T)
-  
   observeEvent(event_data("plotly_selected", source = "Volcano"), {
     triggeredEvent <- event_data("plotly_selected", source = "Volcano")
     volcanoSelectedItems <<- triggeredEvent$customdata
@@ -199,6 +195,23 @@ function(input, output, session) {
 
   observeEvent(input$volcano_ok, {
     handleVolcanoListAccept()
+  }, ignoreInit = T)
+
+  observeEvent(input$volcanoGenerate, {
+    handleVolcanoGenerate()
+  }, ignoreInit = T)
+
+  observeEvent(input$volcanoClear, {
+    handleVolcanoClear()
+  }, ignoreInit = T)
+
+  # Update dropdown choices when any dropdown changes
+  observeEvent(c(
+    input$volcano_gene_col,
+    input$volcano_logfc_col,
+    input$volcano_pvalue_col
+  ), {
+    updateVolcanoDropdownChoices()
   }, ignoreInit = T)
 
   # ~2D Reduction ####

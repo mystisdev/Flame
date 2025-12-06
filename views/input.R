@@ -146,12 +146,12 @@ generateVolcanoPanel <- function() {
     fluidRow(
       column(
         4,
-        fileInput("volcanoUpload", "Upload gene fold change file:", multiple = F,
+        fileInput("volcanoUpload", "Upload gene fold change file:", multiple = FALSE,
                   accept = c(".tsv", ".csv", ".txt")) %>%
           bsplus::shinyInput_label_embed(
             bsplus::shiny_iconlink("circle-info") %>%
               bsplus::bs_embed_popover(
-                title = "Upload a 3-column file (symbol, logFC, pvalue)."
+                title = "Upload file with at least: 1 column for gene identifiers + 2 numeric columns (logFC, p-value). You'll select which columns to use after upload."
               )
           ),
         actionButton("volcano_addExample", "Example", icon("bookmark")),
@@ -317,6 +317,28 @@ generateVolcanoPlotPanel <- function() {
         3,
         tags$div(
           id = "volcanoPanel",
+          tags$h5("Plot Controls", class = "section-header"),
+          selectInput(
+            inputId = "volcano_gene_col",
+            label = "Gene column *:",
+            choices = c(""),
+            selected = "",
+            width = "100%"
+          ),
+          selectInput(
+            inputId = "volcano_logfc_col",
+            label = "LogFC column *:",
+            choices = c(""),
+            selected = "",
+            width = "100%"
+          ),
+          selectInput(
+            inputId = "volcano_pvalue_col",
+            label = "P-value column *:",
+            choices = c(""),
+            selected = "",
+            width = "100%"
+          ),
           sliderInput(
             inputId = "volcano_pvalue_slider",
             label = "Choose -log10Pvalue threshold:",
@@ -331,7 +353,6 @@ generateVolcanoPlotPanel <- function() {
                   title = "0.05 pvalue == 1.30103 -log10pvalue\n0.01 pvalue == 2 -log10pvalue"
                 )
             ),
-          verbatimTextOutput("volcanoMetricConversions"),
           sliderInput(
             inputId = "volcano_fc_slider",
             label = "Choose |log2FC| threshold:",
@@ -340,11 +361,21 @@ generateVolcanoPlotPanel <- function() {
             step = DEFAULT_VOLCANO_LOG2FC_STEP,
             width = "100%"
           ),
-          actionButton("volcanoRedraw", "Redraw",
+          tags$br(),
+          actionButton("volcanoGenerate", "Generate Plot",
                        icon("palette"), class = "submit_button"),
+          actionButton("volcanoClear", "Clear",
+                       icon("broom"), class = "submit_button"),
           actionButton("volcano_submit", "Add to lists", icon("paper-plane")),
           tags$br(),
           tags$br(),
+          tags$h5("Plot Information", class = "section-header"),
+          tags$div(
+            class = "plot-info-content",
+            textOutput("volcanoPlotStatus"),
+            textOutput("volcanoMetricConversions")
+          ),
+          tags$h5("Selected Genes", class = "section-header"),
           verbatimTextOutput("volcanoSelected")
         )
       )
@@ -370,21 +401,21 @@ generateReductionPlotPanel <- function() {
           tags$h5("Plot Controls", class = "section-header"),
           selectInput(
             inputId = "reduction_gene_col",
-            label = "Gene column:",
+            label = "Gene column *:",
             choices = c(""),
             selected = "",
             width = "100%"
           ),
           selectInput(
             inputId = "reduction_x_axis",
-            label = "X axis:",
+            label = "X axis *:",
             choices = c(""),
             selected = "",
             width = "100%"
           ),
           selectInput(
             inputId = "reduction_y_axis",
-            label = "Y axis:",
+            label = "Y axis *:",
             choices = c(""),
             selected = "",
             width = "100%"

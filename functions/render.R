@@ -64,15 +64,15 @@ renderUpset <- function(shinyOutputId, upsetList, upsetModeFunction) {
 }
 
 renderVolcano <- function() {
-  minLog10PValue <- min(currentVolcano$`-log10Pvalue`)
-  maxLog10PValue <- max(currentVolcano$`-log10Pvalue`)
-  maxLog2FC <- max(currentVolcano$logfc)
+  minLog10PValue <- min(volcanoPlotData$`-log10Pvalue`)
+  maxLog10PValue <- max(volcanoPlotData$`-log10Pvalue`)
+  maxLog2FC <- max(volcanoPlotData$logfc)
   pvalueThreshold <- input$volcano_pvalue_slider
   logFCThreshold <- input$volcano_fc_slider
-  
+
   output$volcanoPlot <- renderPlotly({
     plot_ly(
-      data = currentVolcano,
+      data = volcanoPlotData,
       x = ~`logfc`,
       y = ~`-log10Pvalue`,
       customdata = ~symbol,
@@ -82,7 +82,7 @@ renderVolcano <- function() {
       color = ~expression,
       colors = VOLCANO_COLORS,
       hoverinfo = "text",
-      hovertext = ~paste0("Symbol: ", symbol,
+      hovertext = ~paste0("Gene: ", symbol,
                           "\nlogFC: ", logfc,
                           "\n-log10Pvalue: ", `-log10Pvalue`),
       source = "Volcano"
@@ -90,7 +90,8 @@ renderVolcano <- function() {
       layout(
         xaxis = list(title = "log2FC"),
         yaxis = list(title = "-log10Pvalue"),
-        showlegend = F,
+        showlegend = FALSE,
+        dragmode = "lasso",
         shapes = list(
           renderLine(minLog10PValue, maxLog10PValue, logFCThreshold, logFCThreshold),
           renderLine(minLog10PValue, maxLog10PValue, -logFCThreshold, -logFCThreshold),

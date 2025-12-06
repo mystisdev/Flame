@@ -38,7 +38,7 @@ updateVolcanoSliders <- function(maxLog10PValue, maxLogFC) {
 
 updateVolcanoMetricsConversionText <- function(log10pvalue, log2fc) {
   conversionText <- sprintf(
-    "pvalue = %f\nFC = %f",
+    "pvalue = %.6f, FC = %.2f",
     10 ^ -log10pvalue,
     2 ^ log2fc
   )
