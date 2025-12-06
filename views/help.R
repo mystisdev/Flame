@@ -192,12 +192,12 @@ generateHelpVolcano <- function() {
   HTML('
    <p>
    
-   <b>Variants</b>
-   Flame is capable of parsing and annotating lists of single nucleotide
-   polymorphisms (SNPs), through the “SNP” input option.
-   
+   <b>Volcano Plot</b>
+   FLAME allows you to upload gene expression data and visualize it as an interactive
+   Volcano plot for differential expression analysis.
+
    </p>
-   
+
       <div>
       <div class = "wholeRow">
         <div class = "helpImage_div">
@@ -210,7 +210,7 @@ generateHelpVolcano <- function() {
         <p style = "text-align: justify">
        Flame offers the ability to <b>(1)</b> upload expression data in tab delimited or comma separated format, 
        or run a pre-set example (format: gene name - log fold change - statistical significance).
-      The respective table is then loaded next to the file input (mandatory column names: symbol, pvalue, logFC).
+      The respective table is then loaded next to the file input (you can select which columns to use for gene names, log fold change, and p-values).
       In the View Tab, a Volcano plot will be generated automatically.
       You can adjust both the p-value <b>(2)</b> and FC thresholds <b>(3)</b> (red lines on the plot) to 
       mark your under- and over-expressed genes of preference.
