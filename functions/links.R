@@ -106,6 +106,8 @@ attachLinks <- function(sourceId, url, stopChar = "$", gSub = NULL, urlSuffix = 
   }
 }
 
+MAX_KEGG_HIGHLIGHTED_GENES <- 10
+
 attachKEGGLinks <- function() {
   # KEGG organism codes and supported organisms reference:
   # https://www.kegg.jp/kegg/tables/br08606.html
@@ -133,7 +135,11 @@ attachKEGGLinks <- function() {
             convertPositiveHitsToEntrezAcc(tempEnrichmentDF, conversionTable)
           linksVector <- tempEnrichmentDFWithEntrezAcc$Term_ID
           geneHighlights <- gsub(",", "+", tempEnrichmentDFWithEntrezAcc$`Positive Hits EntrezAcc`)
-          urlSuffix <- paste0("+", geneHighlights)
+          # Limit highlighting per pathway to avoid "Request-URI Too Long" errors
+          geneCounts <- sapply(strsplit(geneHighlights, "\\+"), length)
+          urlSuffix <- ifelse(geneCounts <= MAX_KEGG_HIGHLIGHTED_GENES,
+                              paste0("+", geneHighlights),
+                              "")
         } else {
           linksVector <- tempEnrichmentDF$Term_ID
           urlSuffix <- ""  # No gene highlighting if conversion fails
@@ -165,7 +171,12 @@ attachKEGGLinks <- function() {
             tempEnrichmentDFWithEntrezAcc <-
               convertPositiveHitsToEntrezAcc(tempEnrichmentDF, conversionTable)
             linksVector <- tempEnrichmentDFWithEntrezAcc$Term_ID
-            urlSuffix <- paste0("+", gsub(",", "+", tempEnrichmentDFWithEntrezAcc$`Positive Hits EntrezAcc`))
+            geneHighlights <- gsub(",", "+", tempEnrichmentDFWithEntrezAcc$`Positive Hits EntrezAcc`)
+            # Limit highlighting per pathway to avoid "Request-URI Too Long" errors
+            geneCounts <- sapply(strsplit(geneHighlights, "\\+"), length)
+            urlSuffix <- ifelse(geneCounts <= MAX_KEGG_HIGHLIGHTED_GENES,
+                                paste0("+", geneHighlights),
+                                "")
           } else {
             # Conversion failed - create links WITHOUT highlighting
             linksVector <- tempEnrichmentDF$Term_ID
