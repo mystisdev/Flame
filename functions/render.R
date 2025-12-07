@@ -319,6 +319,7 @@ renderEnrichmentTable <- function(shinyOutputId, input_table,
     extensions = c('Buttons'),
     caption = caption,
     options = list(
+      scrollX = TRUE,
       "dom" = 'T<"clear">lBfrtip',
       buttons = list(
         list(extend = 'excel', filename = fileName),
