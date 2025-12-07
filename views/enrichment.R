@@ -193,11 +193,12 @@ generateToolPanel <- function(toolName) {
 
 generateParametersBox <- function() {
   box(
-    title = "Parameters", 
+    title = "Parameters",
     width = NULL,
-    status = "primary", 
+    status = "primary",
     solidHeader = T,
     collapsible = T,
+    collapsed = T,
     verbatimTextOutput(
       outputId = paste(currentType_Tool, "enrichment_parameters", sep = "_")
     ),
