@@ -813,10 +813,12 @@ generateHelpPlotsNetwork <- function() {
        <div class = "sideBySide">
        <p>
        
-       Similar to Functions Vs Genes.Here functions are connected with each other 
-       with edge weights relative to the number of their shared genes. An extra option 
-       named “Similarity score cut-off(%)” allows you to filter out edges below a percent
-       of shared genes.
+       Similar to Functions Vs Genes. Here functions are connected with each other
+       with edge weights relative to the number of their shared genes. An extra option
+       named "Similarity score cut-off(%)" allows you to filter out edges below a certain
+       similarity threshold. The similarity score is calculated as:
+       (Common Genes / Total Genes) x 100, representing the percentage of shared genes
+       relative to the combined gene pool of both terms (Jaccard-like similarity).
 
         </p>
         </div>

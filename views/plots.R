@@ -200,22 +200,26 @@ generatePlotPanelOrDiv <- function(plotId) {
 }
 
 generateNetworkExtraControl <- function(networkId) {
-  label <- switch(
+  exclusiveNetworkComponent <- switch(
     networkId,
     "network1" = NULL,
-    "network2" = "Similarity score cut-off (%):",
-    "network3" = paste0(
-      "Number of common ", UI_TERM_KEYWORD[[currentEnrichmentType]], ":"
+    "network2" = sliderInput(
+      inputId = paste(currentType_Tool, networkId, "thresholdSlider", sep = "_"),
+      label = "Similarity score cut-off (%):",
+      min = 1, max = 100, value = 10, step = 1
+    ) %>%
+      bsplus::shinyInput_label_embed(
+        bsplus::shiny_iconlink("circle-info") %>%
+          bsplus::bs_embed_popover(
+            title = "Jaccard-like similarity: (Common Genes / Total Genes) x 100"
+          )
+      ),
+    "network3" = sliderInput(
+      inputId = paste(currentType_Tool, networkId, "thresholdSlider", sep = "_"),
+      label = paste0("Number of common ", UI_TERM_KEYWORD[[currentEnrichmentType]], ":"),
+      min = 1, max = 100, value = 10, step = 1
     )
   )
-  
-  if (!is.null(label))
-    exclusiveNetworkComponent <- sliderInput(
-      inputId = paste(currentType_Tool, networkId, "thresholdSlider", sep = "_"),
-      label = label, min = 1, max = 100, value = 10, step = 1
-    )
-  else
-    exclusiveNetworkComponent <- NULL
   
   return(
     fluidRow(

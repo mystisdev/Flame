@@ -54,7 +54,7 @@ const pulseUpsetTab = (message) => {
   // Add pulse animation class
   $tab.addClass('tab-pulse-effect');
 
-  // Remove class after animation completes (3 iterations × 0.8s = 2.4s)
+  // Remove class after animation completes (3 iterations x 0.8s = 2.4s)
   setTimeout(function() {
     $tab.removeClass('tab-pulse-effect');
   }, 2400);
