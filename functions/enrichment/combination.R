@@ -41,9 +41,16 @@ existTwoToolResults <- function() {
 createGlobalComboTable <- function() {
   functionalEnrichmentResults <- enrichmentResults[grep("^functional", names(enrichmentResults))]
   combinationResult <<- dplyr::bind_rows(functionalEnrichmentResults, .id = "Tool")
+
+  # Keep Positive Hits for intersection/union calculation before dropping
   combinationResult <<- combinationResult[, c("Source", "Term_ID", "Function",
-                                              "Term_ID_noLinks", "Tool", "P-value")]
+                                              "Term_ID_noLinks", "Tool", "P-value",
+                                              "Positive Hits")]
   combinationResult$Tool <<- sapply(strsplit(combinationResult$Tool, "_"), "[[", 2)
+
+  # Calculate intersection and union of positive hits per term across tools
+  termHitStats <- calculateTermHitStats(combinationResult)
+
   # Deduplicate (Term_ID, Tool) pairs before grouping: PANTHER returns the same GO term
   # under both regular GO (GO:BP) and GO Slim (GOSLIM:BP) with identical Term_IDs.
   # Without this, grouping by Term_ID creates "PANTHER, PANTHER" in Tools column and rank=7 instead of 6
@@ -52,23 +59,62 @@ createGlobalComboTable <- function() {
     group_by(Term_ID_noLinks) %>%
     summarise(Tools = toString(Tool)) %>%
     ungroup()
-  
+
   combinationResult <<- plyr::join(termToolMatching, combinationResult, type = "left",
                                    by = "Term_ID_noLinks")
   combinationResult <<- calculateFisherStats(combinationResult)
   combinationResult <<- distinct(combinationResult, Term_ID_noLinks, Tools,
                                  .keep_all = T)
+
+  # Join hit stats and select final columns
+  combinationResult <<- plyr::join(combinationResult, termHitStats, type = "left",
+                                   by = "Term_ID_noLinks")
   combinationResult <<- combinationResult[, c("Source", "Term_ID", "Function",
                                               "Term_ID_noLinks", "Tools",
-                                              "Chisq", "P_value_combined")]
+                                              "Chisq", "P_value_combined",
+                                              "Intersection_Hits", "Union_Hits",
+                                              "Hit_Summary")]
   names(combinationResult) <<- c("Source", "Term ID", "Function",
                                  "Term_ID_noLinks", "Tools",
-                                 "X<sup>2</sup>", "Comb. P-value")
+                                 "X<sup>2</sup>", "Comb. P-value",
+                                 "Intersection_Hits", "Union_Hits", "Hit_Summary")
   combinationResult$Rank <<- lengths(
     regmatches(
       combinationResult$Tools, gregexpr(",", combinationResult$Tools)
     )
   ) + 1
+}
+
+calculateTermHitStats <- function(comboData) {
+  # Get unique hits per term per tool (remove duplicates within same tool)
+  hitsPerTermTool <- comboData %>%
+    dplyr::select(Term_ID_noLinks, Tool, `Positive Hits`) %>%
+    dplyr::distinct(Term_ID_noLinks, Tool, .keep_all = TRUE)
+
+  # Calculate intersection and union per term
+  hitsPerTermTool %>%
+    dplyr::group_by(Term_ID_noLinks) %>%
+    dplyr::summarise(
+      Intersection_Hits = {
+        hitLists <- strsplit(trimws(`Positive Hits`), ",\\s*")
+        if (length(hitLists) == 1) {
+          paste(hitLists[[1]], collapse = ", ")
+        } else {
+          paste(Reduce(intersect, hitLists), collapse = ", ")
+        }
+      },
+      Union_Hits = {
+        hitLists <- strsplit(trimws(`Positive Hits`), ",\\s*")
+        paste(Reduce(union, hitLists), collapse = ", ")
+      },
+      .groups = "drop"
+    ) %>%
+    dplyr::mutate(
+      Intersection_Count = sapply(strsplit(Intersection_Hits, ",\\s*"), function(x) sum(trimws(x) != "")),
+      Union_Count = sapply(strsplit(Union_Hits, ",\\s*"), function(x) sum(trimws(x) != "")),
+      Hit_Summary = paste0(Intersection_Count, " / ", Union_Count, " genes")
+    ) %>%
+    dplyr::select(Term_ID_noLinks, Intersection_Hits, Union_Hits, Hit_Summary)
 }
 
 calculateFisherStats <- function(combinationResult) {
@@ -107,9 +153,11 @@ handleComboSourceSelect <- function() {
     # Convert Source to factor for dropdown filtering (instead of text search)
     filteredCombinationResult$Source <- as.factor(filteredCombinationResult$Source)
 
-    renderShinyDataTable(
+    # Hidden columns: 5=Term_ID_noLinks, 9=Intersection_Hits, 10=Union_Hits, 11=Hit_Summary
+    # Indices are +1 from expected due to DT's handling with filter="top"
+    renderCombinationTable(
       "combo_table", filteredCombinationResult, caption = "Term-tool combinations",
-      fileName = "combination", hiddenColumns = c(3), filter = "top"
+      fileName = "combination", hiddenColumns = c(5, 9, 10, 11), filter = "top"
     )
     executeComboUpsetPlot(filteredCombinationResult)
   }, error = function(e) {
@@ -162,10 +210,11 @@ handleComboUpsetClick <- function() {
       # Convert Source to factor for dropdown filtering (instead of text search)
       elements$Source <- as.factor(elements$Source)
 
-      renderShinyDataTable("combo_upsetClick_table", elements,
-                           caption = "UpSet Clicked Terms",
-                           fileName = "combo_upsetClick", hiddenColumns = c(0),
-                           filter = "top")
+      # Use same render function as main combo table for consistency
+      renderCombinationTable("combo_upsetClick_table", elements,
+                             caption = "UpSet Clicked Terms",
+                             fileName = "combo_upsetClick",
+                             hiddenColumns = c(5, 9, 10, 11), filter = "top")
     }
   }, error = function(e) {
     print(paste0("Error: ", e))

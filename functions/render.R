@@ -355,11 +355,61 @@ renderEnrichmentTable <- function(shinyOutputId, input_table,
 renderManhattanEnrichmentTable <- function(manhattanTable) {
   renderEnrichmentTable("manhattan_table",
                         manhattanTable,
-                        caption = "Selected Terms", 
+                        caption = "Selected Terms",
                         fileName = "gprofiler_manhattan_selected",
                         mode = "Positive Hits",
                         hiddenColumns = c(0, 11, 12),
                         expandableColumn = 11)
+}
+
+renderCombinationTable <- function(shinyOutputId, input_table, caption, fileName,
+                                   hiddenColumns, filter = 'none') {
+  # Column indices after cbind (0-indexed):
+  # 0=⊕, 1=Source, 2=Term ID, 3=Function, 4=Term_ID_noLinks, 5=Tools,
+  # 6=X², 7=Comb. P-value, 8=Intersection_Hits, 9=Union_Hits, 10=Hit_Summary, 11=Rank
+  # Note: With filter="top", DT requires +1 offset for hiddenColumns and JS indices
+  output[[shinyOutputId]] <- DT::renderDataTable(
+    server = F,
+    cbind(' ' = '&oplus;', input_table),
+    escape = F,
+    filter = filter,
+    extensions = c('Buttons'),
+    caption = caption,
+    options = list(
+      scrollX = TRUE,
+      "dom" = 'T<"clear">lBfrtip',
+      buttons = list(
+        list(extend = 'excel', filename = fileName),
+        list(extend = 'csv', filename = fileName),
+        list(extend = 'copy', filename = fileName),
+        list(extend = 'pdf', filename = fileName, exportOptions = list(orthogonal = "export"), orientation = "landscape"),
+        list(extend = 'print', filename = fileName)
+      ),
+      columnDefs = list(
+        list(visible = F, targets = hiddenColumns),
+        list(orderable = F, className = 'details-control', targets = 1)
+      )
+    ),
+    callback = JS(
+      "table.column(1).nodes().to$().css({cursor: 'pointer'});
+      let format = function(d) {
+        return '<div style=\"background-color:#eee; padding: .5em;\">' +
+               '<b>Hit Summary:</b> ' + d[11] + '<br/><br/>' +
+               '<b>Intersection Hits (found by all tools):</b><br/>' + d[9] + '<br/><br/>' +
+               '<b>Union Hits (found by any tool):</b><br/>' + d[10] + '</div>';
+      };
+      table.on('click', 'td.details-control', function() {
+        let td = $(this), row = table.row(td.closest('tr'));
+        if (row.child.isShown()) {
+          row.child.hide();
+          td.html('&oplus;');
+        } else {
+          row.child(format(row.data())).show();
+          td.html('&CircleMinus;');
+        }
+      });"
+    )
+  )
 }
 
 renderShinyVisNetwork <- function(networkId, nodes, edges, layout) {
