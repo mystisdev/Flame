@@ -206,6 +206,8 @@ handleComboUpsetClick <- function() {
       colnames(elements) <- "Term_ID_noLinks"
       elements <- plyr::join(elements, combinationResult, type = "left",
                              by = "Term_ID_noLinks")
+      # Reorder columns to match combinationResult (join puts key column first)
+      elements <- elements[, names(combinationResult)]
 
       # Convert Source to factor for dropdown filtering (instead of text search)
       elements$Source <- as.factor(elements$Source)
