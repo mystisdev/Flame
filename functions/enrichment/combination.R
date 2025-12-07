@@ -150,8 +150,10 @@ handleComboSourceSelect <- function() {
     filteredCombinationResult <-
       filteredCombinationResult[order(-filteredCombinationResult$Rank), ]
 
-    # Convert Source to factor for dropdown filtering (instead of text search)
+    # Convert Source, Tools, and Rank to factor for dropdown filtering (instead of text search)
     filteredCombinationResult$Source <- as.factor(filteredCombinationResult$Source)
+    filteredCombinationResult$Tools <- as.factor(filteredCombinationResult$Tools)
+    filteredCombinationResult$Rank <- as.factor(filteredCombinationResult$Rank)
 
     # Hidden columns: 5=Term_ID_noLinks, 9=Intersection_Hits, 10=Union_Hits, 11=Hit_Summary
     # Indices are +1 from expected due to DT's handling with filter="top"
@@ -209,8 +211,10 @@ handleComboUpsetClick <- function() {
       # Reorder columns to match combinationResult (join puts key column first)
       elements <- elements[, names(combinationResult)]
 
-      # Convert Source to factor for dropdown filtering (instead of text search)
+      # Convert Source, Tools, and Rank to factor for dropdown filtering (instead of text search)
       elements$Source <- as.factor(elements$Source)
+      elements$Tools <- as.factor(elements$Tools)
+      elements$Rank <- as.factor(elements$Rank)
 
       # Use same render function as main combo table for consistency
       renderCombinationTable("combo_upsetClick_table", elements,
