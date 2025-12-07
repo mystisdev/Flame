@@ -453,7 +453,8 @@ renderShinyVisNetwork <- function(networkId, nodes, edges, layout) {
 }
 
 renderHeatmap <- function(type_Tool, shinyOutputId, heatmapTable, color,
-                          yAxisColumn, xAxisColumn, weightColumn, height) {
+                          yAxisColumn, xAxisColumn, weightColumn, height,
+                          showColorbar = TRUE, colorbarTitle = NULL) {
   output[[paste(type_Tool, shinyOutputId, sep = "_")]] <- renderPlotly({
     plot_ly(
       data = heatmapTable,
@@ -465,7 +466,9 @@ renderHeatmap <- function(type_Tool, shinyOutputId, heatmapTable, color,
       hoverinfo = "text",
       hovertext = generateHeatmapHoverText(shinyOutputId),
       height = height,
-      source = "Heatmap"
+      source = "Heatmap",
+      showscale = showColorbar,
+      colorbar = list(title = colorbarTitle)
     ) %>%
       layout(xaxis = list(showgrid = F),
              yaxis = list(showgrid = F))

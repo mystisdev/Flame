@@ -57,7 +57,8 @@ constructFunctionsVsGeneHeatmap <- function(enrichmentType,
                   type_Tool, "heatmap1_sourceSelect", sep = "_")]]]],
                 yAxisColumn, xAxisColumn,
                 weightColumn = "GeneExists",
-                height = height)
+                height = height,
+                showColorbar = FALSE)
 }
 
 handleFunctionVsFunctionHeatmap <- function(enrichmentType, enrichmentTool, type_Tool) {
@@ -96,7 +97,8 @@ constructFunctionsVsFunctionHeatmap <- function(enrichmentType, enrichmentTool,
                 yAxisColumn = yAxisColumn,
                 xAxisColumn = xAxisColumn,
                 weightColumn = "Similarity Score %",
-                height = height)
+                height = height,
+                colorbarTitle = "Similarity %")
 }
 
 handleGeneVsGeneHeatmap <- function(enrichmentType, enrichmentTool, type_Tool) {
@@ -125,5 +127,6 @@ constructGeneVsGeneHeatmap <- function(type_Tool, enrichmentFilteredData) {
                 yAxisColumn = "Source Name",
                 xAxisColumn = "Target Name",
                 weightColumn = "Common Functions",
-                height = height)
+                height = height,
+                colorbarTitle = "Common Functions")
 }
