@@ -40,7 +40,7 @@ function(input, output, session) {
   source("functions/plots/dotplot.R", local = T)
   source("functions/plots/manhattan.R", local = T)
   source("functions/plots/arena3d.R", local = T)
-  
+
   source("functions/stringNetwork.R", local = T)
   source("functions/conversion.R", local = T)
   
@@ -405,7 +405,191 @@ function(input, output, session) {
     if (isEventFromManhattan(triggeredEvent))
       handleManhattanSelect(triggeredEvent$key)
   }, ignoreInit = T)
-  
+
+  # ~~Plot-Table Synchronization ####
+  # Plot click events - filter table to show clicked term
+  observeEvent(event_data("plotly_click", source = "Barchart"), {
+    handlePlotClick("barchart", "Barchart")
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+  observeEvent(event_data("plotly_click", source = "Scatter"), {
+    handlePlotClick("scatterPlot", "Scatter")
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+  observeEvent(event_data("plotly_click", source = "DotPlot"), {
+    handlePlotClick("dotPlot", "DotPlot")
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+  # Zoom events - filter table to visible terms
+  observeEvent(event_data("plotly_relayout", source = "Barchart"), {
+    handlePlotZoom("barchart", "Barchart")
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+  observeEvent(event_data("plotly_relayout", source = "Scatter"), {
+    handlePlotZoom("scatterPlot", "Scatter")
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+  observeEvent(event_data("plotly_relayout", source = "DotPlot"), {
+    handlePlotZoom("dotPlot", "DotPlot")
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+  # Selection events (lasso/box) - filter table to selected terms
+  observeEvent(event_data("plotly_selected", source = "Barchart"), {
+    handlePlotSelection("barchart", "Barchart")
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+  observeEvent(event_data("plotly_selected", source = "Scatter"), {
+    handlePlotSelection("scatterPlot", "Scatter")
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+  observeEvent(event_data("plotly_selected", source = "DotPlot"), {
+    handlePlotSelection("dotPlot", "DotPlot")
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+  # Table filter -> Plot synchronization
+  # Watch for DT filter changes and update plots accordingly
+  lapply(ENRICHMENT_TYPES, function(enrichmentType) {
+    lapply(ENRICHMENT_TOOLS, function(toolName) {
+      type_Tool <- paste(enrichmentType, toolName, sep = "_")
+
+      # Barchart table filter observer
+      observeEvent(input[[paste(type_Tool, "barchart_table_rows_all", sep = "_")]], {
+        handleTableFilterChange(enrichmentType, toolName, "barchart")
+      }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+      # Scatter plot table filter observer
+      observeEvent(input[[paste(type_Tool, "scatterPlot_table_rows_all", sep = "_")]], {
+        handleTableFilterChange(enrichmentType, toolName, "scatterPlot")
+      }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+      # Dot plot table filter observer
+      observeEvent(input[[paste(type_Tool, "dotPlot_table_rows_all", sep = "_")]], {
+        handleTableFilterChange(enrichmentType, toolName, "dotPlot")
+      }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+      # Reset View button handlers
+      observeEvent(input[[paste(type_Tool, "barchart_resetView", sep = "_")]], {
+        handleResetView(enrichmentType, toolName, "barchart")
+      }, ignoreInit = TRUE)
+
+      observeEvent(input[[paste(type_Tool, "scatterPlot_resetView", sep = "_")]], {
+        handleResetView(enrichmentType, toolName, "scatterPlot")
+      }, ignoreInit = TRUE)
+
+      observeEvent(input[[paste(type_Tool, "dotPlot_resetView", sep = "_")]], {
+        handleResetView(enrichmentType, toolName, "dotPlot")
+      }, ignoreInit = TRUE)
+
+      # Heatmap table filter observers
+      observeEvent(input[[paste(type_Tool, "heatmap1_table_rows_all", sep = "_")]], {
+        handleTableFilterChange(enrichmentType, toolName, "heatmap1")
+      }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+      observeEvent(input[[paste(type_Tool, "heatmap2_table_rows_all", sep = "_")]], {
+        handleTableFilterChange(enrichmentType, toolName, "heatmap2")
+      }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+      observeEvent(input[[paste(type_Tool, "heatmap3_table_rows_all", sep = "_")]], {
+        handleTableFilterChange(enrichmentType, toolName, "heatmap3")
+      }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+      # Heatmap Reset View button handlers
+      observeEvent(input[[paste(type_Tool, "heatmap1_resetView", sep = "_")]], {
+        handleResetView(enrichmentType, toolName, "heatmap1")
+      }, ignoreInit = TRUE)
+
+      observeEvent(input[[paste(type_Tool, "heatmap2_resetView", sep = "_")]], {
+        handleResetView(enrichmentType, toolName, "heatmap2")
+      }, ignoreInit = TRUE)
+
+      observeEvent(input[[paste(type_Tool, "heatmap3_resetView", sep = "_")]], {
+        handleResetView(enrichmentType, toolName, "heatmap3")
+      }, ignoreInit = TRUE)
+    })
+  })
+
+  # Heatmap plot event observers
+  # Heatmap1 - click, zoom, selection
+  observeEvent(event_data("plotly_click", source = "Heatmap1"), {
+    handlePlotClick("heatmap1", "Heatmap1")
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+  observeEvent(event_data("plotly_relayout", source = "Heatmap1"), {
+    handlePlotZoom("heatmap1", "Heatmap1")
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+  observeEvent(event_data("plotly_selected", source = "Heatmap1"), {
+    handlePlotSelection("heatmap1", "Heatmap1")
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+  # Heatmap2 - click, zoom, selection
+  observeEvent(event_data("plotly_click", source = "Heatmap2"), {
+    handlePlotClick("heatmap2", "Heatmap2")
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+  observeEvent(event_data("plotly_relayout", source = "Heatmap2"), {
+    handlePlotZoom("heatmap2", "Heatmap2")
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+  observeEvent(event_data("plotly_selected", source = "Heatmap2"), {
+    handlePlotSelection("heatmap2", "Heatmap2")
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+  # Heatmap3 - click, zoom, selection
+  observeEvent(event_data("plotly_click", source = "Heatmap3"), {
+    handlePlotClick("heatmap3", "Heatmap3")
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+  observeEvent(event_data("plotly_relayout", source = "Heatmap3"), {
+    handlePlotZoom("heatmap3", "Heatmap3")
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+  observeEvent(event_data("plotly_selected", source = "Heatmap3"), {
+    handlePlotSelection("heatmap3", "Heatmap3")
+  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+  # ~~Network Plot-Table Synchronization ####
+  lapply(ENRICHMENT_TYPES, function(enrichmentType) {
+    lapply(ENRICHMENT_TOOLS, function(toolName) {
+      lapply(NETWORK_IDS, function(networkId) {
+        type_Tool <- paste(enrichmentType, toolName, sep = "_")
+        networkInputId <- paste(type_Tool, networkId, sep = "_")
+
+        # Click event handles both node and edge clicks
+        # Each handler checks if nodes/edges are present and returns early if not
+        observeEvent(input[[paste(networkInputId, "click", sep = "_")]], {
+          handleNetworkNodeClick(enrichmentType, toolName, networkId)
+          handleNetworkEdgeClick(enrichmentType, toolName, networkId)
+        }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+        # Multi-node selection - filter to selected nodes
+        observeEvent(input[[paste(networkInputId, "selected", sep = "_")]], {
+          handleNetworkSelection(enrichmentType, toolName, networkId)
+        }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+        # Deselection - restore view when nodes are deselected
+        observeEvent(input[[paste(networkInputId, "deselect", sep = "_")]], {
+          handleNetworkDeselection(enrichmentType, toolName, networkId)
+        }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+        # Enrichment table filter -> network update
+        observeEvent(input[[paste(type_Tool, networkId, "table_rows_all", sep = "_")]], {
+          handleNetworkEnrichmentTableFilter(enrichmentType, toolName, networkId)
+        }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+        # Edgelist table filter -> network update
+        observeEvent(input[[paste(type_Tool, networkId, "edgelist_rows_all", sep = "_")]], {
+          handleNetworkEdgelistTableFilter(enrichmentType, toolName, networkId)
+        }, ignoreInit = TRUE, ignoreNULL = TRUE)
+
+        # Reset View button
+        observeEvent(input[[paste(type_Tool, networkId, "resetView", sep = "_")]], {
+          handleNetworkResetView(enrichmentType, toolName, networkId)
+        }, ignoreInit = TRUE)
+      })
+    })
+  })
+
   # STRING ####
   observeEvent(input$string_network_organism, {
     handleStringOrganismSelection()

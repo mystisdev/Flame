@@ -12,6 +12,7 @@ initializeServerApp <- function() {
   initializeEnrichmentResults()
   initializeArenaEdgelist()
   initializeSTRINGData()
+  initializePlotTableState()
   hideConversionBoxes()
   hideVisNetworks()
   hideEnrichmentTabs()

@@ -185,7 +185,17 @@ generatePlotPanelOrDiv <- function(plotId) {
           actionButton(
             inputId = paste(currentType_Tool, plotId, "button", sep = "_"),
             label = "Generate", icon("palette"), class = "submit_button"
-          )
+          ),
+          # Reset View button for plot-table synchronization
+          if (plotId %in% c("barchart", "scatterPlot", "dotPlot",
+                            "heatmap1", "heatmap2", "heatmap3",
+                            "network1", "network2", "network3")) {
+            actionButton(
+              inputId = paste(currentType_Tool, plotId, "resetView", sep = "_"),
+              label = "Reset View", icon("refresh"), class = "reset_button",
+              style = "margin-left: 10px;"
+            )
+          }
         ),
         plotDrawFormatControl,
         plotExtraControl

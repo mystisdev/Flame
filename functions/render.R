@@ -449,13 +449,52 @@ renderShinyVisNetwork <- function(networkId, nodes, edges, layout) {
       visGroups(groupname = "PUBMED", color = LITERATURE_NODE_COLOR, shape = "square") %>%
       visEdges(color = "black") %>%
       visIgraphLayout(layout = layout) %>%
-      visInteraction(navigationButtons = T, hover = T)
+      visInteraction(navigationButtons = T, hover = T, multiselect = T) %>%
+      # Enable event callbacks for plot-table synchronization
+      # Must use sprintf() to inject networkId - this.id doesn't work in vis.js context
+      visEvents(
+        click = sprintf("function(params) {
+          setTimeout(function() {
+            Shiny.setInputValue('%s_click', params, {priority: 'event'});
+          }, 0);
+        }", networkId),
+        select = sprintf("function(params) {
+          setTimeout(function() {
+            Shiny.setInputValue('%s_selected', params.nodes, {priority: 'event'});
+          }, 0);
+        }", networkId),
+        deselectNode = sprintf("function(params) {
+          setTimeout(function() {
+            Shiny.setInputValue('%s_deselect', params, {priority: 'event'});
+          }, 0);
+        }", networkId)
+      )
   })
 }
 
 renderHeatmap <- function(type_Tool, shinyOutputId, heatmapTable, color,
                           yAxisColumn, xAxisColumn, weightColumn, height,
-                          showColorbar = TRUE, colorbarTitle = NULL) {
+                          showColorbar = TRUE, colorbarTitle = NULL,
+                          doubleClickReset = TRUE) {
+  # Create unique source ID for plotly events (e.g., "Heatmap1", "Heatmap2", "Heatmap3")
+  plotSource <- switch(
+    shinyOutputId,
+    "heatmap1" = "Heatmap1",
+    "heatmap2" = "Heatmap2",
+    "heatmap3" = "Heatmap3",
+    "Heatmap"  # fallback
+  )
+
+  # Get unique y-axis and x-axis categories
+  # Data comes in DESCENDING order (highest values first from filterTopData)
+  # Plotly's y-axis has y=0 at bottom, so first category = bottom
+  # To match barchart/dotplot (highest at TOP), we REVERSE the y-categories
+  yCategories <- rev(unique(heatmapTable[[yAxisColumn]]))
+  xCategories <- unique(heatmapTable[[xAxisColumn]])
+
+  # Configure double-click behavior
+  doubleClickBehavior <- if (doubleClickReset) "reset+autosize" else FALSE
+
   output[[paste(type_Tool, shinyOutputId, sep = "_")]] <- renderPlotly({
     plot_ly(
       data = heatmapTable,
@@ -467,12 +506,23 @@ renderHeatmap <- function(type_Tool, shinyOutputId, heatmapTable, color,
       hoverinfo = "text",
       hovertext = generateHeatmapHoverText(shinyOutputId),
       height = height,
-      source = "Heatmap",
+      source = plotSource,
       showscale = showColorbar,
       colorbar = list(title = colorbarTitle)
     ) %>%
-      layout(xaxis = list(showgrid = F),
-             yaxis = list(showgrid = F))
+      layout(
+        xaxis = list(
+          showgrid = FALSE,
+          categoryorder = "array",
+          categoryarray = xCategories
+        ),
+        yaxis = list(
+          showgrid = FALSE,
+          categoryorder = "array",
+          categoryarray = yCategories
+        )
+      ) %>%
+      config(doubleClick = doubleClickBehavior)
   })
 }
 
@@ -521,8 +571,14 @@ renderBarchart <- function(shinyOutputId, barchartData, column,
                           "\nEnrichment Score %: ", `Enrichment Score %`,
                           "\n-log10Pvalue: ", `-log10Pvalue`),
       height = height,
-      source = "Barchart"
-    )
+      source = "Barchart",
+      customdata = ~Term_ID_noLinks
+    ) %>%
+      layout(legend = list(
+        title = list(text = "Source"),
+        itemclick = FALSE,
+        itemdoubleclick = FALSE
+      ))
   })
 }
 
@@ -547,11 +603,17 @@ renderScatterPlot <- function(shinyOutputId, scatterData) {
                           "\n<b>Function</b>: ", Function,
                           "\nEnrichment Score %: ", `Enrichment Score %`,
                           "\n-log10Pvalue: ", `-log10Pvalue`),
-      source = "Scatter"
+      source = "Scatter",
+      customdata = ~Term_ID_noLinks
     ) %>%
       layout(
         xaxis = list(title = "-log10Pvalue"),
-        yaxis = list(title = "Enrichment Score")
+        yaxis = list(title = "Enrichment Score"),
+        legend = list(
+          title = list(text = "Source"),
+          itemclick = FALSE,
+          itemdoubleclick = FALSE
+        )
       )
   })
 }
@@ -601,7 +663,8 @@ renderDotPlot <- function(shinyOutputId, dotPlotData, drawFormatColumn, height) 
         "\nEnrichment Score %: ", `Enrichment Score %`
       ),
       height = height,
-      source = "DotPlot"
+      source = "DotPlot",
+      customdata = ~Term_ID_noLinks
     ) %>%
       layout(xaxis = list(title = "Gene Ratio"))
   })
