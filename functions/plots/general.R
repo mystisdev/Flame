@@ -603,7 +603,10 @@ extractGeneVsGeneEdgelist <- function(enrichmentData, thresholdSlider = NULL,
 # Handle plot click events - filter TABLE to show clicked term (plot unchanged)
 handlePlotClick <- function(plotId, plotSource) {
   tryCatch({
-    type_Tool <- currentType_Tool
+    # Use the currently visible tool tab to determine which results to update
+    selectedTool <- currentSelectedToolTab
+    if (is.null(selectedTool) || selectedTool == "" || selectedTool == "Combination") return()
+    type_Tool <- paste(currentEnrichmentType, selectedTool, sep = "_")
     if (is.null(type_Tool) || type_Tool == "") return()
 
     clickData <- event_data("plotly_click", source = plotSource)
@@ -723,7 +726,10 @@ filterDataByHeatmapClick <- function(currentData, clickData, plotId, type_Tool) 
 # Handle plot zoom events - filter table to visible terms
 handlePlotZoom <- function(plotId, plotSource) {
   tryCatch({
-    type_Tool <- currentType_Tool
+    # Use the currently visible tool tab to determine which results to update
+    selectedTool <- currentSelectedToolTab
+    if (is.null(selectedTool) || selectedTool == "" || selectedTool == "Combination") return()
+    type_Tool <- paste(currentEnrichmentType, selectedTool, sep = "_")
     if (is.null(type_Tool) || type_Tool == "") return()
 
     relayoutData <- event_data("plotly_relayout", source = plotSource)
@@ -751,7 +757,7 @@ handlePlotZoom <- function(plotId, plotSource) {
       originalData <- getOriginalData(type_Tool, plotId)
       if (is.null(originalData) || nrow(originalData) == 0) return()
 
-      filteredData <- filterDataByZoomBounds(originalData, relayoutData, plotId)
+      filteredData <- filterDataByZoomBounds(originalData, relayoutData, plotId, type_Tool)
       if (nrow(filteredData) > 0) {
         updateCurrentView(type_Tool, plotId, filteredData, "plot_zoom")
         renderTableFromCurrentView(type_Tool, plotId)
@@ -765,7 +771,10 @@ handlePlotZoom <- function(plotId, plotSource) {
 # Handle plot selection events (lasso/box) - filter TABLE only
 handlePlotSelection <- function(plotId, plotSource) {
   tryCatch({
-    type_Tool <- currentType_Tool
+    # Use the currently visible tool tab to determine which results to update
+    selectedTool <- currentSelectedToolTab
+    if (is.null(selectedTool) || selectedTool == "" || selectedTool == "Combination") return()
+    type_Tool <- paste(currentEnrichmentType, selectedTool, sep = "_")
     if (is.null(type_Tool) || type_Tool == "") return()
 
     # Heatmaps: selection doesn't apply well (use click for cells)
@@ -815,7 +824,7 @@ handlePlotSelection <- function(plotId, plotSource) {
 }
 
 # Filter data based on plotly zoom bounds
-filterDataByZoomBounds <- function(data, relayoutData, plotId) {
+filterDataByZoomBounds <- function(data, relayoutData, plotId, type_Tool) {
   # Extract axis ranges from relayout event
   xMin <- relayoutData$`xaxis.range[0]`
   xMax <- relayoutData$`xaxis.range[1]`
@@ -823,7 +832,6 @@ filterDataByZoomBounds <- function(data, relayoutData, plotId) {
   yMax <- relayoutData$`yaxis.range[1]`
 
   filteredData <- data
-  type_Tool <- currentType_Tool
 
   if (plotId == "barchart") {
     # Barchart: x-axis is the value column, y-axis is categorical

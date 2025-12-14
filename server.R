@@ -407,6 +407,22 @@ function(input, output, session) {
   }, ignoreInit = T)
 
   # ~~Plot-Table Synchronization ####
+  # Tracks which tool tab the user is currently viewing (e.g., "gProfiler", "STRING")
+  currentSelectedToolTab <<- NULL
+  # Flag to defer plot control panel updates until the tab UI is fully rendered
+  pendingPickerUpdate <<- FALSE
+
+  observeEvent(input$toolTabsPanel, {
+    currentSelectedToolTab <<- input$toolTabsPanel
+    # Update plot controls here (after tab switch) because Shiny only renders
+    # tab content when it becomes visible - updating before would target
+    # UI elements that don't exist yet
+    if (pendingPickerUpdate) {
+      pendingPickerUpdate <<- FALSE
+      updatePlotControlPanels()
+    }
+  }, ignoreInit = FALSE, ignoreNULL = TRUE)
+
   # Plot click events - filter table to show clicked term
   observeEvent(event_data("plotly_click", source = "Barchart"), {
     handlePlotClick("barchart", "Barchart")

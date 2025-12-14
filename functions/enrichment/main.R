@@ -12,12 +12,11 @@ handleEnrichment <- function(enrichmentType) {
             "literature" = "STRING"
           )
 
-          # If running a single tool, clear results from other tools to prevent accumulation
-          if (currentEnrichmentType == "functional" && length(tools) == 1) {
+          # Clear results from tools that are not in the current selection
+          if (currentEnrichmentType == "functional") {
             lapply(ENRICHMENT_TOOLS, function(toolName) {
-              if (toolName != tools) {
+              if (!(toolName %in% tools)) {
                 type_tool <- paste("functional", toolName, sep = "_")
-                # Check if this other tool has any results stored
                 if (exists("enrichmentResults") &&
                     type_tool %in% names(enrichmentResults) &&
                     nrow(enrichmentResults[[type_tool]]) > 0) {
@@ -138,7 +137,8 @@ handleEnrichmentWithTool <- function() {
         }
         findAndPrintNoHitGenes(noHitGenesCheckList)
         printResultTables()
-        updatePlotControlPanels()
+        # Defer plot control updates until after tab switch (see server.R observer)
+        pendingPickerUpdate <<- TRUE
         updateTabsetPanel(session, "toolTabsPanel", selected = currentEnrichmentTool)
       }
     }
