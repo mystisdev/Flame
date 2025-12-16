@@ -62,7 +62,7 @@ runGeneCodis <- function(userInputList, taxid, user_reference = NULL) {
   }
 
   # Always store background size for statistics display
-  enrichmentBackgroundSizes[[sprintf("%s_GeneCodis", toupper(currentEnrichmentType))]] <<-
+  enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<-
     getGeneCodisBackgroundSize(user_reference)
 }
 

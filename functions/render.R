@@ -353,8 +353,8 @@ renderEnrichmentTable <- function(shinyOutputId, input_table,
   ) 
 }
 
-renderManhattanEnrichmentTable <- function(manhattanTable) {
-  renderEnrichmentTable("manhattan_table",
+renderManhattanEnrichmentTable <- function(shinyOutputId, manhattanTable) {
+  renderEnrichmentTable(shinyOutputId,
                         manhattanTable,
                         caption = "Selected Terms",
                         fileName = "gprofiler_manhattan_selected",
@@ -560,6 +560,9 @@ renderBarchart <- function(shinyOutputId, barchartData, column,
       orientation = 'h',
       color = ~Source,
       colors = DATASOURCE_COLORS,
+      marker = list(
+        line = list(color = "rgba(0,0,0,0.3)", width = 1)  # Initial border for restyle
+      ),
       text = sprintf("%s/%s",
                      barchartData[["Intersection Size"]],
                      barchartData[["Term Size"]]),
@@ -572,7 +575,8 @@ renderBarchart <- function(shinyOutputId, barchartData, column,
                           "\n-log10Pvalue: ", `-log10Pvalue`),
       height = height,
       source = "Barchart",
-      customdata = ~Term_ID_noLinks
+      customdata = ~Term_ID_noLinks,
+      unselected = list(marker = list(opacity = 1))  # Disable auto-dimming on lasso
     ) %>%
       layout(legend = list(
         title = list(text = "Source"),
@@ -604,7 +608,8 @@ renderScatterPlot <- function(shinyOutputId, scatterData) {
                           "\nEnrichment Score %: ", `Enrichment Score %`,
                           "\n-log10Pvalue: ", `-log10Pvalue`),
       source = "Scatter",
-      customdata = ~Term_ID_noLinks
+      customdata = ~Term_ID_noLinks,
+      unselected = list(marker = list(opacity = 1))  # Disable auto-dimming on lasso
     ) %>%
       layout(
         xaxis = list(title = "-log10Pvalue"),
@@ -664,16 +669,21 @@ renderDotPlot <- function(shinyOutputId, dotPlotData, drawFormatColumn, height) 
       ),
       height = height,
       source = "DotPlot",
-      customdata = ~Term_ID_noLinks
+      customdata = ~Term_ID_noLinks,
+      unselected = list(marker = list(opacity = 1))  # Disable auto-dimming on lasso
     ) %>%
       layout(xaxis = list(title = "Gene Ratio"))
   })
 }
 
-renderManhattanPlot <- function() {
-  output$manhattan <- renderPlotly({
+renderManhattanPlot <- function(shinyOutputId, type_Tool) {
+  # Use per-run gProfiler result for multi-run support
+  result <- gprofilerResults[[type_Tool]]
+  if (is.null(result)) result <- gprofilerResult  # fallback for backward compatibility
+
+  output[[shinyOutputId]] <- renderPlotly({
     gprofiler2::gostplot(
-      gprofilerResult,
+      result,
       capped = T,
       interactive = T,
       pal = DATASOURCE_COLORS

@@ -60,8 +60,10 @@ resetPlots <- function(type_tool) {
   resetBarchartTable(type_tool)
   resetScatterPlot(type_tool)
   resetScatterTable(type_tool)
-  resetManhattanPlot()
-  resetManhattanTable()
+  resetDotPlot(type_tool)
+  resetDotPlotTable(type_tool)
+  resetManhattanPlot(type_tool)
+  resetManhattanTable(type_tool)
 }
 
 resetNetworkPlots <- function(type_tool) {
@@ -112,12 +114,20 @@ resetScatterTable <- function(type_tool) {
   output[[paste(type_tool, "scatterPlot_table", sep = "_")]] <- DT::renderDataTable(data.frame())
 }
 
-resetManhattanPlot <- function() {
-  output$manhattan <- renderPlotly(c())
+resetDotPlot <- function(type_tool) {
+  output[[paste(type_tool, "dotPlot", sep = "_")]] <- renderPlotly(c())
 }
 
-resetManhattanTable <- function() {
-  output$manhattan_table <- DT::renderDataTable(data.frame())
+resetDotPlotTable <- function(type_tool) {
+  output[[paste(type_tool, "dotPlot_table", sep = "_")]] <- DT::renderDataTable(data.frame())
+}
+
+resetManhattanPlot <- function(type_tool) {
+  output[[paste(type_tool, "manhattan", sep = "_")]] <- renderPlotly(c())
+}
+
+resetManhattanTable <- function(type_tool) {
+  output[[paste(type_tool, "manhattan_table", sep = "_")]] <- DT::renderDataTable(data.frame())
 }
 
 resetEdgelist_ViewAndArenaObjects <- function(enrichmentType, enrichmentTool, networkId) {

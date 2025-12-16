@@ -24,7 +24,7 @@ runPanther <- function(userInputList, taxid, user_reference = NULL) {
   }
 
   # Always store background size for statistics display
-  enrichmentBackgroundSizes[[sprintf("%s_PANTHER", toupper(currentEnrichmentType))]] <<- getPantherBackgroundSize(user_reference)
+  enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<- getPantherBackgroundSize(user_reference)
 }
 
 sendPantherRequest <- function(userInputList, taxid, user_reference = NULL) {

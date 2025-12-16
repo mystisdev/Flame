@@ -1,10 +1,6 @@
 initializeServerApp <- function() {
   toggleUpsetTab()
   session$sendCustomMessage("handler_setListLimit", LISTNAME_NCHAR_LIMIT)
-  lapply(ENRICHMENT_TOOLS, function(toolName) {
-    session$sendCustomMessage("handler_hideSourceTabs",
-                              paste0("functional_", toolName))
-  })
   initialiazeOrganismSelectors()
   initializeDatasources()
   initializeVolcanoPanel()
@@ -13,9 +9,10 @@ initializeServerApp <- function() {
   initializeArenaEdgelist()
   initializeSTRINGData()
   initializePlotTableState()
+  initializeRunCounters()
   hideConversionBoxes()
-  hideVisNetworks()
-  hideEnrichmentTabs()
+  hideLiteratureVisNetworks()
+  hideEnrichmentResultsPanel()
 }
 
 toggleUpsetTab <- function() {
@@ -86,24 +83,18 @@ initializeReductionPanel <- function() {
 }
 
 initializeEnrichmentResults <- function() {
-  for (enrichmentTool in ENRICHMENT_TOOLS) {
-    newItem <- list(data.frame())
-    names(newItem) <- paste("functional", enrichmentTool, sep = "_")
-    enrichmentResults <<- c(enrichmentResults, newItem)
-  }
+  # Functional enrichment results are now created dynamically per-run
+  # Only initialize literature enrichment (which stays single-result)
+  enrichmentResults <<- list()
   newItem <- list(data.frame())
   names(newItem) <- paste("literature", "STRING", sep = "_")
   enrichmentResults <<- c(enrichmentResults, newItem)
 }
 
 initializeArenaEdgelist <- function() {
-  for (enrichmentTool in ENRICHMENT_TOOLS) {
-    for (networkId in NETWORK_IDS) {
-      newItem <- list(data.frame())
-      names(newItem) <- paste("functional", enrichmentTool, networkId, sep = "_")
-      arenaEdgelist <<- c(arenaEdgelist, newItem)
-    }
-  }
+  # Functional arena edgelists are now created dynamically per-run
+  # Only initialize literature enrichment (which stays single-result)
+  arenaEdgelist <<- list()
   for (networkId in NETWORK_IDS) {
     newItem <- list(data.frame())
     names(newItem) <- paste("literature", "STRING", networkId, sep = "_")
@@ -115,27 +106,21 @@ initializeSTRINGData <- function() {
   STRINGNetworkData <<- list()
 }
 
+# Hide only literature conversion boxes (functional ones are in dynamic tabs)
 hideConversionBoxes <- function() {
-  lapply(ENRICHMENT_TOOLS, function(enrichmentTool) {
-    shinyjs::hide(paste("functional", enrichmentTool,
-                        "conversionBoxes", sep = "_"))
-  })
   shinyjs::hide("literature_STRING_conversionBoxes")
 }
 
-hideVisNetworks <- function() {
-  lapply(ENRICHMENT_TOOLS, function(enrichmentTool) {
-    lapply(NETWORK_IDS, function(networkId) {
-      shinyjs::hide(paste("functional", enrichmentTool, networkId, sep = "_"))
-    })
-  })
+# Hide only literature vis networks (functional ones are dynamic now)
+hideLiteratureVisNetworks <- function() {
   lapply(NETWORK_IDS, function(networkId) {
     shinyjs::hide(paste("literature", "STRING", networkId, sep = "_"))
   })
 }
 
-hideEnrichmentTabs <- function() {
-  lapply(c(ENRICHMENT_TOOLS, "Combination"), function(toolName) {
-    hideTab(inputId = "toolTabsPanel", target = toolName)
-  })
+# Hide the entire enrichment results panel (shown when first run is created)
+hideEnrichmentResultsPanel <- function() {
+  shinyjs::hide("functionalEnrichmentResultsPanel")
+  # Combination tab should be hidden initially (shown when 2+ runs exist)
+  hideTab(inputId = "toolTabsPanel", target = "Combination")
 }

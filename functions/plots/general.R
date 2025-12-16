@@ -10,6 +10,10 @@ initializePlotTableState <- function() {
   # Current view data that both plot and table render from
   plotCurrentView <<- reactiveValues()
 
+  # Data currently rendered on the plot (may differ from currentView after filtering)
+  # Used for highlighting calculations to match actual plot state
+  plotRenderedData <<- reactiveValues()
+
   # Tracks update source and timing to prevent feedback loops
   plotUpdateTracker <<- reactiveValues()
 
@@ -18,11 +22,23 @@ initializePlotTableState <- function() {
 
   # Expected row counts for cascade detection (simple list, not reactive)
   expectedRowCounts <<- list()
+
+  # Per-plot selection state for click-based term selection
+  selectedTermIds <<- reactiveValues()
+
+  # Pair-level selection for heatmap2/heatmap3 (Functions vs Functions, Genes vs Genes)
+  # Stores data.frames with columns: source, target
+  selectedPairs <<- reactiveValues()
+
+  # Heatmap cell selection for visual highlighting
+  # Stores data.frames with columns: x, y (cell coordinates)
+  selectedHeatmapCells <<- reactiveValues()
 }
 
-# Simple list for tracking programmatic table updates (not reactiveValues)
-# This avoids reactivity issues when setting/getting values
-pendingTableUpdates <- list()
+# Timestamps for tracking programmatic table updates (not reactiveValues)
+# Stores the time of last programmatic update per table
+# Events within 200ms of a programmatic update are blocked as cascades
+programmaticTableUpdateTimes <- list()
 
 getStateKey <- function(type_Tool, plotId) {
   paste(type_Tool, plotId, sep = "_")
@@ -35,12 +51,33 @@ setOriginalData <- function(type_Tool, plotId, data) {
   key <- getStateKey(type_Tool, plotId)
   plotOriginalData[[key]] <<- data
   plotCurrentView[[key]] <<- data
+  plotRenderedData[[key]] <<- data  # Initially, rendered data = original data
   plotUpdateTracker[[key]] <<- list(counter = 0, source = "generate", time = Sys.time())
+  # Clear any existing selection when new data is generated
+  selectedTermIds[[key]] <<- NULL
 }
 
 getOriginalData <- function(type_Tool, plotId) {
   key <- getStateKey(type_Tool, plotId)
   return(plotOriginalData[[key]])
+}
+
+# Rendered data functions - tracks what's actually displayed on the plot
+# This may differ from currentView after table filtering
+
+setRenderedData <- function(type_Tool, plotId, data) {
+  key <- getStateKey(type_Tool, plotId)
+  plotRenderedData[[key]] <<- data
+}
+
+getRenderedData <- function(type_Tool, plotId) {
+  key <- getStateKey(type_Tool, plotId)
+  data <- plotRenderedData[[key]]
+  # Fallback to originalData if not set (shouldn't happen normally)
+  if (is.null(data)) {
+    return(getOriginalData(type_Tool, plotId))
+  }
+  return(data)
 }
 
 
@@ -69,8 +106,8 @@ getCurrentView <- function(type_Tool, plotId) {
 }
 
 
-# Feedback loop prevention
-
+# Prevents feedback loops between plot and table updates.
+# Zoom is visual-only; click/selection events use "selection" source.
 shouldProcessUpdate <- function(type_Tool, plotId, expectedSource) {
   key <- getStateKey(type_Tool, plotId)
   tracker <- plotUpdateTracker[[key]]
@@ -85,20 +122,14 @@ shouldProcessUpdate <- function(type_Tool, plotId, expectedSource) {
     return(TRUE)
   }
 
-  # Skip table events that were triggered by plot updates (within 500ms)
-  if (expectedSource == "table") {
-    if (lastSource %in% c("plot_click", "plot_zoom", "plot_select")) {
-      return(FALSE)
-    }
+  # Block table filter events triggered by our own selection updates
+  if (expectedSource == "table" && lastSource == "selection") {
+    return(FALSE)
   }
 
-  # Skip plot events triggered by table updates or our own re-renders
-  if (expectedSource == "plot") {
-    blockedSources <- c("table_filter", "plot_click", "plot_select",
-                        "plot_zoom", "reset", "legend_click")
-    if (lastSource %in% blockedSources) {
-      return(FALSE)
-    }
+  # Block plot re-renders from table filter
+  if (expectedSource == "plot" && lastSource %in% c("table_filter", "selection", "reset")) {
+    return(FALSE)
   }
 
   return(TRUE)
@@ -117,20 +148,6 @@ setUpdateSource <- function(type_Tool, plotId, source) {
   )
 }
 
-markUpdateProcessed <- function(type_Tool, plotId) {
-  key <- getStateKey(type_Tool, plotId)
-  tracker <- plotUpdateTracker[[key]]
-
-  if (!is.null(tracker)) {
-    plotUpdateTracker[[key]] <<- list(
-      counter = tracker$counter,
-      source = "",
-      time = NULL
-    )
-  }
-}
-
-
 # Utility functions
 
 hasPlotData <- function(type_Tool, plotId) {
@@ -143,9 +160,124 @@ clearPlotState <- function(type_Tool, plotId) {
   key <- getStateKey(type_Tool, plotId)
   plotOriginalData[[key]] <<- NULL
   plotCurrentView[[key]] <<- NULL
+  plotRenderedData[[key]] <<- NULL
   plotUpdateTracker[[key]] <<- NULL
+  selectedTermIds[[key]] <<- NULL
+  selectedPairs[[key]] <<- NULL
+  selectedHeatmapCells[[key]] <<- NULL
 }
 
+
+# Selection state functions (click-based term selection)
+
+getSelectedTerms <- function(type_Tool, plotId) {
+  key <- getStateKey(type_Tool, plotId)
+  terms <- selectedTermIds[[key]]
+  if (is.null(terms)) return(character(0))
+  return(terms)
+}
+
+# Adds term if not selected, removes if already selected
+toggleTermSelection <- function(type_Tool, plotId, termId) {
+  key <- getStateKey(type_Tool, plotId)
+  current <- getSelectedTerms(type_Tool, plotId)
+
+  if (termId %in% current) {
+    selectedTermIds[[key]] <<- setdiff(current, termId)
+  } else {
+    selectedTermIds[[key]] <<- union(current, termId)
+  }
+}
+
+addTermsToSelection <- function(type_Tool, plotId, termIds) {
+  key <- getStateKey(type_Tool, plotId)
+  current <- getSelectedTerms(type_Tool, plotId)
+  selectedTermIds[[key]] <<- union(current, termIds)
+}
+
+clearSelection <- function(type_Tool, plotId) {
+  key <- getStateKey(type_Tool, plotId)
+  selectedTermIds[[key]] <<- character(0)
+}
+
+# Pair-level selection functions for heatmaps
+# Tracks selected pairs (order-independent) instead of individual terms
+
+getSelectedPairs <- function(type_Tool, plotId) {
+  key <- getStateKey(type_Tool, plotId)
+  pairs <- selectedPairs[[key]]
+  if (is.null(pairs)) return(data.frame(source = character(0), target = character(0)))
+  return(pairs)
+}
+
+# Check if a pair exists (order-independent)
+pairExists <- function(pairs, sourceId, targetId) {
+  if (nrow(pairs) == 0) return(FALSE)
+  any(
+    (pairs$source == sourceId & pairs$target == targetId) |
+    (pairs$source == targetId & pairs$target == sourceId)
+  )
+}
+
+# Adds pair if not selected, removes if already selected (order-independent)
+togglePairSelection <- function(type_Tool, plotId, sourceId, targetId) {
+  key <- getStateKey(type_Tool, plotId)
+  pairs <- getSelectedPairs(type_Tool, plotId)
+
+  if (pairExists(pairs, sourceId, targetId)) {
+    selectedPairs[[key]] <<- pairs[!(
+      (pairs$source == sourceId & pairs$target == targetId) |
+      (pairs$source == targetId & pairs$target == sourceId)
+    ), , drop = FALSE]
+  } else {
+    selectedPairs[[key]] <<- rbind(pairs, data.frame(source = sourceId, target = targetId))
+  }
+}
+
+# Get unique terms from all selected pairs
+getTermsFromSelectedPairs <- function(type_Tool, plotId) {
+  pairs <- getSelectedPairs(type_Tool, plotId)
+  if (nrow(pairs) == 0) return(character(0))
+  unique(c(pairs$source, pairs$target))
+}
+
+clearPairSelection <- function(type_Tool, plotId) {
+  key <- getStateKey(type_Tool, plotId)
+  selectedPairs[[key]] <<- data.frame(source = character(0), target = character(0))
+}
+
+# Heatmap cell selection functions for visual highlighting
+# Tracks selected cells (x, y coordinates) for rectangle shapes
+
+getSelectedHeatmapCells <- function(type_Tool, plotId) {
+  key <- getStateKey(type_Tool, plotId)
+  cells <- selectedHeatmapCells[[key]]
+  if (is.null(cells)) return(data.frame(x = character(0), y = character(0)))
+  return(cells)
+}
+
+# Check if a cell exists (exact match)
+cellExists <- function(cells, x, y) {
+  if (nrow(cells) == 0) return(FALSE)
+  any(cells$x == x & cells$y == y)
+}
+
+# Adds cell if not selected, removes if already selected
+toggleHeatmapCellSelection <- function(type_Tool, plotId, x, y) {
+  key <- getStateKey(type_Tool, plotId)
+  cells <- getSelectedHeatmapCells(type_Tool, plotId)
+
+  if (cellExists(cells, x, y)) {
+    selectedHeatmapCells[[key]] <<- cells[!(cells$x == x & cells$y == y), , drop = FALSE]
+  } else {
+    selectedHeatmapCells[[key]] <<- rbind(cells, data.frame(x = as.character(x), y = as.character(y)))
+  }
+}
+
+clearHeatmapCellSelection <- function(type_Tool, plotId) {
+  key <- getStateKey(type_Tool, plotId)
+  selectedHeatmapCells[[key]] <<- data.frame(x = character(0), y = character(0))
+}
 
 # Network-specific state functions
 # Networks have 4 components: enrichment, edgelist, nodes, edges
@@ -172,35 +304,6 @@ getNetworkNodes <- function(type_Tool, networkId) {
 
 getNetworkEdges <- function(type_Tool, networkId) {
   getCurrentView(type_Tool, paste0(networkId, "_edges"))
-}
-
-getNetworkOriginalEnrichment <- function(type_Tool, networkId) {
-  getOriginalData(type_Tool, paste0(networkId, "_enrichment"))
-}
-
-getNetworkOriginalEdgelist <- function(type_Tool, networkId) {
-  getOriginalData(type_Tool, paste0(networkId, "_edgelist"))
-}
-
-getNetworkOriginalNodes <- function(type_Tool, networkId) {
-  getOriginalData(type_Tool, paste0(networkId, "_nodes"))
-}
-
-getNetworkOriginalEdges <- function(type_Tool, networkId) {
-  getOriginalData(type_Tool, paste0(networkId, "_edges"))
-}
-
-updateNetworkEnrichmentView <- function(type_Tool, networkId, data, source) {
-  updateCurrentView(type_Tool, paste0(networkId, "_enrichment"), data, source)
-}
-
-updateNetworkEdgelistView <- function(type_Tool, networkId, data, source) {
-  updateCurrentView(type_Tool, paste0(networkId, "_edgelist"), data, source)
-}
-
-updateNetworkStructureView <- function(type_Tool, networkId, nodes, edges, source) {
-  updateCurrentView(type_Tool, paste0(networkId, "_nodes"), nodes, source)
-  updateCurrentView(type_Tool, paste0(networkId, "_edges"), edges, source)
 }
 
 # Cascade blocking is handled by isReRenderCascade() with explicit row count tracking
@@ -231,8 +334,31 @@ clearNetworkState <- function(type_Tool, networkId) {
   clearPlotState(type_Tool, paste0(networkId, "_edges"))
 }
 
-hasNetworkData <- function(type_Tool, networkId) {
-  hasPlotData(type_Tool, paste0(networkId, "_enrichment"))
+# Clear all plot state for a given run (fullRunKey)
+# Used when closing a run tab to clean up all associated plot state
+clearPlotStateForRun <- function(fullRunKey) {
+  # Clear standard plot states
+  for (plotId in c("barchart", "scatterPlot", "dotPlot")) {
+    clearPlotState(fullRunKey, plotId)
+  }
+
+  # Clear heatmap states
+  for (heatmapId in c("heatmap1", "heatmap2", "heatmap3")) {
+    clearPlotState(fullRunKey, heatmapId)
+  }
+
+  # Clear network states (4 components each)
+  for (networkId in c("network1", "network2", "network3")) {
+    clearNetworkState(fullRunKey, networkId)
+  }
+
+  # Clear current network view
+  for (networkId in c("network1", "network2", "network3")) {
+    enrichKey <- paste(fullRunKey, networkId, "enrichment", sep = "_")
+    edgelistKey <- paste(fullRunKey, networkId, "edgelist", sep = "_")
+    currentNetworkView[[enrichKey]] <<- NULL
+    currentNetworkView[[edgelistKey]] <<- NULL
+  }
 }
 
 
@@ -242,13 +368,17 @@ hasNetworkData <- function(type_Tool, networkId) {
 # When handleTableFilterChange fires, it checks and clears this flag.
 
 markTableUpdatePending <- function(tableId) {
-  pendingTableUpdates[[tableId]] <<- TRUE
+  programmaticTableUpdateTimes[[tableId]] <<- Sys.time()
 }
 
 isProgrammaticTableUpdate <- function(tableId) {
-  pending <- pendingTableUpdates[[tableId]]
-  if (!is.null(pending) && isTRUE(pending)) {
-    pendingTableUpdates[[tableId]] <<- NULL
+  lastUpdate <- programmaticTableUpdateTimes[[tableId]]
+  if (is.null(lastUpdate)) {
+    return(FALSE)
+  }
+  # Block events within 200ms of a programmatic update (cascade events)
+  timeSince <- as.numeric(Sys.time() - lastUpdate)
+  if (timeSince < 0.2) {
     return(TRUE)
   }
   return(FALSE)
@@ -313,7 +443,6 @@ handleDatasourcePicker <- function(enrichmentType, toolName, componentId) {
       )
     }
   }, error = function(e) {
-    message("Datasource picker error: ", e$message)
     renderWarning("Could not update slider filter values properly.")
   })
 }
@@ -370,6 +499,9 @@ filterAndPrintTable <- function(enrichmentType, enrichmentTool,
   # Store as ORIGINAL data (this is called from "Generate" button)
   # This sets both original and current view to the same data
   setOriginalData(type_Tool, plotId, enrichmentFilteredData)
+
+  # Mark table update as programmatic to prevent cascade re-render
+  markTableUpdatePending(paste0(outputId, "_table"))
 
   renderEnrichmentTable(
     shinyOutputId = paste0(outputId, "_table"),
@@ -600,439 +732,356 @@ extractGeneVsGeneEdgelist <- function(enrichmentData, thresholdSlider = NULL,
 # Plot-Table Synchronization Functions
 # Plot and table always show the SAME data. Compare actual Term_IDs to detect real changes.
 
-# Handle plot click events - filter TABLE to show clicked term (plot unchanged)
-handlePlotClick <- function(plotId, plotSource) {
+# Visual Highlighting Functions (plotlyProxy-based in-place updates)
+
+# Updates plot highlighting via plotlyProxy (no re-render)
+# Adds black borders to selected items using marker.line styling
+updatePlotHighlighting <- function(type_Tool, plotId, session) {
+  if (is.null(session)) return()
+
   tryCatch({
-    # Use the currently visible tool tab to determine which results to update
+    shinyOutputId <- paste(type_Tool, plotId, sep = "_")
+    selectedTerms <- getSelectedTerms(type_Tool, plotId)
+
+    # Use rendered data (what's displayed, may differ from original after filtering)
+    renderedData <- getRenderedData(type_Tool, plotId)
+    if (is.null(renderedData) || nrow(renderedData) == 0) return()
+
+    proxy <- plotlyProxy(shinyOutputId, session = session)
+
+    # DotPlot is single-trace (continuous color), others are multi-trace
+    if (plotId == "dotPlot") {
+      updateSingleTraceHighlighting(proxy, renderedData, selectedTerms)
+    } else {
+      updateMultiTraceHighlighting(proxy, renderedData, selectedTerms)
+    }
+  }, error = function(e) {
+    # Silently ignore highlight errors
+  })
+}
+
+# Single-trace highlighting (DotPlot): sets per-point border styling
+updateSingleTraceHighlighting <- function(proxy, originalData, selectedTerms) {
+  n <- nrow(originalData)
+
+  if (length(selectedTerms) == 0) {
+    lineColors <- rep("rgba(0,0,0,0.3)", n)
+    lineWidths <- rep(1, n)
+  } else {
+    isSelected <- originalData$Term_ID_noLinks %in% selectedTerms
+    lineColors <- ifelse(isSelected, "black", "rgba(0,0,0,0.3)")
+    lineWidths <- ifelse(isSelected, 2, 1)
+  }
+
+  plotlyProxyInvoke(proxy, "restyle", "marker.line.color", list(lineColors), 0)
+  plotlyProxyInvoke(proxy, "restyle", "marker.line.width", list(lineWidths), 0)
+}
+
+# Multi-trace highlighting (Barchart, Scatter): one trace per Source category
+updateMultiTraceHighlighting <- function(proxy, originalData, selectedTerms) {
+  sources <- unique(originalData$Source)
+
+  for (i in seq_along(sources)) {
+    traceData <- originalData[originalData$Source == sources[i], ]
+    n <- nrow(traceData)
+    traceIndex <- i - 1  # 0-indexed for plotly.js
+
+    if (length(selectedTerms) == 0) {
+      lineColors <- rep("rgba(0,0,0,0.3)", n)
+      lineWidths <- rep(1, n)
+    } else {
+      isSelected <- traceData$Term_ID_noLinks %in% selectedTerms
+      lineColors <- ifelse(isSelected, "black", "rgba(0,0,0,0.3)")
+      lineWidths <- ifelse(isSelected, 2, 1)
+    }
+
+    plotlyProxyInvoke(proxy, "restyle", "marker.line.color", list(lineColors), traceIndex)
+    plotlyProxyInvoke(proxy, "restyle", "marker.line.width", list(lineWidths), traceIndex)
+  }
+}
+
+# Heatmap highlighting: draws rectangle shapes around selected cells
+# Heatmaps don't support marker.line, uses layout shapes instead
+updateHeatmapHighlighting <- function(type_Tool, plotId, session) {
+  if (is.null(session)) return()
+
+  tryCatch({
+    shinyOutputId <- paste(type_Tool, plotId, sep = "_")
+    selectedCells <- getSelectedHeatmapCells(type_Tool, plotId)
+
+    # Use rendered data (what's displayed, may differ from original after filtering)
+    renderedData <- getRenderedData(type_Tool, plotId)
+    if (is.null(renderedData) || nrow(renderedData) == 0) return()
+
+    proxy <- plotlyProxy(shinyOutputId, session = session)
+    shapes <- list()
+
+    if (nrow(selectedCells) > 0) {
+      # Get category arrays matching renderHeatmap order
+      categoryInfo <- getHeatmapCategoryArrays(type_Tool, plotId, renderedData)
+      if (is.null(categoryInfo)) return()
+
+      xCategories <- categoryInfo$x
+      yCategories <- categoryInfo$y  # Already reversed in getHeatmapCategoryArrays
+
+      for (i in seq_len(nrow(selectedCells))) {
+        cellX <- selectedCells$x[i]
+        cellY <- selectedCells$y[i]
+
+        # Convert to 0-based indices for plotly.js
+        xIndex <- match(cellX, xCategories) - 1
+        yIndex <- match(cellY, yCategories) - 1
+
+        if (!is.na(xIndex) && !is.na(yIndex)) {
+          # Rectangle spans (index - 0.5) to (index + 0.5) around the cell center
+          shapes[[length(shapes) + 1]] <- list(
+            type = "rect",
+            xref = "x",
+            yref = "y",
+            x0 = xIndex - 0.5,
+            x1 = xIndex + 0.5,
+            y0 = yIndex - 0.5,
+            y1 = yIndex + 0.5,
+            line = list(color = "black", width = 2),
+            fillcolor = "rgba(0,0,0,0)"
+          )
+        }
+      }
+    }
+
+    # Empty list clears shapes, populated list adds them
+    plotlyProxyInvoke(proxy, "relayout", list(shapes = shapes))
+
+  }, error = function(e) {
+    # Silently ignore highlight errors
+  })
+}
+
+# Get heatmap category arrays for proper shape positioning
+# Returns list(x = xCategories, y = yCategories) matching renderHeatmap order
+getHeatmapCategoryArrays <- function(type_Tool, plotId, enrichmentData) {
+  tryCatch({
+    if (plotId == "heatmap1") {
+      # Heatmap1: Function vs Gene
+      # Transform to heatmap format
+      heatmapTable <- separateRows(enrichmentData)
+
+      # Get axis setting
+      enrichmentType <- strsplit(type_Tool, "_")[[1]][1]
+      uiTermKeyword <- stringr::str_to_title(UI_TERM_KEYWORD[[enrichmentType]])
+      heatmap1_axis <- input[[paste(type_Tool, "heatmap1_axis", sep = "_")]]
+      drawFormatColumn <- input[[paste(type_Tool, "heatmap1_drawFormat", sep = "_")]]
+
+      if (heatmap1_axis == paste0(uiTermKeyword, "-Genes")) {
+        yAxisColumn <- drawFormatColumn
+        xAxisColumn <- "Positive Hits"
+      } else {
+        yAxisColumn <- "Positive Hits"
+        xAxisColumn <- drawFormatColumn
+      }
+
+      # Match renderHeatmap order: y is reversed
+      yCategories <- rev(unique(heatmapTable[[yAxisColumn]]))
+      xCategories <- unique(heatmapTable[[xAxisColumn]])
+
+    } else if (plotId == "heatmap2") {
+      # Heatmap2: Function vs Function
+      # Extract type and tool parts
+      parts <- strsplit(type_Tool, "_")[[1]]
+      enrichmentType <- parts[1]
+      enrichmentTool <- paste(parts[2:length(parts)], collapse = "_")
+
+      # Transform to edgelist format
+      heatmapTable <- extractFunctionVsFunctionEdgelist(enrichmentType, enrichmentTool,
+                                                        enrichmentData)
+      if (is.null(heatmapTable) || nrow(heatmapTable) == 0) return(NULL)
+
+      # Get draw format setting
+      drawFormatColumn <- switch(
+        input[[paste(type_Tool, "heatmap2_drawFormat", sep = "_")]],
+        "Term_ID" = "Id",
+        "Function" = "Name"
+      )
+      yAxisColumn <- paste0("Source ", drawFormatColumn)
+      xAxisColumn <- paste0("Target ", drawFormatColumn)
+
+      # Match renderHeatmap order: y is reversed
+      yCategories <- rev(unique(heatmapTable[[yAxisColumn]]))
+      xCategories <- unique(heatmapTable[[xAxisColumn]])
+
+    } else if (plotId == "heatmap3") {
+      # Heatmap3: Gene vs Gene
+      # Transform to edgelist format
+      heatmapTable <- extractGeneVsGeneEdgelist(enrichmentData)
+      if (is.null(heatmapTable) || nrow(heatmapTable) == 0) return(NULL)
+
+      # Match renderHeatmap order: y is reversed
+      yCategories <- rev(unique(heatmapTable$`Source Name`))
+      xCategories <- unique(heatmapTable$`Target Name`)
+
+    } else {
+      return(NULL)
+    }
+
+    return(list(x = xCategories, y = yCategories))
+
+  }, error = function(e) {
+    return(NULL)
+  })
+}
+
+# Plot Click and Selection Handlers
+
+# Handles plot click events: toggles term selection and updates table
+# Plot is NOT re-rendered to preserve zoom state
+handlePlotClick <- function(plotId, plotSource, session = NULL) {
+  tryCatch({
     selectedTool <- currentSelectedToolTab
     if (is.null(selectedTool) || selectedTool == "" || selectedTool == "Combination") return()
+
     type_Tool <- paste(currentEnrichmentType, selectedTool, sep = "_")
     if (is.null(type_Tool) || type_Tool == "") return()
 
     clickData <- event_data("plotly_click", source = plotSource)
     if (is.null(clickData)) return()
 
-    # All heatmaps: click filters TABLE only, plot stays unchanged
-    # Filter from ORIGINAL data so each click is independent
-    if (plotId %in% c("heatmap1", "heatmap2", "heatmap3")) {
-      originalData <- getOriginalData(type_Tool, plotId)
-      if (is.null(originalData) || nrow(originalData) == 0) return()
+    # Simple plots: term-level selection
+    if (plotId %in% c("barchart", "scatterPlot", "dotPlot")) {
+      clickedTermId <- extractTermIdFromClick(clickData)
+      if (is.null(clickedTermId)) return()
 
-      selectedData <- filterDataByHeatmapClick(originalData, clickData, plotId, type_Tool)
-      if (!is.null(selectedData) && nrow(selectedData) > 0) {
-        updateCurrentView(type_Tool, plotId, selectedData, "plot_click")
-        renderTableFromCurrentView(type_Tool, plotId)
+      termId <- resolveToTermIdNoLinks(clickedTermId, type_Tool, plotId)
+      if (!is.null(termId)) {
+        toggleTermSelection(type_Tool, plotId, termId)
+        renderTableFromSelection(type_Tool, plotId)
       }
-      return()
-    }
 
-    # Other plots (barchart, scatter, dot): check feedback loop prevention
-    if (!shouldProcessUpdate(type_Tool, plotId, "plot")) {
-      return()
-    }
+    } else if (plotId == "heatmap1") {
+      # Heatmap1: pair-level selection (Function, Gene)
+      cellX <- as.character(clickData$x)
+      cellY <- as.character(clickData$y)
 
-    originalData <- getOriginalData(type_Tool, plotId)
-    if (is.null(originalData) || nrow(originalData) == 0) return()
+      # Axis orientation depends on user setting
+      enrichmentType <- strsplit(type_Tool, "_")[[1]][1]
+      uiTermKeyword <- stringr::str_to_title(UI_TERM_KEYWORD[[enrichmentType]])
+      heatmap1_axis <- input[[paste(type_Tool, "heatmap1_axis", sep = "_")]]
 
-    clickedTermId <- clickData$customdata
-    if (is.null(clickedTermId) || length(clickedTermId) == 0) {
-      clickedTermId <- clickData$y
-    }
-    if (is.null(clickedTermId)) return()
+      if (heatmap1_axis == paste0(uiTermKeyword, "-Genes")) {
+        clickedTermId <- cellY
+        clickedGene <- cellX
+      } else {
+        clickedTermId <- cellX
+        clickedGene <- cellY
+      }
 
-    # Safe column matching against original data
-    matchVector <- rep(FALSE, nrow(originalData))
-    if ("Term_ID_noLinks" %in% names(originalData)) {
-      matchVector <- matchVector | (originalData$Term_ID_noLinks == clickedTermId)
-    }
-    if ("Function" %in% names(originalData)) {
-      matchVector <- matchVector | (originalData$Function == clickedTermId)
-    }
-    if ("Term_ID" %in% names(originalData)) {
-      matchVector <- matchVector | (originalData$Term_ID == clickedTermId)
-    }
-    matchVector[is.na(matchVector)] <- FALSE
-    selectedData <- originalData[matchVector, , drop = FALSE]
+      termId <- resolveToTermIdNoLinks(clickedTermId, type_Tool, plotId)
 
-    if (!is.null(selectedData) && nrow(selectedData) > 0) {
-      updateCurrentView(type_Tool, plotId, selectedData, "plot_click")
-      # Only update table, don't re-render plot
-      renderTableFromCurrentView(type_Tool, plotId)
-    }
-  }, error = function(e) {
-    message("Plot click error: ", e$message)
-  })
-}
+      if (!is.null(termId) && !is.null(clickedGene)) {
+        togglePairSelection(type_Tool, plotId, termId, clickedGene)
+        renderTableFromHeatmap1PairSelection(type_Tool, plotId)
+        toggleHeatmapCellSelection(type_Tool, plotId, cellX, cellY)
+      }
 
-# Filter enrichment data based on heatmap click coordinates
-filterDataByHeatmapClick <- function(currentData, clickData, plotId, type_Tool) {
-  yValue <- clickData$y
-  xValue <- clickData$x
+    } else if (plotId == "heatmap2") {
+      # Heatmap2: pair-level selection (Function, Function)
+      termIds <- extractTermsFromHeatmap2Click(clickData)
 
-  matchVector <- rep(FALSE, nrow(currentData))
+      if (length(termIds) == 2) {
+        sourceId <- resolveToTermIdNoLinks(termIds[1], type_Tool, plotId)
+        targetId <- resolveToTermIdNoLinks(termIds[2], type_Tool, plotId)
 
-  if (plotId == "heatmap1") {
-    # For heatmap1, y or x could be term depending on axis setting
-    # Try to match against term columns first
-    if ("Term_ID_noLinks" %in% names(currentData)) {
-      matchVector <- matchVector | (currentData$Term_ID_noLinks == yValue)
-      matchVector <- matchVector | (currentData$Term_ID_noLinks == xValue)
-    }
-    if ("Function" %in% names(currentData)) {
-      matchVector <- matchVector | (currentData$Function == yValue)
-      matchVector <- matchVector | (currentData$Function == xValue)
-    }
-    if ("Term_ID" %in% names(currentData)) {
-      matchVector <- matchVector | (currentData$Term_ID == yValue)
-      matchVector <- matchVector | (currentData$Term_ID == xValue)
-    }
+        if (!is.null(sourceId) && !is.null(targetId)) {
+          togglePairSelection(type_Tool, plotId, sourceId, targetId)
+          renderTableFromPairSelection(type_Tool, plotId)
 
-  } else if (plotId == "heatmap2") {
-    # For heatmap2, both axes are terms (source and target)
-    # Match either - typically user clicks to see that specific term
-    if ("Term_ID_noLinks" %in% names(currentData)) {
-      matchVector <- matchVector | (currentData$Term_ID_noLinks == yValue)
-      matchVector <- matchVector | (currentData$Term_ID_noLinks == xValue)
-    }
-    if ("Function" %in% names(currentData)) {
-      matchVector <- matchVector | (currentData$Function == yValue)
-      matchVector <- matchVector | (currentData$Function == xValue)
-    }
-    # Also check with "Source"/"Target" prefixes in case labels are from edgelist
-    if ("Source Id" %in% names(currentData)) {
-      matchVector <- matchVector | (currentData$`Source Id` == yValue)
-    }
-    if ("Source Name" %in% names(currentData)) {
-      matchVector <- matchVector | (currentData$`Source Name` == yValue)
-    }
-
-  } else if (plotId == "heatmap3") {
-    # For heatmap3, axes are genes - filter to terms containing BOTH genes
-    # The cell represents shared functions, so show terms that explain the connection
-    if ("Positive Hits" %in% names(currentData)) {
-      for (i in seq_len(nrow(currentData))) {
-        genes <- unlist(strsplit(as.character(currentData$`Positive Hits`[i]), ",\\s*"))
-        if (yValue %in% genes && xValue %in% genes) {
-          matchVector[i] <- TRUE
+          cellX <- as.character(clickData$x)
+          cellY <- as.character(clickData$y)
+          toggleHeatmapCellSelection(type_Tool, plotId, cellX, cellY)
         }
       }
-    }
-  }
 
-  matchVector[is.na(matchVector)] <- FALSE
-  return(currentData[matchVector, , drop = FALSE])
-}
+    } else if (plotId == "heatmap3") {
+      # Heatmap3: pair-level selection (Gene, Gene)
+      geneX <- clickData$x
+      geneY <- clickData$y
 
-# Handle plot zoom events - filter table to visible terms
-handlePlotZoom <- function(plotId, plotSource) {
-  tryCatch({
-    # Use the currently visible tool tab to determine which results to update
-    selectedTool <- currentSelectedToolTab
-    if (is.null(selectedTool) || selectedTool == "" || selectedTool == "Combination") return()
-    type_Tool <- paste(currentEnrichmentType, selectedTool, sep = "_")
-    if (is.null(type_Tool) || type_Tool == "") return()
+      if (!is.null(geneX) && !is.null(geneY)) {
+        togglePairSelection(type_Tool, plotId, geneX, geneY)
+        renderTableFromGenePairSelection(type_Tool, plotId)
 
-    relayoutData <- event_data("plotly_relayout", source = plotSource)
-    if (is.null(relayoutData)) return()
-
-    isResetEvent <- any(grepl("autorange", names(relayoutData)))
-    isZoomEvent <- any(grepl("range", names(relayoutData)))
-
-    # Always process reset (autoscale), only check feedback loop for zoom
-    if (!isResetEvent && !shouldProcessUpdate(type_Tool, plotId, "plot")) {
-      return()
-    }
-
-    if (isResetEvent) {
-      # Autoscale (double-click): restore original data
-      originalData <- getOriginalData(type_Tool, plotId)
-      if (!is.null(originalData) && nrow(originalData) > 0) {
-        updateCurrentView(type_Tool, plotId, originalData, "reset")
-        renderTableFromCurrentView(type_Tool, plotId)
-      }
-    } else if (isZoomEvent) {
-      # Heatmap3: zoom is visual only, don't update table
-      if (plotId == "heatmap3") return()
-
-      originalData <- getOriginalData(type_Tool, plotId)
-      if (is.null(originalData) || nrow(originalData) == 0) return()
-
-      filteredData <- filterDataByZoomBounds(originalData, relayoutData, plotId, type_Tool)
-      if (nrow(filteredData) > 0) {
-        updateCurrentView(type_Tool, plotId, filteredData, "plot_zoom")
-        renderTableFromCurrentView(type_Tool, plotId)
+        cellX <- as.character(geneX)
+        cellY <- as.character(geneY)
+        toggleHeatmapCellSelection(type_Tool, plotId, cellX, cellY)
       }
     }
+
+    # Update visual highlighting
+    if (!is.null(session)) {
+      if (plotId %in% c("barchart", "scatterPlot", "dotPlot")) {
+        updatePlotHighlighting(type_Tool, plotId, session)
+      } else if (plotId %in% c("heatmap1", "heatmap2", "heatmap3")) {
+        updateHeatmapHighlighting(type_Tool, plotId, session)
+      }
+    }
+
   }, error = function(e) {
-    message("Plot zoom error: ", e$message)
+    # Silently ignore click errors
   })
 }
 
-# Handle plot selection events (lasso/box) - filter TABLE only
-handlePlotSelection <- function(plotId, plotSource) {
+# Handle plot zoom events - zoom is purely visual, no data/selection changes
+# Use Reset View button to clear selection and restore original data
+handlePlotZoom <- function(plotId, plotSource) {
+  # Zoom events (including autoscale) are visual only - no action needed
+  # The plotly chart handles zoom/pan/autoscale internally
+  # Selection is managed separately via clicks and Reset View button
+}
+
+# Handle plot selection events (lasso/box) - add to selection (cumulative)
+# Note: Plot is NOT re-rendered to preserve zoom state
+handlePlotSelection <- function(plotId, plotSource, session = NULL) {
   tryCatch({
-    # Use the currently visible tool tab to determine which results to update
     selectedTool <- currentSelectedToolTab
     if (is.null(selectedTool) || selectedTool == "" || selectedTool == "Combination") return()
     type_Tool <- paste(currentEnrichmentType, selectedTool, sep = "_")
     if (is.null(type_Tool) || type_Tool == "") return()
 
-    # Heatmaps: selection doesn't apply well (use click for cells)
+    # Heatmaps don't support lasso well (use click for cells)
     if (plotId %in% c("heatmap1", "heatmap2", "heatmap3")) return()
-
-    if (!shouldProcessUpdate(type_Tool, plotId, "plot")) {
-      return()
-    }
-
-    # Filter from original data so each selection is independent
-    originalData <- getOriginalData(type_Tool, plotId)
-    if (is.null(originalData) || nrow(originalData) == 0) return()
 
     selectionData <- event_data("plotly_selected", source = plotSource)
     if (is.null(selectionData) || nrow(selectionData) == 0) return()
 
-    selectedTermIds <- selectionData$customdata
-    if (is.null(selectedTermIds) || length(selectedTermIds) == 0) {
-      selectedTermIds <- selectionData$y
+    # Get selected term IDs from lasso/box
+    selectedValues <- selectionData$customdata
+    if (is.null(selectedValues) || length(selectedValues) == 0) {
+      selectedValues <- selectionData$y
     }
-    if (is.null(selectedTermIds) || length(selectedTermIds) == 0) return()
+    if (is.null(selectedValues) || length(selectedValues) == 0) return()
 
-    # Match against original data
-    matchVector <- rep(FALSE, nrow(originalData))
-
-    if ("Term_ID_noLinks" %in% names(originalData)) {
-      matchVector <- matchVector | (originalData$Term_ID_noLinks %in% selectedTermIds)
-    }
-    if ("Function" %in% names(originalData)) {
-      matchVector <- matchVector | (originalData$Function %in% selectedTermIds)
-    }
-    if ("Term_ID" %in% names(originalData)) {
-      matchVector <- matchVector | (originalData$Term_ID %in% selectedTermIds)
+    # Resolve all selected values to Term_ID_noLinks and add to selection
+    resolvedTermIds <- character(0)
+    for (val in selectedValues) {
+      termId <- resolveToTermIdNoLinks(val, type_Tool, plotId)
+      if (!is.null(termId)) {
+        resolvedTermIds <- c(resolvedTermIds, termId)
+      }
     }
 
-    matchVector[is.na(matchVector)] <- FALSE
-    selectedData <- originalData[matchVector, , drop = FALSE]
+    if (length(resolvedTermIds) > 0) {
+      # Add to existing selection (cumulative), update table only
+      addTermsToSelection(type_Tool, plotId, unique(resolvedTermIds))
+      renderTableFromSelection(type_Tool, plotId)
 
-    if (nrow(selectedData) > 0) {
-      updateCurrentView(type_Tool, plotId, selectedData, "plot_select")
-      # Only update table, don't re-render plot
-      renderTableFromCurrentView(type_Tool, plotId)
+      # Update visual highlighting (black borders on selected items)
+      if (!is.null(session)) {
+        updatePlotHighlighting(type_Tool, plotId, session)
+      }
     }
   }, error = function(e) {
-    message("Plot selection error: ", e$message)
+    # Silently ignore selection errors
   })
 }
-
-# Filter data based on plotly zoom bounds
-filterDataByZoomBounds <- function(data, relayoutData, plotId, type_Tool) {
-  # Extract axis ranges from relayout event
-  xMin <- relayoutData$`xaxis.range[0]`
-  xMax <- relayoutData$`xaxis.range[1]`
-  yMin <- relayoutData$`yaxis.range[0]`
-  yMax <- relayoutData$`yaxis.range[1]`
-
-  filteredData <- data
-
-  if (plotId == "barchart") {
-    # Barchart: x-axis is the value column, y-axis is categorical
-    # Get mode and drawFormat to reconstruct the correct y-axis order
-    mode <- input[[paste(type_Tool, "barchart_mode", sep = "_")]]
-    drawFormatColumn <- input[[paste(type_Tool, "barchart_drawFormat", sep = "_")]]
-
-    column <- switch(mode,
-      "Enrichment Score" = "Enrichment Score %",
-      "-log10Pvalue"
-    )
-
-    # Reconstruct factor levels in same order as plot (ascending by value, so top = highest)
-    factorLevels <- unique(data[[drawFormatColumn]])[order(data[[column]], decreasing = FALSE)]
-
-    # Filter by visible y categories
-    if (!is.null(yMin) && !is.null(yMax)) {
-      visibleIndices <- ceiling(yMin):floor(yMax)
-      visibleIndices <- visibleIndices[visibleIndices >= 0 & visibleIndices < length(factorLevels)]
-      if (length(visibleIndices) > 0) {
-        # Get the actual category values at these positions (1-indexed for R)
-        visibleCategories <- factorLevels[visibleIndices + 1]
-        filteredData <- data[data[[drawFormatColumn]] %in% visibleCategories, , drop = FALSE]
-      }
-    }
-
-  } else if (plotId == "scatterPlot") {
-    # Scatter: both axes are numeric
-    if (!is.null(xMin) && !is.null(xMax)) {
-      filteredData <- filteredData[
-        filteredData$`-log10Pvalue` >= xMin &
-        filteredData$`-log10Pvalue` <= xMax, , drop = FALSE]
-    }
-    if (!is.null(yMin) && !is.null(yMax)) {
-      filteredData <- filteredData[
-        filteredData$`Enrichment Score %` >= yMin &
-        filteredData$`Enrichment Score %` <= yMax, , drop = FALSE]
-    }
-
-  } else if (plotId == "dotPlot") {
-    # DotPlot: x = Gene Ratio (numeric), y = categorical term names
-    # Get mode and drawFormat to reconstruct the correct y-axis order
-    mode <- input[[paste(type_Tool, "dotPlot_mode", sep = "_")]]
-    drawFormatColumn <- input[[paste(type_Tool, "dotPlot_drawFormat", sep = "_")]]
-
-    # Need Gene Ratio for ordering
-    dataCopy <- data
-    if (!"Gene Ratio" %in% names(dataCopy)) {
-      dataCopy$`Gene Ratio` <- dataCopy$`Intersection Size` / dataCopy$`Query size`
-    }
-
-    orderColumn <- switch(mode,
-      "Enrichment Score" = "Enrichment Score %",
-      "Gene Ratio" = "Gene Ratio",
-      "-log10Pvalue"
-    )
-
-    # Reconstruct factor levels in same order as plot
-    factorLevels <- unique(dataCopy[[drawFormatColumn]])[order(dataCopy[[orderColumn]], decreasing = FALSE)]
-
-    # Filter by visible y categories
-    if (!is.null(yMin) && !is.null(yMax)) {
-      visibleIndices <- ceiling(yMin):floor(yMax)
-      visibleIndices <- visibleIndices[visibleIndices >= 0 & visibleIndices < length(factorLevels)]
-      if (length(visibleIndices) > 0) {
-        visibleCategories <- factorLevels[visibleIndices + 1]
-        filteredData <- data[data[[drawFormatColumn]] %in% visibleCategories, , drop = FALSE]
-      }
-    }
-
-    # Also filter by x-axis (Gene Ratio) if zoomed
-    if (!is.null(xMin) && !is.null(xMax)) {
-      if (!"Gene Ratio" %in% names(filteredData)) {
-        filteredData$`Gene Ratio` <- filteredData$`Intersection Size` / filteredData$`Query size`
-      }
-      filteredData <- filteredData[
-        filteredData$`Gene Ratio` >= xMin &
-        filteredData$`Gene Ratio` <= xMax, , drop = FALSE]
-    }
-
-  } else if (plotId == "heatmap1") {
-    # Heatmap1: one axis is terms, other is genes
-    # Get axis setting to determine which is which
-    enrichmentType <- strsplit(type_Tool, "_")[[1]][1]
-    uiTermKeyword <- stringr::str_to_title(UI_TERM_KEYWORD[[enrichmentType]])
-    heatmap1_axis <- input[[paste(type_Tool, "heatmap1_axis", sep = "_")]]
-    drawFormatColumn <- input[[paste(type_Tool, "heatmap1_drawFormat", sep = "_")]]
-
-    # Transform data to heatmap format to get correct axis labels
-    heatmapTable <- separateRows(data)
-
-    if (heatmap1_axis == paste0(uiTermKeyword, "-Genes")) {
-      # Y-axis is terms, X-axis is genes
-      # Y-categories are reversed to show highest values at top (matching barchart)
-      if (!is.null(yMin) && !is.null(yMax)) {
-        termLevels <- rev(unique(heatmapTable[[drawFormatColumn]]))
-        visibleIndices <- ceiling(yMin):floor(yMax)
-        visibleIndices <- visibleIndices[visibleIndices >= 0 & visibleIndices < length(termLevels)]
-        if (length(visibleIndices) > 0) {
-          visibleTerms <- termLevels[visibleIndices + 1]
-          filteredData <- data[data[[drawFormatColumn]] %in% visibleTerms, , drop = FALSE]
-        }
-      }
-    } else {
-      # X-axis is terms, Y-axis is genes
-      if (!is.null(xMin) && !is.null(xMax)) {
-        termLevels <- unique(heatmapTable[[drawFormatColumn]])
-        visibleIndices <- ceiling(xMin):floor(xMax)
-        visibleIndices <- visibleIndices[visibleIndices >= 0 & visibleIndices < length(termLevels)]
-        if (length(visibleIndices) > 0) {
-          visibleTerms <- termLevels[visibleIndices + 1]
-          filteredData <- data[data[[drawFormatColumn]] %in% visibleTerms, , drop = FALSE]
-        }
-      }
-    }
-
-  } else if (plotId == "heatmap2") {
-    # Heatmap2: both axes are terms (source/target)
-    # Need to include terms from BOTH x and y axes
-    drawFormatColumn <- switch(
-      input[[paste(type_Tool, "heatmap2_drawFormat", sep = "_")]],
-      "Term_ID" = "Id",
-      "Function" = "Name"
-    )
-
-    # Extract enrichment type and tool for the edgelist function
-    parts <- strsplit(type_Tool, "_")[[1]]
-    enrichmentType <- parts[1]
-    enrichmentTool <- parts[2]
-
-    # Transform to get heatmap axis labels
-    heatmapTable <- extractFunctionVsFunctionEdgelist(enrichmentType, enrichmentTool, data)
-    if (!is.null(heatmapTable) && nrow(heatmapTable) > 0) {
-      yAxisColumn <- paste0("Source ", drawFormatColumn)
-      xAxisColumn <- paste0("Target ", drawFormatColumn)
-
-      visibleTerms <- c()
-
-      # Filter by Y-axis (source terms) visible range
-      # Plotly y-axis categories are REVERSED (to show highest at top)
-      if (!is.null(yMin) && !is.null(yMax)) {
-        yTermLevels <- rev(unique(heatmapTable[[yAxisColumn]]))
-        visibleIndices <- ceiling(yMin):floor(yMax)
-        visibleIndices <- visibleIndices[visibleIndices >= 0 & visibleIndices < length(yTermLevels)]
-        if (length(visibleIndices) > 0) {
-          visibleTerms <- c(visibleTerms, yTermLevels[visibleIndices + 1])
-        }
-      }
-
-      # Also filter by X-axis (target terms) visible range
-      if (!is.null(xMin) && !is.null(xMax)) {
-        xTermLevels <- unique(heatmapTable[[xAxisColumn]])
-        visibleIndices <- ceiling(xMin):floor(xMax)
-        visibleIndices <- visibleIndices[visibleIndices >= 0 & visibleIndices < length(xTermLevels)]
-        if (length(visibleIndices) > 0) {
-          visibleTerms <- c(visibleTerms, xTermLevels[visibleIndices + 1])
-        }
-      }
-
-      # Get unique terms from both axes
-      visibleTerms <- unique(visibleTerms)
-
-      if (length(visibleTerms) > 0) {
-        # Map back to original data column
-        dataColumn <- switch(
-          input[[paste(type_Tool, "heatmap2_drawFormat", sep = "_")]],
-          "Term_ID" = "Term_ID_noLinks",
-          "Function"
-        )
-        filteredData <- data[data[[dataColumn]] %in% visibleTerms, , drop = FALSE]
-      }
-    }
-
-  } else if (plotId == "heatmap3") {
-    # Heatmap3: both axes are genes - filter to terms involving visible genes
-    # Transform to get heatmap axis labels
-    heatmapTable <- extractGeneVsGeneEdgelist(data)
-    if (!is.null(heatmapTable) && nrow(heatmapTable) > 0) {
-      # Filter by Y-axis (source genes) visible range
-      # Plotly y-axis categories are REVERSED (to show highest at top, matching barchart)
-      # So we need to use the same reversed order here
-      if (!is.null(yMin) && !is.null(yMax)) {
-        geneLevels <- rev(unique(heatmapTable$`Source Name`))
-        visibleIndices <- ceiling(yMin):floor(yMax)
-        visibleIndices <- visibleIndices[visibleIndices >= 0 & visibleIndices < length(geneLevels)]
-        if (length(visibleIndices) > 0) {
-          visibleGenes <- geneLevels[visibleIndices + 1]
-          # Filter to terms that contain at least one visible gene
-          matchVector <- sapply(data$`Positive Hits`, function(hits) {
-            genes <- unlist(strsplit(as.character(hits), ",\\s*"))
-            any(genes %in% visibleGenes)
-          })
-          filteredData <- data[matchVector, , drop = FALSE]
-        }
-      }
-    }
-  }
-
-  return(filteredData)
-}
-
 # Render helper functions
 # These functions render plot/table from the current view data
 
@@ -1061,29 +1110,13 @@ renderTableFromCurrentView <- function(type_Tool, plotId) {
   )
 }
 
-# Render table with specific data (without updating currentView)
-renderTableWithData <- function(type_Tool, plotId, data) {
-  if (is.null(data) || nrow(data) == 0) return()
-
-  tableOutputId <- paste(type_Tool, plotId, "table", sep = "_")
-  data$Source <- as.factor(data$Source)
-
-  renderEnrichmentTable(
-    shinyOutputId = tableOutputId,
-    input_table = data,
-    caption = "Enrichment Results",
-    fileName = paste(type_Tool, plotId, sep = "_"),
-    mode = "Positive Hits",
-    hiddenColumns = c(0, 11, 12),
-    expandableColumn = 11,
-    filter = 'top'
-  )
-}
-
 # Render only the plot from current view
 renderPlotFromCurrentView <- function(type_Tool, plotId) {
   data <- getCurrentView(type_Tool, plotId)
   if (is.null(data) || nrow(data) == 0) return()
+
+  # Track what data we're rendering for highlighting calculations
+  setRenderedData(type_Tool, plotId, data)
 
   plotOutputId <- paste(type_Tool, plotId, sep = "_")
 
@@ -1140,9 +1173,13 @@ renderBothFromCurrentView <- function(type_Tool, plotId) {
 }
 
 # Render plot with specific data (not from currentView)
-# Used for DT filter display where we don't want to update state
+# Used for DT filter display where we don't want to update currentView state
 renderPlotWithData <- function(type_Tool, plotId, data) {
   if (is.null(data) || nrow(data) == 0) return()
+
+  # Track what data we're rendering for highlighting calculations
+  # This is critical for correct highlighting after table filtering
+  setRenderedData(type_Tool, plotId, data)
 
   plotOutputId <- paste(type_Tool, plotId, sep = "_")
 
@@ -1177,6 +1214,167 @@ renderPlotWithData <- function(type_Tool, plotId, data) {
   } else if (plotId == "heatmap3") {
     renderHeatmap3WithData(type_Tool, data)
   }
+}
+
+# Selection-aware render functions
+# Shows selected terms in table, or all data if nothing selected
+renderTableFromSelection <- function(type_Tool, plotId) {
+  originalData <- getOriginalData(type_Tool, plotId)
+  if (is.null(originalData) || nrow(originalData) == 0) return()
+
+  selectedTerms <- getSelectedTerms(type_Tool, plotId)
+
+  if (length(selectedTerms) == 0) {
+    tableData <- originalData
+  } else {
+    if (!"Term_ID_noLinks" %in% names(originalData)) {
+      tableData <- originalData
+    } else {
+      tableData <- originalData[originalData$Term_ID_noLinks %in% selectedTerms, , drop = FALSE]
+    }
+  }
+
+  if (nrow(tableData) > 0) {
+    updateCurrentView(type_Tool, plotId, tableData, "selection")
+    markTableUpdatePending(paste(type_Tool, plotId, "table", sep = "_"))
+    renderTableFromCurrentView(type_Tool, plotId)
+  }
+}
+
+# Heatmap1 pair selection: shows functions from selected (function, gene) pairs
+renderTableFromHeatmap1PairSelection <- function(type_Tool, plotId) {
+  originalData <- getOriginalData(type_Tool, plotId)
+  if (is.null(originalData) || nrow(originalData) == 0) return()
+
+  pairs <- getSelectedPairs(type_Tool, plotId)
+
+  if (nrow(pairs) == 0) {
+    tableData <- originalData
+  } else {
+    # Only show functions (source), not genes (target)
+    selectedTerms <- unique(pairs$source)
+    tableData <- originalData[originalData$Term_ID_noLinks %in% selectedTerms, , drop = FALSE]
+  }
+
+  if (nrow(tableData) > 0) {
+    updateCurrentView(type_Tool, plotId, tableData, "selection")
+    markTableUpdatePending(paste(type_Tool, plotId, "table", sep = "_"))
+    renderTableFromCurrentView(type_Tool, plotId)
+  }
+}
+
+# Heatmap2 pair selection: shows unique terms from selected (function, function) pairs
+renderTableFromPairSelection <- function(type_Tool, plotId) {
+  originalData <- getOriginalData(type_Tool, plotId)
+  if (is.null(originalData) || nrow(originalData) == 0) return()
+
+  selectedTerms <- getTermsFromSelectedPairs(type_Tool, plotId)
+
+  if (length(selectedTerms) == 0) {
+    tableData <- originalData
+  } else {
+    tableData <- originalData[originalData$Term_ID_noLinks %in% selectedTerms, , drop = FALSE]
+  }
+
+  if (nrow(tableData) > 0) {
+    updateCurrentView(type_Tool, plotId, tableData, "selection")
+    markTableUpdatePending(paste(type_Tool, plotId, "table", sep = "_"))
+    renderTableFromCurrentView(type_Tool, plotId)
+  }
+}
+
+# Heatmap3 gene pair selection: shows terms containing both genes in each pair
+renderTableFromGenePairSelection <- function(type_Tool, plotId) {
+  originalData <- getOriginalData(type_Tool, plotId)
+  if (is.null(originalData) || nrow(originalData) == 0) return()
+
+  genePairs <- getSelectedPairs(type_Tool, plotId)
+
+  if (nrow(genePairs) == 0) {
+    tableData <- originalData
+  } else {
+    # Union of terms containing both genes for each selected pair
+    allTermIds <- character(0)
+    for (i in seq_len(nrow(genePairs))) {
+      geneX <- genePairs$source[i]
+      geneY <- genePairs$target[i]
+
+      if (geneX == geneY) {
+        # Diagonal: terms containing the single gene
+        matchingTerms <- originalData$Term_ID_noLinks[
+          sapply(originalData$`Positive Hits`, function(hits) {
+            genes <- unlist(strsplit(as.character(hits), ",\\s*"))
+            geneX %in% genes
+          })
+        ]
+      } else {
+        # Off-diagonal: terms containing both genes
+        matchingTerms <- originalData$Term_ID_noLinks[
+          sapply(originalData$`Positive Hits`, function(hits) {
+            genes <- unlist(strsplit(as.character(hits), ",\\s*"))
+            geneX %in% genes && geneY %in% genes
+          })
+        ]
+      }
+      allTermIds <- union(allTermIds, matchingTerms)
+    }
+
+    tableData <- originalData[originalData$Term_ID_noLinks %in% allTermIds, , drop = FALSE]
+  }
+
+  if (nrow(tableData) > 0) {
+    updateCurrentView(type_Tool, plotId, tableData, "selection")
+    markTableUpdatePending(paste(type_Tool, plotId, "table", sep = "_"))
+    renderTableFromCurrentView(type_Tool, plotId)
+  }
+}
+
+# Extract term ID from click on simple plots (barchart, scatter, dot)
+extractTermIdFromClick <- function(clickData) {
+  termId <- clickData$customdata
+  if (is.null(termId) || length(termId) == 0) {
+    termId <- clickData$y
+  }
+  return(termId)
+}
+
+# Resolve a clicked value to Term_ID_noLinks
+# The clicked value might be Function name, Term_ID, or Term_ID_noLinks
+resolveToTermIdNoLinks <- function(clickedValue, type_Tool, plotId) {
+  if (is.null(clickedValue)) return(NULL)
+
+  originalData <- getOriginalData(type_Tool, plotId)
+  if (is.null(originalData) || nrow(originalData) == 0) return(NULL)
+
+  # Try direct match on Term_ID_noLinks
+  if ("Term_ID_noLinks" %in% names(originalData)) {
+    if (clickedValue %in% originalData$Term_ID_noLinks) {
+      return(clickedValue)
+    }
+  }
+
+  # Try matching by Function name
+  if ("Function" %in% names(originalData)) {
+    match_row <- which(originalData$Function == clickedValue)
+    if (length(match_row) > 0) {
+      return(originalData$Term_ID_noLinks[match_row[1]])
+    }
+  }
+
+  # Try matching by Term_ID (with HTML links)
+  if ("Term_ID" %in% names(originalData)) {
+    match_row <- which(originalData$Term_ID == clickedValue)
+    if (length(match_row) > 0) {
+      return(originalData$Term_ID_noLinks[match_row[1]])
+    }
+  }
+
+  return(NULL)
+}
+
+# Extract both term IDs from heatmap2 click (both axes are terms)
+extractTermsFromHeatmap2Click <- function(clickData) {
+  return(c(clickData$x, clickData$y))
 }
 
 # Heatmap rendering helpers
@@ -1222,9 +1420,10 @@ renderHeatmap2WithData <- function(type_Tool, enrichmentData) {
   if (is.null(enrichmentData) || nrow(enrichmentData) == 0) return()
 
   # Extract enrichment type and tool from type_Tool
+  # For multi-run: type_Tool = "enrichmentType_toolName_runNumber"
   parts <- strsplit(type_Tool, "_")[[1]]
   enrichmentType <- parts[1]
-  enrichmentTool <- parts[2]
+  enrichmentTool <- paste(parts[2:length(parts)], collapse = "_")  # e.g., "gProfiler_1"
 
   # Transform to edgelist format
   heatmapTable <- extractFunctionVsFunctionEdgelist(enrichmentType, enrichmentTool,
@@ -1277,55 +1476,47 @@ renderHeatmap3WithData <- function(type_Tool, enrichmentData) {
                 colorbarTitle = "Common Functions")
 }
 
-# Table filter handler
-
-# Handle table filter changes - update plot with filtered data
-# DT uses client-side filtering, so we render from filtered indices
-# without modifying currentView (keeps state in sync with DT's underlying data).
+# Handles table filter changes: updates plot with filtered data
+# DT uses client-side filtering, so we render from filtered row indices
 handleTableFilterChange <- function(enrichmentType, toolName, plotId) {
   tryCatch({
     type_Tool <- paste(enrichmentType, toolName, sep = "_")
 
-    # Skip if last update was from plot (prevents feedback loop within 500ms)
-    if (!shouldProcessUpdate(type_Tool, plotId, "table")) {
-      return()
-    }
+    if (!shouldProcessUpdate(type_Tool, plotId, "table")) return()
 
     tableId <- paste(type_Tool, plotId, "table", sep = "_")
-
-    # Get current view (what the DT was rendered with)
     currentData <- getCurrentView(type_Tool, plotId)
     if (is.null(currentData) || nrow(currentData) == 0) return()
 
-    # Get filtered row indices from DT
     filteredRowIndices <- input[[paste0(tableId, "_rows_all")]]
     if (is.null(filteredRowIndices) || length(filteredRowIndices) == 0) return()
-
-    # Safety check: indices must be valid for DT's data (currentView)
     if (max(filteredRowIndices) > nrow(currentData)) return()
 
-    # Check if this is from a programmatic table update (e.g., after zoom/click)
-    # If so, skip plot re-render - the plot is already in the correct state
-    if (isProgrammaticTableUpdate(tableId)) {
-      return()
-    }
+    # Skip programmatic updates (within 200ms of markTableUpdatePending)
+    if (isProgrammaticTableUpdate(tableId)) return()
 
-    # If all rows are visible, user cleared a filter - restore plot to currentView
+    # All rows visible = filter cleared, restore plot from currentView
     if (length(filteredRowIndices) == nrow(currentData)) {
       setUpdateSource(type_Tool, plotId, "table_filter")
       renderPlotFromCurrentView(type_Tool, plotId)
       return()
     }
 
-    # Filter is active - render plot with visible terms only (no state update)
+    # Filter active: render plot with filtered subset
+    # currentView stays unchanged so filter clear can restore properly
     filteredData <- currentData[filteredRowIndices, , drop = FALSE]
-
     if (nrow(filteredData) == 0) return()
+
+    # Clear selections (may reference terms no longer visible after filter)
+    clearSelection(type_Tool, plotId)
+    clearPairSelection(type_Tool, plotId)
+    clearHeatmapCellSelection(type_Tool, plotId)
 
     setUpdateSource(type_Tool, plotId, "table_filter")
     renderPlotWithData(type_Tool, plotId, filteredData)
+
   }, error = function(e) {
-    message("Table filter error: ", e$message)
+    # Silently ignore filter errors
   })
 }
 
@@ -1356,12 +1547,16 @@ orderForDotPlot <- function(data, mode, drawFormatColumn) {
   return(data)
 }
 
-# Handle Reset View button - restore ORIGINAL data to both plot and table
+# Clears all selections and restores original data from Generate button
 handleResetView <- function(enrichmentType, toolName, plotId) {
   tryCatch({
     type_Tool <- paste(enrichmentType, toolName, sep = "_")
 
-    # Get ORIGINAL data (from Generate button, immutable)
+    # Clear all selection state
+    clearSelection(type_Tool, plotId)
+    clearPairSelection(type_Tool, plotId)
+    clearHeatmapCellSelection(type_Tool, plotId)
+
     originalData <- getOriginalData(type_Tool, plotId)
     if (is.null(originalData) || nrow(originalData) == 0) {
       showNotification("No data available. Please generate the plot first.",
@@ -1369,13 +1564,10 @@ handleResetView <- function(enrichmentType, toolName, plotId) {
       return()
     }
 
-    # Restore original data to current view with "reset" source tracking
     updateCurrentView(type_Tool, plotId, originalData, "reset")
-
-    # Re-render BOTH table and plot from current view
     renderBothFromCurrentView(type_Tool, plotId)
+
   }, error = function(e) {
-    message("Reset view error: ", e$message)
     showNotification("Could not reset view.", type = "error", duration = 3)
   })
 }

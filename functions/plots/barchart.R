@@ -34,6 +34,7 @@ constructBarchart <- function(type_Tool, enrichmentFilteredData, mode) {
   enrichmentFilteredData <- orderForBarchartByColumn(enrichmentFilteredData,
                                                      column, drawFormatColumun)
   height <- calculatePlotHeight(nrow(enrichmentFilteredData))
+
   renderBarchart(paste(type_Tool, "barchart", sep = "_"),
                  enrichmentFilteredData, column, drawFormatColumun, height)
 }

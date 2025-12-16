@@ -26,6 +26,7 @@ handleScatterPlot <- function(enrichmentType, enrichmentTool) {
 
 constructScatterPlot <- function(type_Tool, scatterData) {
   scatterData <- addJitter(scatterData)
+
   renderScatterPlot(paste(type_Tool, "scatterPlot", sep = "_"), scatterData)
 }
 

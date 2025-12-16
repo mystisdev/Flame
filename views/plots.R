@@ -1,6 +1,7 @@
+# Used for literature enrichment (single-result mode)
 generatePlotsPanel <- function() {
   tabPanel(
-    title = "Plots", 
+    title = "Plots",
     icon = icon("chart-bar"),
     do.call(
       tabsetPanel,

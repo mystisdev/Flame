@@ -240,6 +240,53 @@ updateShinySliderInput <- function(shinyOutputId, minSliderValue, maxSliderValue
   )
 }
 
+# Parameterized versions of control update functions (explicit inputs, no globals)
+
+updatePlotControlPanelsForTool <- function(enrichmentType, tool) {
+  type_Tool <- paste(enrichmentType, tool, sep = "_")
+  selectedDataSource <- updatePlotDataSourcesForTool(enrichmentType, type_Tool)
+  updatePlotSliderInputsForTool(enrichmentType, type_Tool, selectedDataSource)
+}
+
+updatePlotDataSourcesForTool <- function(enrichmentType, type_Tool) {
+  sources <- switch(
+    enrichmentType,
+    "functional" = ENRICHMENT_DATASOURCES[
+      which(ENRICHMENT_DATASOURCES %in% unique(enrichmentResults[[type_Tool]]$Source))
+    ],
+    "literature" = "PUBMED"
+  )
+  selected <- sources[1]
+
+  lapply(ALL_PLOT_IDS, function(plotId) {
+    updatePickerInput(
+      session, paste(type_Tool, plotId, "sourceSelect", sep = "_"),
+      choices = sources, selected = selected
+    )
+  })
+  return(selected)
+}
+
+updatePlotSliderInputsForTool <- function(enrichmentType, type_Tool, selectedDataSource) {
+  maxSliderValue <- switch(
+    enrichmentType,
+    "functional" = nrow(enrichmentResults[[type_Tool]][grepl(
+      selectedDataSource, enrichmentResults[[type_Tool]]$Source), ]),
+    "literature" = nrow(enrichmentResults[[type_Tool]])
+  )
+  if (maxSliderValue > MAX_SLIDER_VALUE)
+    maxSliderValue <- MAX_SLIDER_VALUE
+
+  lapply(ALL_PLOT_IDS, function(plotId) {
+    updateShinySliderInput(
+      shinyOutputId = paste(type_Tool, plotId, "slider", sep = "_"),
+      minSliderValue = 1, maxSliderValue)
+  })
+  updateShinySliderInput(
+    shinyOutputId = paste(type_Tool, "network3_thresholdSlider", sep = "_"),
+    minSliderValue = 1, maxSliderValue)
+}
+
 updateAvailableStringNamespaces <- function() {
   if (input$string_network_organism != "") {
     if (!is.na(

@@ -7,7 +7,7 @@ runEnrichr <- function(userInputList) {
   enrichrResult <- do.call(rbind, result) # extracting df from list of lists
   enrichrResult <- filterSignificance(enrichrResult)
   
-  enrichmentBackgroundSizes[["FUNCTIONAL_ENRICHR"]] <<- getEnrichrBackgroundSize(site, databases)
+  enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<- getEnrichrBackgroundSize(site, databases)
   
   if (isResultValid(enrichrResult)) {
     enrichrResult <- parseEnirchrResult(enrichrResult, length(userInputList))

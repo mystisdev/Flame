@@ -72,4 +72,3 @@ DATASOURCE_COLORS <- c(
   "BioPlanet" = "#9370DB", "PharmGKB" = "#FF6B6B", "LINCS" = "#4ECDC4",
   "PUBMED" = LITERATURE_NODE_COLOR, "GENE" = GENE_NODE_COLOR
 )
-    

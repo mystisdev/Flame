@@ -152,16 +152,16 @@ generateEnrichmentResultsPanel <- function() {
   if (currentEnrichmentType == "functional") {
     return(
       tags$div(
+        id = "functionalEnrichmentResultsPanel",
         class = "toolTabs",
-        do.call(
-          tabsetPanel, c(
-            id = "toolTabsPanel",
-            lapply(c(ENRICHMENT_TOOLS, "Combination"), function(toolName) {
-              tabPanel(
-                title = toolName,
-                generateToolPanel(toolName)
-              )
-            })
+        style = "display: none;",  # Hidden by default, shown when first run is created
+        tabsetPanel(
+          id = "toolTabsPanel",
+          # Only Combination tab is static; run tabs are created dynamically
+          tabPanel(
+            title = "Combination",
+            value = "Combination",
+            generateCombinationPanel()
           )
         )
       )
@@ -171,11 +171,12 @@ generateEnrichmentResultsPanel <- function() {
   }
 }
 
+# Used for literature enrichment (single-result mode)
 generateToolPanel <- function(toolName) {
   if (toolName != "Combination") {
     currentEnrichmentTool <<- toolName
     currentType_Tool <<- paste(currentEnrichmentType, currentEnrichmentTool, sep = "_")
-    
+
     return(
       tags$div(
         tags$br(),

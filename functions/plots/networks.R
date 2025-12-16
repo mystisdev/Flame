@@ -12,7 +12,6 @@ handleEnrichmentNetwork <- function(enrichmentType, enrichmentTool, networkId) {
       handleNetworkCallbackFunction(enrichmentType, enrichmentTool, type_Tool)
     }
   }, error = function(e) {
-    message("Network generation error: ", e$message)
     renderWarning("Cannot create network with the chosen settings.
                   Please adjust the data sources or filter values.")
   }, finally = {
@@ -298,7 +297,7 @@ handleNetworkNodeClick <- function(enrichmentType, enrichmentTool, networkId) {
       renderNetwork3NodeClickTables(type_Tool, networkId, nodeId)
     }
   }, error = function(e) {
-    message("Network node click error: ", e$message)
+    # Silently ignore click errors
   })
 }
 
@@ -491,7 +490,7 @@ handleNetworkEdgeClick <- function(enrichmentType, enrichmentTool, networkId) {
       renderEdgelistTableWithData(type_Tool, networkId, filteredEdgelist)
     }
   }, error = function(e) {
-    message("Network edge click error: ", e$message)
+    # Silently ignore edge click errors
   })
 }
 
@@ -511,7 +510,7 @@ handleNetworkSelection <- function(enrichmentType, enrichmentTool, networkId) {
     setNetworkUpdateSource(type_Tool, networkId, "network_select")
     renderTablesForSelectedNodes(type_Tool, networkId, selectedNodes)
   }, error = function(e) {
-    message("Network selection error: ", e$message)
+    # Silently ignore selection errors
   })
 }
 
@@ -606,7 +605,7 @@ handleNetworkDeselection <- function(enrichmentType, enrichmentTool, networkId) 
       renderEdgelistTableWithData(type_Tool, networkId, edgelistData)
     }
   }, error = function(e) {
-    message("Network deselection error: ", e$message)
+    # Silently ignore deselection errors
   })
 }
 
@@ -643,8 +642,13 @@ handleNetworkEnrichmentTableFilter <- function(enrichmentType, enrichmentTool, n
 
     # All networks use the same approach: filter existing edges to visible nodes
     renderNetworkFromFilteredEnrichment(type_Tool, networkId, filteredEnrichment)
+
+    # Sync edgelist table with cascade prevention
+    edgelistTableId <- paste(type_Tool, networkId, "edgelist", sep = "_")
+    setExpectedRowCount(edgelistTableId, nrow(filteredEdgelist))
+    renderEdgelistFromFilteredEnrichment(type_Tool, networkId, filteredEnrichment)
   }, error = function(e) {
-    message("Network enrichment table filter error: ", e$message)
+    # Silently ignore filter errors
   })
 }
 
@@ -676,8 +680,13 @@ handleNetworkEdgelistTableFilter <- function(enrichmentType, enrichmentTool, net
 
     setCurrentNetworkView(type_Tool, networkId, filteredEnrichment, filteredEdgelist)
     renderNetworkFromFilteredEdgelist(type_Tool, networkId, filteredEdgelist)
+
+    # Sync enrichment table with cascade prevention
+    enrichmentTableId <- paste(type_Tool, networkId, "table", sep = "_")
+    setExpectedRowCount(enrichmentTableId, nrow(filteredEnrichment))
+    renderEnrichmentFromFilteredEdgelist(type_Tool, networkId, filteredEdgelist)
   }, error = function(e) {
-    message("Network edgelist table filter error: ", e$message)
+    # Silently ignore filter errors
   })
 }
 
@@ -929,7 +938,6 @@ handleNetworkResetView <- function(enrichmentType, enrichmentTool, networkId) {
     renderNetworkFromState(type_Tool, networkId)
     renderNetworkTablesFromStateWithTracking(type_Tool, networkId)
   }, error = function(e) {
-    message("Network reset view error: ", e$message)
     showNotification("Could not reset view.", type = "error", duration = 3)
   })
 }

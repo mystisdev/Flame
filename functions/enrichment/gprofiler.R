@@ -27,9 +27,12 @@ runGprofiler <- function(query, user_reference = NULL) {
     )
   
   if(is.null(user_reference))
-    enrichmentBackgroundSizes[["FUNCTIONAL_GPROFILER"]] <<- getGprofilerBackgroundSize()
+    enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<- getGprofilerBackgroundSize()
   else
-    enrichmentBackgroundSizes[["FUNCTIONAL_GPROFILER"]] <<- length(user_reference)
+    enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<- length(user_reference)
+
+  # Store gprofiler result for Manhattan plot (per-run for multi-run support)
+  gprofilerResults[[currentType_Tool]] <<- gprofilerResult
   
   if (isGprofilerResultValid()) {
     gprofilerParsedResult <- parseGprofilerResult()
@@ -39,9 +42,13 @@ runGprofiler <- function(query, user_reference = NULL) {
 }
 
 isGprofilerResultValid <- function() {
-  isValid <- F
-  if (length(gprofilerResult) > 0)
-    isValid <- T
+  # Check per-run storage first, then global (for immediate execution context)
+  result <- gprofilerResults[[currentType_Tool]]
+  if (is.null(result)) result <- gprofilerResult
+
+  isValid <- FALSE
+  if (length(result) > 0)
+    isValid <- TRUE
   return(isValid)
 }
 

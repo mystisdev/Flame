@@ -13,6 +13,9 @@ runString <- function(userInputList, taxid, user_reference = NULL) {
       # Filter by user's selected data sources (GO, KEGG, etc.)
       stringParsedResult <- filterStringByDataSources(stringParsedResult)
 
+      # Filter by user's significance threshold (STRING API doesn't support this)
+      stringParsedResult <- filterStringByThreshold(stringParsedResult)
+
       if (nrow(stringParsedResult) > 0) {
         # Store results in global structure after adding -log10Pvalue and enrichment scores
         enrichmentResults[[currentType_Tool]] <<-
@@ -22,7 +25,7 @@ runString <- function(userInputList, taxid, user_reference = NULL) {
   }
 
   # Always store background size for statistics display
-  enrichmentBackgroundSizes[[sprintf("%s_STRING", toupper(currentEnrichmentType))]] <<- getStringBackgroundSize(user_reference)
+  enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<- getStringBackgroundSize(user_reference)
 }
 
 sendStringRequest <- function(userInputList, taxid, user_reference = NULL) {
@@ -147,6 +150,16 @@ filterStringByDataSources <- function(stringParsedResult) {
 
   # Filter results to only include selected data sources
   filteredResult <- stringParsedResult[stringParsedResult$Source %in% selectedDataSources, ]
+  return(filteredResult)
+}
+
+filterStringByThreshold <- function(stringParsedResult) {
+  # STRING API doesn't support threshold filtering, so we filter results after retrieval
+  # This matches behavior of enrichR, PANTHER, and GeneCodis
+  threshold <- as.numeric(input[[paste0(currentEnrichmentType, "_enrichment_threshold")]])
+
+  # The P-value column has already been renamed to "P-value" in parseStringResult
+  filteredResult <- stringParsedResult[stringParsedResult$`P-value` <= threshold, ]
   return(filteredResult)
 }
 

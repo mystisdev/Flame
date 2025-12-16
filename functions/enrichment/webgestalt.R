@@ -24,13 +24,13 @@ runWebgestalt <- function(userInputList, user_reference = NULL) {
     referenceSet <- "genome"
     referenceGene <- NULL
     referenceGeneType <- NULL
-    enrichmentBackgroundSizes[["FUNCTIONAL_WEBGESTALT"]] <<- getWebgestaltBackgroundSize(organism = organism)
+    enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<- getWebgestaltBackgroundSize(organism = organism)
   }
   else {
     referenceSet <- NULL
     referenceGene <- user_reference
-    referenceGeneType <- namespace 
-    enrichmentBackgroundSizes[["FUNCTIONAL_WEBGESTALT"]] <<- length(user_reference)
+    referenceGeneType <- namespace
+    enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<- length(user_reference)
   }
   
   result <- suppressWarnings(WebGestaltR::WebGestaltR(

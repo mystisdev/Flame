@@ -92,6 +92,26 @@ caption {
   border-bottom: none;
 }
 
+/* Close button for run tabs */
+.close-run-tab {
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 14px;
+  padding: 0 0 0 8px;
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.close-run-tab:hover {
+  color: #eb4310;
+}
+
+.toolTabs > .tabbable > .nav-tabs > li > a > span {
+  display: flex;
+  align-items: center;
+}
+
 
 .logo {
   height: 90px !important;

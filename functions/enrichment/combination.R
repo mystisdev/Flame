@@ -2,7 +2,7 @@ prepareCombinationTab <- function() {
   if (existTwoToolResults()) {
     showTab(inputId = "toolTabsPanel", target = "Combination")
     createGlobalComboTable()
-    
+
     choices <- ENRICHMENT_DATASOURCES[
       which(ENRICHMENT_DATASOURCES %in% unique(combinationResult$Source))
     ]
@@ -10,14 +10,14 @@ prepareCombinationTab <- function() {
                       choices = choices, selected = NULL) # to always trigger the event
     updatePickerInput(session, "combo_datasources",
                       choices = choices, selected = choices)
-    
+
     choices <- unlist(strsplit(unique(combinationResult$Tools), split = ","))
     choices <- unique(trimws(choices))
     updatePickerInput(session, "combo_tool_picker",
                       choices = choices, selected = NULL) # trigger
     updatePickerInput(session, "combo_tool_picker",
                       choices = choices, selected = choices)
-    
+
     maxRank <- max(combinationResult$Rank, na.rm = TRUE)
     if(maxRank <= 2)
       value <- maxRank
@@ -26,6 +26,9 @@ prepareCombinationTab <- function() {
     updateSliderInput(session, "combo_rank_slider",
                       value = value, max = maxRank)
     shinyjs::show("functional_enrichment_all_clear")
+  } else {
+    # Hide Combination tab when fewer than 2 runs have results
+    hideTab(inputId = "toolTabsPanel", target = "Combination")
   }
 }
 
@@ -46,7 +49,21 @@ createGlobalComboTable <- function() {
   combinationResult <<- combinationResult[, c("Source", "Term_ID", "Function",
                                               "Term_ID_noLinks", "Tool", "P-value",
                                               "Positive Hits")]
-  combinationResult$Tool <<- sapply(strsplit(combinationResult$Tool, "_"), "[[", 2)
+  # Convert fullRunKey to display name matching tab title
+  # fullRunKey format: "functional_toolName_uniqueId" (e.g., "functional_gProfiler_5")
+  # Tab title format: "toolName (runNumber)" (e.g., "gProfiler (1)")
+  # Look up runNumber from activeRuns to match the tab title
+  combinationResult$Tool <<- sapply(combinationResult$Tool, function(fullRunKey) {
+    runInfo <- activeRuns[[fullRunKey]]
+    if (!is.null(runInfo)) {
+      # Use display number (runNumber) to match tab title
+      paste0(runInfo$toolName, " (", runInfo$runNumber, ")")
+    } else {
+      # Fallback: parse from key if run not found (shouldn't happen)
+      parts <- strsplit(fullRunKey, "_")[[1]]
+      paste(parts[-1], collapse = "_")
+    }
+  })
 
   # Calculate intersection and union of positive hits per term across tools
   termHitStats <- calculateTermHitStats(combinationResult)
@@ -274,8 +291,16 @@ parseComboVisNetwork <- function() {
   comboResult_forNetwork <- subset(comboResult_forNetwork,
      Source %in% input$combo_datasources)
 
-  comboResult_forNetwork$Tool <-
-    sapply(strsplit(comboResult_forNetwork$Tool, "_"), "[[", 2)
+  # Convert fullRunKey to display name matching tab title and tool picker
+  comboResult_forNetwork$Tool <- sapply(comboResult_forNetwork$Tool, function(fullRunKey) {
+    runInfo <- activeRuns[[fullRunKey]]
+    if (!is.null(runInfo)) {
+      paste0(runInfo$toolName, " (", runInfo$runNumber, ")")
+    } else {
+      parts <- strsplit(fullRunKey, "_")[[1]]
+      paste(parts[-1], collapse = "_")
+    }
+  })
   comboResult_forNetwork <- subset(comboResult_forNetwork,
     Tool %in% input$combo_tool_picker)
   

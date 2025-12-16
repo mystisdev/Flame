@@ -10,7 +10,9 @@ function(input, output, session) {
   source("functions/render.R", local = T)
   source("functions/update.R", local = T)
   source("functions/reset.R", local = T)
-  
+  source("functions/runs.R", local = T)
+  source("functions/observers.R", local = T)
+
   source("functions/input/main.R", local = T)
   source("functions/input/upset.R", local = T)
   source("functions/input/text_mining.R", local = T)
@@ -43,7 +45,7 @@ function(input, output, session) {
 
   source("functions/stringNetwork.R", local = T)
   source("functions/conversion.R", local = T)
-  
+  source("functions/tabGeneration.R", local = T)
 
   # API ####
   observeEvent(session$clientData$url_search, {
@@ -298,7 +300,32 @@ function(input, output, session) {
   observeEvent(input$functional_enrichment_all_clear, {
     handleMultiClear()
   }, ignoreInit = T)
-  
+
+  # Close individual run tab (via X button)
+  observeEvent(input$closeRunTab, {
+    runId <- input$closeRunTab
+    fullRunKey <- paste("functional", runId, sep = "_")
+
+    # Remember the tool name before we clear (since clearRunCompletely removes it from activeRuns)
+    toolName <- parseFullRunKey(fullRunKey)$toolName
+
+    # Clear all data and remove tab
+    clearRunCompletely(fullRunKey)
+
+    # If no tabs remain for this tool, reset its DISPLAY counter
+    # (uniqueIdCounters never reset, so IDs stay unique - no caching bugs)
+    if (countActiveRunsForTool(toolName) == 0) {
+      resetRunCounterForTool(toolName)
+    }
+
+    # Update combination tab and results panel visibility
+    if (getActiveFunctionalRunCount() == 0) {
+      shinyjs::hide("functionalEnrichmentResultsPanel")
+      shinyjs::hide("functional_enrichment_all_clear")
+    }
+    prepareCombinationTab()
+  }, ignoreInit = TRUE)
+
   # ~Combination ####
   observeEvent(input$combo_datasources, {
       handleComboSourceSelect()
@@ -407,36 +434,54 @@ function(input, output, session) {
   }, ignoreInit = T)
 
   # ~~Plot-Table Synchronization ####
-  # Tracks which tool tab the user is currently viewing (e.g., "gProfiler", "STRING")
+  # Tracks which tool tab the user is currently viewing
+  # For functional multi-run: runId like "gProfiler_1"
+  # For literature: tool name like "STRING"
   currentSelectedToolTab <<- NULL
-  # Flag to defer plot control panel updates until the tab UI is fully rendered
-  pendingPickerUpdate <<- FALSE
+  # Set of tools needing control updates (for literature enrichment)
+  toolsPendingControlUpdate <<- character(0)
 
   observeEvent(input$toolTabsPanel, {
     currentSelectedToolTab <<- input$toolTabsPanel
-    # Update plot controls here (after tab switch) because Shiny only renders
-    # tab content when it becomes visible - updating before would target
-    # UI elements that don't exist yet
-    if (pendingPickerUpdate) {
-      pendingPickerUpdate <<- FALSE
-      updatePlotControlPanels()
+
+    if (is.null(currentSelectedToolTab) ||
+        currentSelectedToolTab == "" ||
+        currentSelectedToolTab == "Combination") {
+      return()
+    }
+
+    # Check if this is a functional enrichment runId (contains number suffix)
+    if (grepl("_[0-9]+$", currentSelectedToolTab)) {
+      # Multi-run functional enrichment
+      if (currentSelectedToolTab %in% runsPendingControlUpdate) {
+        runsPendingControlUpdate <<- setdiff(runsPendingControlUpdate, currentSelectedToolTab)
+        fullRunKey <- paste("functional", currentSelectedToolTab, sep = "_")
+        updatePlotControlPanelsForRun(fullRunKey)
+      }
+    } else {
+      # Literature enrichment (static tabs)
+      if (currentSelectedToolTab %in% toolsPendingControlUpdate) {
+        toolsPendingControlUpdate <<- setdiff(toolsPendingControlUpdate, currentSelectedToolTab)
+        updatePlotControlPanelsForTool(currentEnrichmentType, currentSelectedToolTab)
+      }
     }
   }, ignoreInit = FALSE, ignoreNULL = TRUE)
 
-  # Plot click events - filter table to show clicked term
-  observeEvent(event_data("plotly_click", source = "Barchart"), {
-    handlePlotClick("barchart", "Barchart")
+  # Plot click observers (simple plots)
+  # priority = "event" fires on every click, even if same data
+  observeEvent(event_data("plotly_click", source = "Barchart", priority = "event"), {
+    handlePlotClick("barchart", "Barchart", session = session)
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
-  observeEvent(event_data("plotly_click", source = "Scatter"), {
-    handlePlotClick("scatterPlot", "Scatter")
+  observeEvent(event_data("plotly_click", source = "Scatter", priority = "event"), {
+    handlePlotClick("scatterPlot", "Scatter", session = session)
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
-  observeEvent(event_data("plotly_click", source = "DotPlot"), {
-    handlePlotClick("dotPlot", "DotPlot")
+  observeEvent(event_data("plotly_click", source = "DotPlot", priority = "event"), {
+    handlePlotClick("dotPlot", "DotPlot", session = session)
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
-  # Zoom events - filter table to visible terms
+  # Zoom/relayout observers (simple plots)
   observeEvent(event_data("plotly_relayout", source = "Barchart"), {
     handlePlotZoom("barchart", "Barchart")
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
@@ -449,17 +494,18 @@ function(input, output, session) {
     handlePlotZoom("dotPlot", "DotPlot")
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
-  # Selection events (lasso/box) - filter table to selected terms
-  observeEvent(event_data("plotly_selected", source = "Barchart"), {
-    handlePlotSelection("barchart", "Barchart")
+  # Selection (lasso/box) observers
+  # priority = "event" fires on every selection, even if same data
+  observeEvent(event_data("plotly_selected", source = "Barchart", priority = "event"), {
+    handlePlotSelection("barchart", "Barchart", session = session)
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
-  observeEvent(event_data("plotly_selected", source = "Scatter"), {
-    handlePlotSelection("scatterPlot", "Scatter")
+  observeEvent(event_data("plotly_selected", source = "Scatter", priority = "event"), {
+    handlePlotSelection("scatterPlot", "Scatter", session = session)
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
-  observeEvent(event_data("plotly_selected", source = "DotPlot"), {
-    handlePlotSelection("dotPlot", "DotPlot")
+  observeEvent(event_data("plotly_selected", source = "DotPlot", priority = "event"), {
+    handlePlotSelection("dotPlot", "DotPlot", session = session)
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
   # Table filter -> Plot synchronization
@@ -526,8 +572,8 @@ function(input, output, session) {
 
   # Heatmap plot event observers
   # Heatmap1 - click, zoom, selection
-  observeEvent(event_data("plotly_click", source = "Heatmap1"), {
-    handlePlotClick("heatmap1", "Heatmap1")
+  observeEvent(event_data("plotly_click", source = "Heatmap1", priority = "event"), {
+    handlePlotClick("heatmap1", "Heatmap1", session = session)
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
   observeEvent(event_data("plotly_relayout", source = "Heatmap1"), {
@@ -535,12 +581,12 @@ function(input, output, session) {
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
   observeEvent(event_data("plotly_selected", source = "Heatmap1"), {
-    handlePlotSelection("heatmap1", "Heatmap1")
+    handlePlotSelection("heatmap1", "Heatmap1", session = session)
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
   # Heatmap2 - click, zoom, selection
-  observeEvent(event_data("plotly_click", source = "Heatmap2"), {
-    handlePlotClick("heatmap2", "Heatmap2")
+  observeEvent(event_data("plotly_click", source = "Heatmap2", priority = "event"), {
+    handlePlotClick("heatmap2", "Heatmap2", session = session)
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
   observeEvent(event_data("plotly_relayout", source = "Heatmap2"), {
@@ -548,12 +594,12 @@ function(input, output, session) {
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
   observeEvent(event_data("plotly_selected", source = "Heatmap2"), {
-    handlePlotSelection("heatmap2", "Heatmap2")
+    handlePlotSelection("heatmap2", "Heatmap2", session = session)
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
   # Heatmap3 - click, zoom, selection
-  observeEvent(event_data("plotly_click", source = "Heatmap3"), {
-    handlePlotClick("heatmap3", "Heatmap3")
+  observeEvent(event_data("plotly_click", source = "Heatmap3", priority = "event"), {
+    handlePlotClick("heatmap3", "Heatmap3", session = session)
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
   observeEvent(event_data("plotly_relayout", source = "Heatmap3"), {
@@ -561,7 +607,7 @@ function(input, output, session) {
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
   observeEvent(event_data("plotly_selected", source = "Heatmap3"), {
-    handlePlotSelection("heatmap3", "Heatmap3")
+    handlePlotSelection("heatmap3", "Heatmap3", session = session)
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
   # ~~Network Plot-Table Synchronization ####
