@@ -4,7 +4,7 @@ DEFAULT_TOOL_UPPER <- toupper(DEFAULT_TOOL)
 STRING_DATASOURCES_PRINT_LITERATURE <- list("PubMed Publications" = "PUBMED")
 
 # Plots ####
-PLOT_TABNAMES <- c("Network", "Heatmap", "Barchart", "Scatter Plot", "Dot Plot", "Manhattan")
+PLOT_TABNAMES <- c("Barchart", "Dot Plot", "Scatter Plot", "Manhattan", "Heatmap", "Network")
 # Network 
 LEGEND_ITEMS <- list(
   list("GO:MF", "GO:BP", "GO:CC","UNIPROT"),
