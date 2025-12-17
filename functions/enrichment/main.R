@@ -952,18 +952,8 @@ formatResultTableMultiRun <- function() {
 }
 
 attachDBLinksMultiRun <- function() {
-  enrichmentResult <- enrichmentResults[[currentFullRunKey]]
-  for (i in 1:nrow(enrichmentResult)) {
-    source <- enrichmentResult$Source[i]
-    code <- DATASOURCES_CODES[[source]]
-    if (!is.null(code) && !is.na(code)) {
-      enrichmentResult$Term_ID[i] <- paste0(
-        "<a href='", code, enrichmentResult$Term_ID_noLinks[i],
-        "' target='_blank'>", enrichmentResult$Term_ID_noLinks[i], "</a>"
-      )
-    }
-  }
-  enrichmentResults[[currentFullRunKey]] <<- enrichmentResult
+  # Reuse the standard link attachment logic with the multi-run result key
+  attachDBLinks(currentFullRunKey)
 }
 
 printFunctionalResultTableMultiRun <- function() {

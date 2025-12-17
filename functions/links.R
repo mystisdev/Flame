@@ -47,58 +47,62 @@ attachVariantTableLinks <- function(df) {
   
 }
 
-attachDBLinks <- function() { # Transfac HPA CORUMLinks, unavailable
+attachDBLinks <- function(resultKey = NULL) { # Transfac HPA CORUMLinks, unavailable
+  if (is.null(resultKey)) resultKey <- currentType_Tool
+
   # Gene Ontology - stopChar=":" prevents matching "GOSLIM:*"
-  attachLinks("GO", "https://www.ebi.ac.uk/QuickGO/term/", stopChar = ":")
+  attachLinks("GO", "https://www.ebi.ac.uk/QuickGO/term/", stopChar = ":", resultKey = resultKey)
   # GO Slim terms use same GO term IDs, just curated subset
-  attachLinks("GOSLIM", "https://www.ebi.ac.uk/QuickGO/term/", stopChar = ":")
+  attachLinks("GOSLIM", "https://www.ebi.ac.uk/QuickGO/term/", stopChar = ":", resultKey = resultKey)
 
   # Protein domains and classifications
-  attachLinks("INTERPRO", "https://www.ebi.ac.uk/interpro/entry/InterPro/")
-  attachLinks("PFAM", "https://www.ebi.ac.uk/interpro/entry/pfam/")
-  attachLinks("UNIPROT", "https://www.uniprot.org/keywords/")
-  attachLinks("PANTHERPC", "https://pantherdb.org/panther/category.do?categoryAcc=")
+  attachLinks("INTERPRO", "https://www.ebi.ac.uk/interpro/entry/InterPro/", resultKey = resultKey)
+  attachLinks("PFAM", "https://www.ebi.ac.uk/interpro/entry/pfam/", resultKey = resultKey)
+  attachLinks("UNIPROT", "https://www.uniprot.org/keywords/", resultKey = resultKey)
+  attachLinks("PANTHERPC", "https://pantherdb.org/panther/category.do?categoryAcc=", resultKey = resultKey)
 
   # Pathways
-  attachLinks("PANTHER Pathways", "http://www.pantherdb.org/pathway/pathDetail.do?clsAccession=")
-  attachLinks("REAC", "https://reactome.org/content/detail/")
-  attachLinks("WP", "https://www.wikipathways.org/index.php/Pathway:")
-  attachLinks("BioPlanet", "https://tripod.nih.gov/bioplanet/detail.jsp?pid=", urlSuffix = "&target=pathway")
+  attachLinks("PANTHER Pathways", "http://www.pantherdb.org/pathway/pathDetail.do?clsAccession=", resultKey = resultKey)
+  attachLinks("REAC", "https://reactome.org/content/detail/", resultKey = resultKey)
+  attachLinks("WP", "https://www.wikipathways.org/index.php/Pathway:", resultKey = resultKey)
+  attachLinks("BioPlanet", "https://tripod.nih.gov/bioplanet/detail.jsp?pid=", urlSuffix = "&target=pathway", resultKey = resultKey)
 
   # Disease and phenotype ontologies
-  attachLinks("DO", "http://www.informatics.jax.org/disease/")
-  attachLinks("HP", "https://monarchinitiative.org/")
-  attachLinks("OMIM", "https://www.omim.org/entry/")
-  attachLinks("ORPHA", "https://www.orpha.net/consor/cgi-bin/OC_Exp.php?Lng=GB&Expert=", gSub = "ORPHA:")
-  attachLinks("WBP", "https://wormbase.org/species/all/phenotype/")
-  attachLinks("WBBT", "https://wormbase.org/species/all/anatomy_term/")
-  attachLinks("MGI", "https://www.informatics.jax.org/vocab/mp_ontology/")
+  attachLinks("DO", "http://www.informatics.jax.org/disease/", resultKey = resultKey)
+  attachLinks("HP", "https://monarchinitiative.org/", resultKey = resultKey)
+  attachLinks("OMIM", "https://www.omim.org/entry/", resultKey = resultKey)
+  attachLinks("ORPHA", "https://www.orpha.net/consor/cgi-bin/OC_Exp.php?Lng=GB&Expert=", gSub = "ORPHA:", resultKey = resultKey)
+  attachLinks("WBP", "https://wormbase.org/species/all/phenotype/", resultKey = resultKey)
+  attachLinks("WBBT", "https://wormbase.org/species/all/anatomy_term/", resultKey = resultKey)
+  attachLinks("MGI", "https://www.informatics.jax.org/vocab/mp_ontology/", resultKey = resultKey)
 
   # Tissue ontologies
-  attachLinks("BTO", "https://www.ebi.ac.uk/ols/ontologies/bto/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2FBTO_", gSub = "BTO:")
+  attachLinks("BTO", "https://www.ebi.ac.uk/ols/ontologies/bto/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2FBTO_", gSub = "BTO:", resultKey = resultKey)
 
   # Regulatory elements
-  attachLinks("TF", "http://gene-regulation.com/cgi-bin/pub/databases/transfac/search.cgi?species=Homo_sapiens&factor=")
-  attachLinks("CollecTRI", "https://www.genecards.org/cgi-bin/carddisp.pl?gene=")
-  attachLinks("MIRNA", "https://www.mirbase.org/textsearch.shtml?q=", gSub = "MIRNA:")
+  attachLinks("TF", "http://gene-regulation.com/cgi-bin/pub/databases/transfac/search.cgi?species=Homo_sapiens&factor=", resultKey = resultKey)
+  attachLinks("CollecTRI", "https://www.genecards.org/cgi-bin/carddisp.pl?gene=", resultKey = resultKey)
+  attachLinks("MIRNA", "https://www.mirbase.org/textsearch.shtml?q=", gSub = "MIRNA:", resultKey = resultKey)
 
   # Pharmacogenomics and drug perturbations
-  attachLinks("PharmGKB", "https://www.clinpgx.org/chemical/")
+  attachLinks("PharmGKB", "https://www.clinpgx.org/chemical/", resultKey = resultKey)
   # LINCS: No external links available - terms displayed as plain text
 
-  attachKEGGLinks()
+  attachKEGGLinks(resultKey)
 }
 
-attachLinks <- function(sourceId, url, stopChar = "$", gSub = NULL, urlSuffix = "") {
+attachLinks <- function(sourceId, url, stopChar = "$", gSub = NULL, urlSuffix = "", resultKey = NULL) {
+  if (is.null(resultKey)) resultKey <- currentType_Tool
+
   linksVector <-
-    enrichmentResults[[currentType_Tool]][grepl(
-      paste0("^", sourceId, stopChar), enrichmentResults[[currentType_Tool]]$Source), ]$Term_ID
+    enrichmentResults[[resultKey]][grepl(
+      paste0("^", sourceId, stopChar), enrichmentResults[[resultKey]]$Source), ]$Term_ID
   if (length(linksVector) > 0) {
     gSubLinksVector <- linksVector
     if (!is.null(gSub))
       gSubLinksVector <- gsub(gSub, "", linksVector)
-    enrichmentResults[[currentType_Tool]][grepl(
-      paste0("^", sourceId, stopChar), enrichmentResults[[currentType_Tool]]$Source), ]$Term_ID <<-
+    enrichmentResults[[resultKey]][grepl(
+      paste0("^", sourceId, stopChar), enrichmentResults[[resultKey]]$Source), ]$Term_ID <<-
       paste0(
         "<a href='", url, gSubLinksVector, urlSuffix, "' target='_blank'>",
         linksVector, "</a>"
@@ -108,15 +112,17 @@ attachLinks <- function(sourceId, url, stopChar = "$", gSub = NULL, urlSuffix = 
 
 MAX_KEGG_HIGHLIGHTED_GENES <- 10
 
-attachKEGGLinks <- function() {
+attachKEGGLinks <- function(resultKey = NULL) {
+  if (is.null(resultKey)) resultKey <- currentType_Tool
+
   # KEGG organism codes and supported organisms reference:
   # https://www.kegg.jp/kegg/tables/br08606.html
   # This table contains all KEGG-supported organisms and their corresponding
   # 3-4 letter organism codes (kegg_name) used in pathway URLs
 
   tempEnrichmentDF <-
-    enrichmentResults[[currentType_Tool]][grepl(
-      "^KEGG$", enrichmentResults[[currentType_Tool]]$Source
+    enrichmentResults[[resultKey]][grepl(
+      "^KEGG$", enrichmentResults[[resultKey]]$Source
     ), ][, c("Source", "Positive Hits", "Term_ID")]
 
   if (nrow(tempEnrichmentDF) > 0) {
@@ -150,8 +156,8 @@ attachKEGGLinks <- function() {
         urlSuffix <- ""  # No gene highlighting
       }
 
-      enrichmentResults[[currentType_Tool]][grepl(
-        "^KEGG$", enrichmentResults[[currentType_Tool]]$Source), ]$Term_ID <<-
+      enrichmentResults[[resultKey]][grepl(
+        "^KEGG$", enrichmentResults[[resultKey]]$Source), ]$Term_ID <<-
         paste0(
           "<a href='https://www.kegg.jp/kegg-bin/show_pathway?",
           linksVector, urlSuffix,
@@ -189,8 +195,8 @@ attachKEGGLinks <- function() {
         }
 
         # Create KEGG links (with or without gene highlighting)
-        enrichmentResults[[currentType_Tool]][grepl(
-          "^KEGG$", enrichmentResults[[currentType_Tool]]$Source), ]$Term_ID <<-
+        enrichmentResults[[resultKey]][grepl(
+          "^KEGG$", enrichmentResults[[resultKey]]$Source), ]$Term_ID <<-
           paste0(
             "<a href='https://www.kegg.jp/kegg-bin/show_pathway?",
             gsub("KEGG:|map", keggName, linksVector),
