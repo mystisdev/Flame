@@ -23,6 +23,7 @@ renderShinyDataTable <- function(shinyOutputId, outputData,
   output[[shinyOutputId]] <- DT::renderDataTable(
     outputData,
     server = F,
+    selection = 'none',
     extensions = 'Buttons',
     caption = caption,
     options = list(
@@ -315,6 +316,7 @@ renderEnrichmentTable <- function(shinyOutputId, input_table,
     server = F,
     cbind(' ' = '&oplus;', input_table),
     escape = F,
+    selection = 'none',
     filter = filter,  # Enable column-specific filtering controls (default: none)
     extensions = c('Buttons'),
     caption = caption,
@@ -373,6 +375,7 @@ renderCombinationTable <- function(shinyOutputId, input_table, caption, fileName
     server = F,
     cbind(' ' = '&oplus;', input_table),
     escape = F,
+    selection = 'none',
     filter = filter,
     extensions = c('Buttons'),
     caption = caption,
