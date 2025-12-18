@@ -201,10 +201,27 @@ handleEnrichmentWithToolMultiRun <- function(isUpdate = FALSE) {
         noHitGenesCheckList <- executeNamespaceRollback(inputGenesConversionTable)
         printParametersMultiRun()
 
+        # For new runs, defer shinyjs::show until UI is flushed (element must exist in DOM)
+        # For updates, the UI already exists so we can call immediately
         if (input[[paste0(currentEnrichmentType, "_enrichment_namespace")]] != "USERINPUT") {
-          shinyjs::show(paste(currentFullRunKey, "conversionBoxes", sep = "_"))
-          printUnconvertedGenesMultiRun(inputGenesConversionTable, backgroundGenesConversionTable)
-          printConversionTableMultiRun(inputGenesConversionTable, backgroundGenesConversionTable)
+          if (!isUpdate) {
+            # Capture values for async callback
+            local({
+              runKey <- currentFullRunKey
+              inputTable <- inputGenesConversionTable
+              bgTable <- backgroundGenesConversionTable
+              session$onFlushed(function() {
+                shinyjs::show(paste(runKey, "conversionBoxes", sep = "_"))
+                printUnconvertedGenesMultiRun(inputTable, bgTable)
+                printConversionTableMultiRun(inputTable, bgTable)
+              }, once = TRUE)
+            })
+          } else {
+            # Update mode: UI already exists
+            shinyjs::show(paste(currentFullRunKey, "conversionBoxes", sep = "_"))
+            printUnconvertedGenesMultiRun(inputGenesConversionTable, backgroundGenesConversionTable)
+            printConversionTableMultiRun(inputGenesConversionTable, backgroundGenesConversionTable)
+          }
         }
 
         findAndPrintNoHitGenesMultiRun(noHitGenesCheckList)
