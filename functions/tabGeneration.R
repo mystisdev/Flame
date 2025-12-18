@@ -64,6 +64,7 @@ generateResultsPanelForRun <- function(enrichmentType, toolName, fullRunKey) {
           status = "primary",
           solidHeader = TRUE,
           collapsible = TRUE,
+          collapsed = TRUE,
           tabsetPanel(
             tabPanel("Input List", DT::dataTableOutput(paste(fullRunKey, "conversionTable_input", sep = "_"))),
             tabPanel("Reference Background",
@@ -81,6 +82,7 @@ generateResultsPanelForRun <- function(enrichmentType, toolName, fullRunKey) {
           status = "primary",
           solidHeader = TRUE,
           collapsible = TRUE,
+          collapsed = TRUE,
           verbatimTextOutput(paste(fullRunKey, "notConverted_input", sep = "_")),
           tags$hr(),
           div(id = paste(fullRunKey, "notConverted_reference_div", sep = "_"), style = "display:none",
@@ -95,6 +97,7 @@ generateResultsPanelForRun <- function(enrichmentType, toolName, fullRunKey) {
         status = "primary",
         solidHeader = TRUE,
         collapsible = TRUE,
+        collapsed = TRUE,
         verbatimTextOutput(paste(fullRunKey, "genesNotFound", sep = "_"))
       )
     )
