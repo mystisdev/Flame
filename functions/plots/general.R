@@ -509,8 +509,8 @@ filterAndPrintTable <- function(enrichmentType, enrichmentTool,
     caption = "Enrichment Results",
     fileName = paste(outputId, paste(sourceSelect, collapse = "_"), sep = "_"),
     mode = "Positive Hits",
-    hiddenColumns = c(0, 11, 12),
-    expandableColumn = 11,
+    hiddenColumns = c(10, 11),
+    expandableColumn = 10,
     filter = filter
   )
   return(enrichmentFilteredData)
@@ -1104,8 +1104,8 @@ renderTableFromCurrentView <- function(type_Tool, plotId) {
     caption = "Enrichment Results",
     fileName = paste(type_Tool, plotId, sep = "_"),
     mode = "Positive Hits",
-    hiddenColumns = c(0, 11, 12),
-    expandableColumn = 11,
+    hiddenColumns = c(10, 11),
+    expandableColumn = 10,
     filter = 'top'
   )
 }

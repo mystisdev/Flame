@@ -148,11 +148,10 @@ calculateFisherStats <- function(combinationResult) {
   # Merge the combined results back to the original data frame
   combinationResult <- merge(combinationResult, combinedResults,
                              by = "Term_ID_noLinks")
-  combinationResult$P_value_combined <-
-    formatC(combinationResult$P_value_combined, format = "e", digits = 3)
-  combinationResult$Chisq <-
-    formatC(combinationResult$Chisq, format = "e", digits = 3)
-  
+  # Keep numeric for DT slider filters; formatSignif() handles display formatting
+  combinationResult$P_value_combined <- as.numeric(combinationResult$P_value_combined)
+  combinationResult$Chisq <- as.numeric(combinationResult$Chisq)
+
   return(combinationResult)
 }
 
@@ -172,11 +171,11 @@ handleComboSourceSelect <- function() {
     filteredCombinationResult$Tools <- as.factor(filteredCombinationResult$Tools)
     filteredCombinationResult$Rank <- as.factor(filteredCombinationResult$Rank)
 
-    # Hidden columns: 5=Term_ID_noLinks, 9=Intersection_Hits, 10=Union_Hits, 11=Hit_Summary
-    # Indices are +1 from expected due to DT's handling with filter="top"
+    # Hidden columns (0-indexed after cbind adds ⊕ at position 0):
+    # 4=Term_ID_noLinks, 8=Intersection_Hits, 9=Union_Hits, 10=Hit_Summary
     renderCombinationTable(
       "combo_table", filteredCombinationResult, caption = "Term-tool combinations",
-      fileName = "combination", hiddenColumns = c(5, 9, 10, 11), filter = "top"
+      fileName = "combination", hiddenColumns = c(4, 8, 9, 10), filter = "top"
     )
     executeComboUpsetPlot(filteredCombinationResult)
   }, error = function(e) {
@@ -237,7 +236,7 @@ handleComboUpsetClick <- function() {
       renderCombinationTable("combo_upsetClick_table", elements,
                              caption = "UpSet Clicked Terms",
                              fileName = "combo_upsetClick",
-                             hiddenColumns = c(5, 9, 10, 11), filter = "top")
+                             hiddenColumns = c(4, 8, 9, 10), filter = "top")
     }
   }, error = function(e) {
     print(paste0("Error: ", e))

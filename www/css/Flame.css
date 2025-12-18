@@ -157,6 +157,12 @@ caption {
   top: -5px;
 }
 
+/* DT filter input boxes - ensure sufficient width for typing range values */
+.dataTables_wrapper thead input[type="text"],
+.dataTables_wrapper thead input[type="search"] {
+  min-width: 100px !important;
+}
+
 .loader {
   border: 16px solid #f3f3f3;
   border-radius: 50%;

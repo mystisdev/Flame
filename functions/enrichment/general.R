@@ -5,9 +5,8 @@ transformEnrichmentResultTable <- function(enrichmentParsedResult) {
       format = "e", digits = 3
     )
   )
-  enrichmentParsedResult$`P-value` <- formatC(
-    enrichmentParsedResult$`P-value`, format = "e", digits = 2
-  )
+  # Keep P-value as numeric for DT slider filter; formatSignif() handles display formatting
+  enrichmentParsedResult$`P-value` <- as.numeric(enrichmentParsedResult$`P-value`)
   enrichmentParsedResult$`Enrichment Score %` <- calculateEnrichmentScore(
     enrichmentParsedResult$`Intersection Size`,
     enrichmentParsedResult$`Term Size`

@@ -1002,8 +1002,8 @@ renderEnrichmentTableWithData <- function(type_Tool, networkId, data) {
     caption = "Enrichment Results",
     fileName = paste(type_Tool, networkId, sep = "_"),
     mode = "Positive Hits",
-    hiddenColumns = c(0, 11, 12),
-    expandableColumn = 11,
+    hiddenColumns = c(10, 11),
+    expandableColumn = 10,
     filter = "top"
   )
 }

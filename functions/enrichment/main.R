@@ -743,8 +743,9 @@ printResultTable <- function(shinyOutputId, tabPosition, datasource) {
     caption = "Enrichment Results"
     fileName <- paste(currentType_Tool, datasource, sep = "_")
     mode <- "Positive Hits"
-    hiddenColumns <- c(0, 11, 12)
-    expandableColumn <- 11
+    # With rownames=FALSE: 0=⊕, ..., 10=Positive Hits, 11=Term_ID_noLinks
+    hiddenColumns <- c(10, 11)
+    expandableColumn <- 10
 
     # Convert Source to factor for dropdown filtering (instead of text search)
     transformedResultPartial$Source <- as.factor(transformedResultPartial$Source)
@@ -988,8 +989,9 @@ printResultTableMultiRun <- function(shinyOutputId, tabPosition, datasource) {
     caption = "Enrichment Results"
     fileName <- paste(currentFullRunKey, datasource, sep = "_")
     mode <- "Positive Hits"
-    hiddenColumns <- c(0, 11, 12)
-    expandableColumn <- 11
+    # With rownames=FALSE: 0=⊕, ..., 10=Positive Hits, 11=Term_ID_noLinks
+    hiddenColumns <- c(10, 11)
+    expandableColumn <- 10
 
     transformedResultPartial$Source <- as.factor(transformedResultPartial$Source)
 
