@@ -16,6 +16,29 @@ renderShinyText <- function(shinyOutputId, prompt) {
   output[[shinyOutputId]] <- renderText(prompt)
 }
 
+# Helper function to create export buttons excluding specified columns
+createExportButtons <- function(fileName, excludeColumns = c()) {
+  if (length(excludeColumns) > 0) {
+    columnSelector <- JS(sprintf(
+      "function(idx, data, node) { return [%s].indexOf(idx) === -1; }",
+      paste(excludeColumns, collapse = ",")
+    ))
+    exportOpts <- list(columns = columnSelector)
+  } else {
+    exportOpts <- list()
+  }
+
+  list(
+    list(extend = 'excel', filename = fileName, exportOptions = exportOpts),
+    list(extend = 'csv', filename = fileName, exportOptions = exportOpts),
+    list(extend = 'copy', exportOptions = exportOpts),
+    list(extend = 'pdf', filename = fileName,
+         exportOptions = c(exportOpts, list(orthogonal = "export")),
+         orientation = "landscape"),
+    list(extend = 'print', exportOptions = exportOpts)
+  )
+}
+
 renderShinyDataTable <- function(shinyOutputId, outputData,
                                  caption = NULL, fileName = "",
                                  scrollY = NULL, hiddenColumns = c(),
@@ -31,13 +54,7 @@ renderShinyDataTable <- function(shinyOutputId, outputData,
       scrollX = TRUE,
       scroller = T,
       "dom" = 'Blfiprt',
-      buttons = list(
-        list(extend = 'excel', filename = fileName),
-        list(extend = 'csv', filename = fileName),
-        list(extend = 'copy', filename = fileName),
-        list(extend = 'pdf', filename = fileName),
-        list(extend = 'print', filename = fileName)
-      ),
+      buttons = createExportButtons(fileName, hiddenColumns),
       columnDefs = list(
         list(visible = F, targets = hiddenColumns)
       )
@@ -311,7 +328,8 @@ renderReduction <- function() {
 
 renderEnrichmentTable <- function(shinyOutputId, input_table,
                                   caption, fileName, mode,
-                                  hiddenColumns, expandableColumn, filter = 'none'){
+                                  hiddenColumns, expandableColumn, filter = 'none',
+                                  exportExcludeColumns = c(0, 11)){
   output[[shinyOutputId]] <- DT::renderDataTable({
     tableData <- cbind(' ' = '&oplus;', input_table)
 
@@ -326,13 +344,7 @@ renderEnrichmentTable <- function(shinyOutputId, input_table,
       options = list(
         scrollX = TRUE,
         "dom" = 'T<"clear">lBfrtip',
-        buttons = list(
-          list(extend = 'excel', filename = fileName),
-          list(extend = 'csv', filename = fileName),
-          list(extend = 'copy', filename = fileName),
-          list(extend = 'pdf', filename = fileName, exportOptions = list(orthogonal = "export"), orientation = "landscape"),
-          list(extend = 'print', filename = fileName)
-        ),
+        buttons = createExportButtons(fileName, exportExcludeColumns),
         columnDefs = list(
           list(visible = F, targets = hiddenColumns),
           list(orderable = F, searchable = F, className = 'details-control', targets = 0)
@@ -380,7 +392,8 @@ renderManhattanEnrichmentTable <- function(shinyOutputId, manhattanTable) {
 }
 
 renderCombinationTable <- function(shinyOutputId, input_table, caption, fileName,
-                                   hiddenColumns, filter = 'none') {
+                                   hiddenColumns, filter = 'none',
+                                   exportExcludeColumns = c(0, 4)) {
   # Column indices after cbind (0-indexed, rownames=FALSE):
   # 0=⊕, 1=Source, 2=Term ID, 3=Function, 4=Term_ID_noLinks, 5=Tools,
   # 6=X², 7=Comb. P-value, 8=Intersection_Hits, 9=Union_Hits, 10=Hit_Summary, 11=Rank
@@ -398,13 +411,7 @@ renderCombinationTable <- function(shinyOutputId, input_table, caption, fileName
       options = list(
         scrollX = TRUE,
         "dom" = 'T<"clear">lBfrtip',
-        buttons = list(
-          list(extend = 'excel', filename = fileName),
-          list(extend = 'csv', filename = fileName),
-          list(extend = 'copy', filename = fileName),
-          list(extend = 'pdf', filename = fileName, exportOptions = list(orthogonal = "export"), orientation = "landscape"),
-          list(extend = 'print', filename = fileName)
-        ),
+        buttons = createExportButtons(fileName, exportExcludeColumns),
         columnDefs = list(
           list(visible = F, targets = hiddenColumns),
           list(orderable = F, searchable = F, className = 'details-control', targets = 0)
