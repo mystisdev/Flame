@@ -245,11 +245,12 @@ generateResultsPanel <- function() {
       tags$div(
         id = paste(currentType_Tool, "conversionBoxes", sep = "_"),
         box(
-          title = "Conversion Table", 
+          title = "Conversion Table",
           width = NULL,
-          status = "primary", 
+          status = "primary",
           solidHeader = TRUE,
           collapsible = TRUE,
+          collapsed = TRUE,
           tabsetPanel(
             tabPanel("Input List", DT::dataTableOutput(paste(currentType_Tool, "conversionTable_input", sep = "_"))),
             tabPanel("Reference Background", 
@@ -264,9 +265,10 @@ generateResultsPanel <- function() {
           title = "Unconverted Inputs",
           class = "conversionBox",
           width = NULL,
-          status = "primary", 
+          status = "primary",
           solidHeader = TRUE,
           collapsible = TRUE,
+          collapsed = TRUE,
           verbatimTextOutput(paste(currentType_Tool, "notConverted_input", sep = "_")),
           tags$hr(),
           div(id=paste(currentType_Tool, "notConverted_reference_div", sep = "_"), style="display:none",
@@ -278,9 +280,10 @@ generateResultsPanel <- function() {
         title = "No-hit Inputs",
         class = "conversionBox",
         width = NULL,
-        status = "primary", 
+        status = "primary",
         solidHeader = TRUE,
         collapsible = TRUE,
+        collapsed = TRUE,
         verbatimTextOutput(paste(currentType_Tool, "genesNotFound", sep = "_"))
       )
     )

@@ -323,7 +323,11 @@ handleEnrichmentWithToolLiterature <- function() {
         }
         findAndPrintNoHitGenes(noHitGenesCheckList)
         printResultTables()
-        updateTabsetPanel(session, "toolTabsPanel", selected = currentEnrichmentTool)
+        # For literature enrichment, there's no toolTabsPanel (unlike functional enrichment)
+        # So we call updatePlotControlPanelsForTool() directly instead of deferring via observer
+        updatePlotControlPanelsForTool(currentEnrichmentType, currentEnrichmentTool)
+        # Set currentSelectedToolTab for plot click handlers (since there's no toolTabsPanel observer)
+        currentSelectedToolTab <<- currentEnrichmentTool
       }
     }
   }
