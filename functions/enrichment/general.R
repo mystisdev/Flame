@@ -24,11 +24,37 @@ calculateEnrichmentScore <- function(hitGenesCount, databaseGenesCount) {
   return(enrichmentScore)
 }
 
-isResultValid <- function(result) {
-  isValid <- F
-  if (!is.null(result) && nrow(result) > 0)
-    isValid <- T
-  return(isValid)
+isEnrichmentResultValid <- function(result) {
+  if (is.null(result)) return(FALSE)
+  if (!is.data.frame(result)) return(FALSE)
+  if (nrow(result) == 0) return(FALSE)
+  return(TRUE)
+}
+
+# Backward compatibility alias for existing callers
+isResultValid <- isEnrichmentResultValid
+
+filterEnrichmentByDataSources <- function(result, enrichmentType, warn_on_empty = FALSE) {
+  selectedDataSources <- input[[paste0(enrichmentType, "_enrichment_datasources")]]
+  if (is.null(selectedDataSources) || length(selectedDataSources) == 0) {
+    return(result)
+  }
+
+  filteredResult <- result[result$Source %in% selectedDataSources, ]
+
+  if (warn_on_empty && nrow(filteredResult) == 0 && nrow(result) > 0) {
+    renderWarning(paste0(
+      "Data source filtering removed all results. ",
+      "Results had sources: ", paste(unique(result$Source), collapse = ", "),
+      " but you selected: ", paste(selectedDataSources, collapse = ", ")
+    ))
+  }
+
+  return(filteredResult)
+}
+
+getSimpleBackgroundSize <- function(user_reference) {
+  if (is.null(user_reference)) NULL else length(user_reference)
 }
 
 unlistDatasourceCodes <- function(sources, codes) {

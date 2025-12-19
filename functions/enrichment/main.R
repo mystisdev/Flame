@@ -79,9 +79,11 @@ handleEnrichment <- function(enrichmentType) {
             handleEnrichmentRun(isUpdate = FALSE)
           })
 
-          # Update combination tab visibility (config-driven)
+          # Update combination tab after UI is flushed to ensure DOM elements are ready
           if (config$supportsCombination) {
-            prepareCombinationTab()
+            session$onFlushed(function() {
+              prepareCombinationTab()
+            }, once = TRUE)
           }
         }
       }
@@ -223,13 +225,17 @@ handleEnrichmentRun <- function(isUpdate = FALSE) {
         findAndPrintNoHitGenes(noHitGenesCheckList, runKey = currentFullRunKey)
         printResultTables(runKey = currentFullRunKey)
 
-        # Add run to pending set for deferred control update (using config)
         runId <- createRunId(currentEnrichmentTool, currentUniqueId)
-        if (currentEnrichmentType == "functional") {
-          runsPendingControlUpdate <<- union(runsPendingControlUpdate, runId)
-        } else {
-          literatureRunsPendingControlUpdate <<- union(literatureRunsPendingControlUpdate, runId)
-        }
+
+        # Update plot control panels after UI is flushed to ensure DOM elements exist
+        # This works for both new runs and datasource-differ updates
+        local({
+          runKeyForUpdate <- currentFullRunKey
+          session$onFlushed(function() {
+            updatePlotControlPanelsForRun(runKeyForUpdate)
+          }, once = TRUE)
+        })
+
         updateTabsetPanel(session, config$tabsetPanelId, selected = runId)
 
         # Pulse the tab to indicate results are ready

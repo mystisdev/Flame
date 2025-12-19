@@ -27,6 +27,8 @@ handleScatterPlot <- function(enrichmentType, enrichmentTool) {
 constructScatterPlot <- function(type_Tool, scatterData) {
   scatterData <- addJitter(scatterData)
 
+  # Track rendered data AFTER jittering for correct highlighting
+  setRenderedData(type_Tool, "scatterPlot", scatterData)
   renderScatterPlot(paste(type_Tool, "scatterPlot", sep = "_"), scatterData)
 }
 

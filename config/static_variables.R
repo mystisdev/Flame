@@ -16,8 +16,6 @@ enrichmentBackgroundSizes <- list()
 activeRuns <- list()        # Metadata for each active run (key: fullRunKey)
 runCounters <- list()       # Display numbers per tool (can reset on Clear All)
 uniqueIdCounters <- list()  # Unique ID numbers per tool (NEVER reset - prevents Shiny caching bugs)
-runsPendingControlUpdate <- character(0)  # Run IDs needing deferred control updates (functional)
-literatureRunsPendingControlUpdate <- character(0)  # Run IDs needing deferred control updates (literature)
 
 # STRING Network
 STRINGNetworkData <- list()

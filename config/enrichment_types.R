@@ -32,9 +32,6 @@ ENRICHMENT_TYPES_CONFIG <- list(
     supportsCombination = TRUE,
     hasManhattanPlot = TRUE,  # gProfiler-specific
 
-    # State Management
-    pendingUpdateSet = "runsPendingControlUpdate",
-
     # Tab Content Generator
     generateTabContent = "generateToolPanelForRun"
   ),
@@ -58,9 +55,6 @@ ENRICHMENT_TYPES_CONFIG <- list(
     supportsCombination = FALSE,
     hasManhattanPlot = FALSE,
 
-    # State Management
-    pendingUpdateSet = "literatureRunsPendingControlUpdate",
-
     # Tab Content Generator
     generateTabContent = "generateToolPanelForLiteratureRun"
   )
@@ -80,7 +74,6 @@ ENRICHMENT_TYPES_CONFIG <- list(
   #   hasManhattanPlot = FALSE,
   #   requiresRanking = TRUE,
   #   rankingMetrics = c("log2FC", "stat", "pvalue"),
-  #   pendingUpdateSet = "gseaRunsPendingControlUpdate",
   #   generateTabContent = "generateToolPanelForGseaRun"
   # )
 )

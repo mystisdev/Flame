@@ -756,7 +756,7 @@ updatePlotHighlighting <- function(type_Tool, plotId, session) {
       updateMultiTraceHighlighting(proxy, renderedData, selectedTerms)
     }
   }, error = function(e) {
-    # Silently ignore highlight errors
+    # Silently handle errors in highlighting
   })
 }
 
@@ -779,7 +779,15 @@ updateSingleTraceHighlighting <- function(proxy, originalData, selectedTerms) {
 
 # Multi-trace highlighting (Barchart, Scatter): one trace per Source category
 updateMultiTraceHighlighting <- function(proxy, originalData, selectedTerms) {
-  sources <- unique(originalData$Source)
+  # Plotly creates traces in FACTOR LEVEL ORDER (alphabetical),
+  # NOT in row-encounter order. So we must iterate in the same order.
+  if (is.factor(originalData$Source)) {
+    sources <- levels(originalData$Source)
+    # Only keep sources that actually exist in the data
+    sources <- sources[sources %in% unique(originalData$Source)]
+  } else {
+    sources <- sort(unique(as.character(originalData$Source)))
+  }
 
   for (i in seq_along(sources)) {
     traceData <- originalData[originalData$Source == sources[i], ]
@@ -1115,9 +1123,6 @@ renderPlotFromCurrentView <- function(type_Tool, plotId) {
   data <- getCurrentView(type_Tool, plotId)
   if (is.null(data) || nrow(data) == 0) return()
 
-  # Track what data we're rendering for highlighting calculations
-  setRenderedData(type_Tool, plotId, data)
-
   plotOutputId <- paste(type_Tool, plotId, sep = "_")
 
   if (plotId == "barchart") {
@@ -1132,12 +1137,16 @@ renderPlotFromCurrentView <- function(type_Tool, plotId) {
     data <- orderForBarchartByColumn(data, column, drawFormatColumn)
     height <- calculatePlotHeight(nrow(data))
 
+    # Track rendered data AFTER sorting for correct highlighting
+    setRenderedData(type_Tool, plotId, data)
     renderBarchart(plotOutputId, data, column, drawFormatColumn, height)
 
   } else if (plotId == "scatterPlot") {
     # Add jitter for scatter plot
     data <- addJitter(data)
 
+    # Track rendered data AFTER jittering for correct highlighting
+    setRenderedData(type_Tool, plotId, data)
     renderScatterPlot(plotOutputId, data)
 
   } else if (plotId == "dotPlot") {
@@ -1153,15 +1162,20 @@ renderPlotFromCurrentView <- function(type_Tool, plotId) {
     data <- orderForDotPlot(data, mode, drawFormatColumn)
     height <- nrow(data) * DOTPLOT_ENTRY_HEIGHT_PX + MIN_BAR_HEIGHT_PX
 
+    # Track rendered data AFTER sorting for correct highlighting
+    setRenderedData(type_Tool, plotId, data)
     renderDotPlot(plotOutputId, data, drawFormatColumn, height)
 
   } else if (plotId == "heatmap1") {
+    setRenderedData(type_Tool, plotId, data)
     renderHeatmap1WithData(type_Tool, data)
 
   } else if (plotId == "heatmap2") {
+    setRenderedData(type_Tool, plotId, data)
     renderHeatmap2WithData(type_Tool, data)
 
   } else if (plotId == "heatmap3") {
+    setRenderedData(type_Tool, plotId, data)
     renderHeatmap3WithData(type_Tool, data)
   }
 }
@@ -1177,10 +1191,6 @@ renderBothFromCurrentView <- function(type_Tool, plotId) {
 renderPlotWithData <- function(type_Tool, plotId, data) {
   if (is.null(data) || nrow(data) == 0) return()
 
-  # Track what data we're rendering for highlighting calculations
-  # This is critical for correct highlighting after table filtering
-  setRenderedData(type_Tool, plotId, data)
-
   plotOutputId <- paste(type_Tool, plotId, sep = "_")
 
   if (plotId == "barchart") {
@@ -1189,10 +1199,16 @@ renderPlotWithData <- function(type_Tool, plotId, data) {
     drawFormatColumn <- input[[paste(type_Tool, "barchart_drawFormat", sep = "_")]]
     data <- orderForBarchartByColumn(data, column, drawFormatColumn)
     height <- calculatePlotHeight(nrow(data))
+
+    # Track rendered data AFTER sorting for correct highlighting
+    setRenderedData(type_Tool, plotId, data)
     renderBarchart(plotOutputId, data, column, drawFormatColumn, height)
 
   } else if (plotId == "scatterPlot") {
     data <- addJitter(data)
+
+    # Track rendered data AFTER jittering for correct highlighting
+    setRenderedData(type_Tool, plotId, data)
     renderScatterPlot(plotOutputId, data)
 
   } else if (plotId == "dotPlot") {
@@ -1203,15 +1219,21 @@ renderPlotWithData <- function(type_Tool, plotId, data) {
     drawFormatColumn <- input[[paste(type_Tool, "dotPlot_drawFormat", sep = "_")]]
     data <- orderForDotPlot(data, mode, drawFormatColumn)
     height <- nrow(data) * DOTPLOT_ENTRY_HEIGHT_PX + MIN_BAR_HEIGHT_PX
+
+    # Track rendered data AFTER sorting for correct highlighting
+    setRenderedData(type_Tool, plotId, data)
     renderDotPlot(plotOutputId, data, drawFormatColumn, height)
 
   } else if (plotId == "heatmap1") {
+    setRenderedData(type_Tool, plotId, data)
     renderHeatmap1WithData(type_Tool, data)
 
   } else if (plotId == "heatmap2") {
+    setRenderedData(type_Tool, plotId, data)
     renderHeatmap2WithData(type_Tool, data)
 
   } else if (plotId == "heatmap3") {
+    setRenderedData(type_Tool, plotId, data)
     renderHeatmap3WithData(type_Tool, data)
   }
 }
@@ -1520,32 +1542,8 @@ handleTableFilterChange <- function(enrichmentType, toolName, plotId) {
   })
 }
 
-# Order data for barchart by specified column
-orderForBarchartByColumn <- function(data, column, drawFormatColumn) {
-  data[[drawFormatColumn]] <-
-    factor(
-      data[[drawFormatColumn]],
-      levels = unique(data[[drawFormatColumn]])[order(
-        data[[column]], decreasing = FALSE)])
-  return(data)
-}
-
-# Order data for dot plot by mode
-orderForDotPlot <- function(data, mode, drawFormatColumn) {
-  if (mode == "Enrichment Score") {
-    data <- data[order(-data$`Enrichment Score %`), ]
-  } else if (mode == "Gene Ratio") {
-    data <- data[order(-data$`Gene Ratio`), ]
-  }
-  # else already sorted by -log10Pvalue
-
-  data[[drawFormatColumn]] <-
-    factor(
-      data[[drawFormatColumn]],
-      levels = unique(data[[drawFormatColumn]])[order(
-        data$`-log10Pvalue`, decreasing = FALSE)])
-  return(data)
-}
+# Note: orderForBarchartByColumn is defined in barchart.R
+# Note: orderForDotPlot is defined in dotplot.R
 
 # Clears all selections and restores original data from Generate button
 handleResetView <- function(enrichmentType, toolName, plotId) {

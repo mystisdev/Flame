@@ -10,9 +10,9 @@ runPanther <- function(userInputList, taxid, user_reference = NULL) {
     # Parse API response into FLAME-compatible format
     pantherParsedResult <- parsePantherResult(pantherResult)
 
-    if (isPantherResultValid(pantherParsedResult)) {
+    if (isEnrichmentResultValid(pantherParsedResult)) {
       # Filter by user's selected data sources (GO, REAC, etc.)
-      pantherParsedResult <- filterPantherByDataSources(pantherParsedResult)
+      pantherParsedResult <- filterEnrichmentByDataSources(pantherParsedResult, currentEnrichmentType)
 
       if (nrow(pantherParsedResult) > 0) {
         # Store results in global structure after adding -log10Pvalue and enrichment scores
@@ -24,7 +24,7 @@ runPanther <- function(userInputList, taxid, user_reference = NULL) {
   }
 
   # Always store background size for statistics display
-  enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<- getPantherBackgroundSize(user_reference)
+  enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<- getSimpleBackgroundSize(user_reference)
 }
 
 sendPantherRequest <- function(userInputList, taxid, user_reference = NULL) {
@@ -247,13 +247,6 @@ parsePantherResult <- function(responseList) {
   return(allResults)
 }
 
-isPantherResultValid <- function(pantherParsedResult) {
-  isValid <- FALSE
-  if (!is.null(pantherParsedResult) && nrow(pantherParsedResult) > 0)
-    isValid <- TRUE
-  return(isValid)
-}
-
 alterPantherSourceKeywords <- function(pantherResult) {
   # Map PANTHER's data source names to FLAME's standard names
   # This ensures consistency with existing FLAME categories
@@ -269,17 +262,6 @@ alterPantherSourceKeywords <- function(pantherResult) {
   pantherResult$Source <- gsub("^ANNOT_TYPE_ID_REACTOME_PATHWAY$", "REAC", pantherResult$Source)
 
   return(pantherResult)
-}
-
-filterPantherByDataSources <- function(pantherParsedResult) {
-  selectedDataSources <- input[[paste0(currentEnrichmentType, "_enrichment_datasources")]]
-  if (is.null(selectedDataSources) || length(selectedDataSources) == 0) {
-    return(pantherParsedResult)
-  }
-
-  # Filter results to only include selected data sources
-  filteredResult <- pantherParsedResult[pantherParsedResult$Source %in% selectedDataSources, ]
-  return(filteredResult)
 }
 
 mapPantherTermIds <- function(pantherResult) {
@@ -350,15 +332,4 @@ mapPantherDatasetToFlameSource <- function(dataset) {
   } else {
     return(dataset)  # Return original if no mapping found
   }
-}
-
-getPantherBackgroundSize <- function(user_reference) {
-  # Return background size for statistical reporting
-  # NULL = genome-wide background, number = custom background size
-  if (is.null(user_reference)) {
-    size <- NULL
-  } else {
-    size <- length(user_reference)
-  }
-  return(size)
 }

@@ -31,9 +31,14 @@ constructBarchart <- function(type_Tool, enrichmentFilteredData, mode) {
     "-log10Pvalue"
   )
   drawFormatColumun <- input[[paste(type_Tool, "barchart_drawFormat", sep = "_")]]
+
   enrichmentFilteredData <- orderForBarchartByColumn(enrichmentFilteredData,
                                                      column, drawFormatColumun)
+
   height <- calculatePlotHeight(nrow(enrichmentFilteredData))
+
+  # Track rendered data AFTER sorting for correct highlighting
+  setRenderedData(type_Tool, "barchart", enrichmentFilteredData)
 
   renderBarchart(paste(type_Tool, "barchart", sep = "_"),
                  enrichmentFilteredData, column, drawFormatColumun, height)
@@ -41,10 +46,11 @@ constructBarchart <- function(type_Tool, enrichmentFilteredData, mode) {
 
 orderForBarchartByColumn <- function(enrichmentFilteredData, column,
                                      drawFormatColumun) {
-  enrichmentFilteredData[[drawFormatColumun]] <-
-    factor(
-      enrichmentFilteredData[[drawFormatColumun]],
-      levels = unique(enrichmentFilteredData[[drawFormatColumun]])[order(
-        enrichmentFilteredData[[column]], decreasing = F)])
+  # Set factor levels ordered by the column value (ascending = bottom-to-top on Y-axis)
+  enrichmentFilteredData[[drawFormatColumun]] <- factor(
+    enrichmentFilteredData[[drawFormatColumun]],
+    levels = unique(enrichmentFilteredData[[drawFormatColumun]])[
+      order(enrichmentFilteredData[[column]], decreasing = FALSE)])
+
   return(enrichmentFilteredData)
 }

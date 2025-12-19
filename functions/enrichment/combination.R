@@ -162,6 +162,11 @@ combine_pvalues <- function(pvalues) {
 
 handleComboSourceSelect <- function() {
   tryCatch({
+    # Clear click-generated outputs when filters change (they show stale data)
+    output$combo_upsetClick_table <- DT::renderDataTable(NULL)
+    output$combo_network_table <- DT::renderDataTable(NULL)
+    output$combo_visNetwork <- renderVisNetwork({})
+
     filteredCombinationResult <- filterComboTable(combinationResult)
     filteredCombinationResult <-
       filteredCombinationResult[order(-filteredCombinationResult$Rank), ]

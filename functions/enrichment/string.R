@@ -9,9 +9,9 @@ runString <- function(userInputList, taxid, user_reference = NULL) {
     # Parse API response into FLAME-compatible format
     stringParsedResult <- parseStringResult(stringResult)
 
-    if (isStringResultValid(stringParsedResult)) {
+    if (isEnrichmentResultValid(stringParsedResult)) {
       # Filter by user's selected data sources (GO, KEGG, etc.)
-      stringParsedResult <- filterStringByDataSources(stringParsedResult)
+      stringParsedResult <- filterEnrichmentByDataSources(stringParsedResult, currentEnrichmentType)
 
       # Filter by user's significance threshold (STRING API doesn't support this)
       stringParsedResult <- filterStringByThreshold(stringParsedResult)
@@ -25,7 +25,7 @@ runString <- function(userInputList, taxid, user_reference = NULL) {
   }
 
   # Always store background size for statistics display
-  enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<- getStringBackgroundSize(user_reference)
+  enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<- getSimpleBackgroundSize(user_reference)
 }
 
 sendStringRequest <- function(userInputList, taxid, user_reference = NULL) {
@@ -109,13 +109,6 @@ parseStringResult <- function(response) {
   return(stringResult)
 }
 
-isStringResultValid <- function(stringParsedResult) {
-  isValid <- FALSE
-  if (!is.null(stringParsedResult) && nrow(stringParsedResult) > 0)
-    isValid <- TRUE
-  return(isValid)
-}
-
 parseStringPositiveHits <- function(stringResult) {
   stringResult$`Positive Hits` <- gsub(",", ",", stringResult$`Positive Hits`)
   return(stringResult)
@@ -140,17 +133,6 @@ alterStringSourceKeywords <- function(stringResult) {
   stringResult$Source <- gsub("^TISSUES$", "BTO", stringResult$Source)
   stringResult$Source <- gsub("^HPO$", "HP", stringResult$Source)
   return(stringResult)
-}
-
-filterStringByDataSources <- function(stringParsedResult) {
-  selectedDataSources <- input[[paste0(currentEnrichmentType, "_enrichment_datasources")]]
-  if (is.null(selectedDataSources) || length(selectedDataSources) == 0) {
-    return(stringParsedResult)
-  }
-
-  # Filter results to only include selected data sources
-  filteredResult <- stringParsedResult[stringParsedResult$Source %in% selectedDataSources, ]
-  return(filteredResult)
 }
 
 filterStringByThreshold <- function(stringParsedResult) {
@@ -193,15 +175,4 @@ mapStringTermIds <- function(stringResult) {
   # expects, so no mapping needed.
 
   return(stringResult)
-}
-
-getStringBackgroundSize <- function(user_reference) {
-  # Return background size for statistical reporting
-  # NULL = genome-wide background, number = custom background size
-  if (is.null(user_reference)) {
-    size <- NULL
-  } else {
-    size <- length(user_reference)
-  }
-  return(size)
 }

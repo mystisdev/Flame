@@ -466,33 +466,11 @@ function(input, output, session) {
   # For functional multi-run: runId like "gProfiler_1"
   # For literature: tool name like "STRING"
   currentSelectedToolTab <<- NULL
-  # Set of tools needing control updates (for literature enrichment)
-  toolsPendingControlUpdate <<- character(0)
 
   observeEvent(input$toolTabsPanel, {
     currentSelectedToolTab <<- input$toolTabsPanel
-
-    if (is.null(currentSelectedToolTab) ||
-        currentSelectedToolTab == "" ||
-        currentSelectedToolTab == "Combination") {
-      return()
-    }
-
-    # Check if this is a functional enrichment runId (contains number suffix)
-    if (grepl("_[0-9]+$", currentSelectedToolTab)) {
-      # Multi-run functional enrichment
-      if (currentSelectedToolTab %in% runsPendingControlUpdate) {
-        runsPendingControlUpdate <<- setdiff(runsPendingControlUpdate, currentSelectedToolTab)
-        fullRunKey <- paste("functional", currentSelectedToolTab, sep = "_")
-        updatePlotControlPanelsForRun(fullRunKey)
-      }
-    } else {
-      # Literature enrichment (static tabs) - legacy, kept for backward compatibility
-      if (currentSelectedToolTab %in% toolsPendingControlUpdate) {
-        toolsPendingControlUpdate <<- setdiff(toolsPendingControlUpdate, currentSelectedToolTab)
-        updatePlotControlPanelsForTool(currentEnrichmentType, currentSelectedToolTab)
-      }
-    }
+    # Tab selection tracking - plot control updates are now handled
+    # immediately via session$onFlushed() in handleEnrichmentRun()
   }, ignoreInit = FALSE, ignoreNULL = TRUE)
 
   # Literature multi-run tab selection observer
@@ -501,17 +479,8 @@ function(input, output, session) {
   observeEvent(input$literatureToolTabsPanel, {
     currentSelectedLiteratureTab <<- input$literatureToolTabsPanel
     currentSelectedToolTab <<- input$literatureToolTabsPanel
-
-    if (is.null(currentSelectedLiteratureTab) || currentSelectedLiteratureTab == "") {
-      return()
-    }
-
-    # Check if this run needs deferred control panel updates
-    if (currentSelectedLiteratureTab %in% literatureRunsPendingControlUpdate) {
-      literatureRunsPendingControlUpdate <<- setdiff(literatureRunsPendingControlUpdate, currentSelectedLiteratureTab)
-      fullRunKey <- paste("literature", currentSelectedLiteratureTab, sep = "_")
-      updatePlotControlPanelsForRun(fullRunKey)
-    }
+    # Tab selection tracking - plot control updates are now handled
+    # immediately via session$onFlushed() in handleEnrichmentRun()
   }, ignoreInit = FALSE, ignoreNULL = TRUE)
 
   # Plot click observers (simple plots)

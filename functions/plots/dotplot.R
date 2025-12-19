@@ -39,6 +39,8 @@ constructDotPlot <- function(type_Tool, dotPlotData) {
   # Calculate dynamic height
   height <- nrow(dotPlotData) * DOTPLOT_ENTRY_HEIGHT_PX + MIN_BAR_HEIGHT_PX
 
+  # Track rendered data AFTER sorting for correct highlighting
+  setRenderedData(type_Tool, "dotPlot", dotPlotData)
   renderDotPlot(paste(type_Tool, "dotPlot", sep = "_"),
                 dotPlotData, drawFormatColumn, height)
 }
@@ -51,10 +53,11 @@ orderForDotPlot <- function(data, mode, drawFormatColumn) {
     "-log10Pvalue"  # default
   )
 
-  # Factor levels in reverse order so highest values appear at top
+  # Set factor levels ordered by the column value (ascending = bottom-to-top on Y-axis)
   data[[drawFormatColumn]] <- factor(
     data[[drawFormatColumn]],
-    levels = unique(data[[drawFormatColumn]])[order(data[[orderColumn]], decreasing = FALSE)]
-  )
+    levels = unique(data[[drawFormatColumn]])[
+      order(data[[orderColumn]], decreasing = FALSE)])
+
   return(data)
 }

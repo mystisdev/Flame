@@ -47,7 +47,7 @@ runGeneCodis <- function(userInputList, taxid, user_reference = NULL) {
 
         if (isGeneCodisResultValid(genecodisParsedResult)) {
           # Filter by user's selected data sources
-          genecodisParsedResult <- filterGeneCodisByDataSources(genecodisParsedResult)
+          genecodisParsedResult <- filterEnrichmentByDataSources(genecodisParsedResult, currentEnrichmentType, warn_on_empty = TRUE)
 
           if (nrow(genecodisParsedResult) > 0) {
             # Store results in global structure after adding -log10Pvalue and enrichment scores
@@ -63,7 +63,7 @@ runGeneCodis <- function(userInputList, taxid, user_reference = NULL) {
 
   # Always store background size for statistics display
   enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<-
-    getGeneCodisBackgroundSize(user_reference)
+    getSimpleBackgroundSize(user_reference)
 }
 
 sendGeneCodisRequest <- function(userInputList, taxid, user_reference = NULL) {
@@ -329,36 +329,6 @@ isGeneCodisResultValid <- function(parsedResult) {
   }
 
   return(TRUE)
-}
-
-filterGeneCodisByDataSources <- function(result) {
-  selectedDataSources <- input[[paste0(currentEnrichmentType, "_enrichment_datasources")]]
-
-  if (is.null(selectedDataSources) || length(selectedDataSources) == 0) {
-    return(result)
-  }
-
-  # Filter results to only include selected data sources
-  filteredResult <- result[result$Source %in% selectedDataSources, ]
-
-  if(nrow(filteredResult) == 0 && nrow(result) > 0) {
-    renderWarning(paste0("Data source filtering removed all results. ",
-                        "Results had sources: ", paste(unique(result$Source), collapse=", "),
-                        " but you selected: ", paste(selectedDataSources, collapse=", ")))
-  }
-
-  return(filteredResult)
-}
-
-getGeneCodisBackgroundSize <- function(user_reference) {
-  if (is.null(user_reference)) {
-    # Genome-wide background - GeneCodis determines this based on organism
-    # Return NULL to indicate genome-wide (FLAME will display appropriately)
-    return(NULL)
-  } else {
-    # Custom background
-    return(length(user_reference))
-  }
 }
 
 # Helper function: Map FLAME data source codes to GeneCodis annotation names

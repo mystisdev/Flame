@@ -9,6 +9,13 @@ resetCombination <- function() {
   combinationResult <<- data.frame()
   hideTab(inputId = "toolTabsPanel", target = "Combination")
   enrichmentBackgroundSizes <<- list()
+
+  # Clear all combo outputs to prevent stale data persisting
+  output$combo_table <- DT::renderDataTable(NULL)
+  output$combo_upsetClick_table <- DT::renderDataTable(NULL)
+  output$combo_network_table <- DT::renderDataTable(NULL)
+  output$combo_visNetwork <- renderVisNetwork({})
+  output$upsetjsCombo <- upsetjs::renderUpsetjs({})
 }
 
 resetEnrichmentResults <- function(type, tool) {
