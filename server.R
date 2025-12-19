@@ -1,6 +1,7 @@
 function(input, output, session) {
   source("config/global_settings.R", local = T)
   source("config/global_variables.R", local = T)
+  source("config/enrichment_types.R", local = T)  # Must load after global_variables.R (depends on ENRICHMENT_DATASOURCES)
   source("config/server_variables.R", local = T)
   source("config/static_variables.R", local = T)
   source("config/ui_variables.R", local = T)
@@ -301,6 +302,10 @@ function(input, output, session) {
     handleMultiClear()
   }, ignoreInit = T)
 
+  observeEvent(input$literature_enrichment_all_clear, {
+    handleLiteratureMultiClear()
+  }, ignoreInit = T)
+
   # Close individual run tab (via X button)
   observeEvent(input$closeRunTab, {
     runId <- input$closeRunTab
@@ -324,6 +329,29 @@ function(input, output, session) {
       shinyjs::hide("functional_enrichment_all_clear")
     }
     prepareCombinationTab()
+  }, ignoreInit = TRUE)
+
+  # Close individual literature run tab (via X button)
+  observeEvent(input$closeLiteratureRunTab, {
+    runId <- input$closeLiteratureRunTab
+    fullRunKey <- paste("literature", runId, sep = "_")
+
+    # Remember the tool name before we clear
+    toolName <- parseFullRunKey(fullRunKey)$toolName
+
+    # Clear all data and remove tab
+    clearLiteratureRunCompletely(fullRunKey)
+
+    # If no tabs remain for this tool, reset its DISPLAY counter
+    if (countActiveRunsForTool(toolName) == 0) {
+      resetRunCounterForTool(toolName)
+    }
+
+    # Update results panel visibility
+    if (getActiveLiteratureRunCount() == 0) {
+      shinyjs::hide("literatureEnrichmentResultsPanel")
+      shinyjs::hide("literature_enrichment_all_clear")
+    }
   }, ignoreInit = TRUE)
 
   # ~Combination ####
@@ -459,11 +487,30 @@ function(input, output, session) {
         updatePlotControlPanelsForRun(fullRunKey)
       }
     } else {
-      # Literature enrichment (static tabs)
+      # Literature enrichment (static tabs) - legacy, kept for backward compatibility
       if (currentSelectedToolTab %in% toolsPendingControlUpdate) {
         toolsPendingControlUpdate <<- setdiff(toolsPendingControlUpdate, currentSelectedToolTab)
         updatePlotControlPanelsForTool(currentEnrichmentType, currentSelectedToolTab)
       }
+    }
+  }, ignoreInit = FALSE, ignoreNULL = TRUE)
+
+  # Literature multi-run tab selection observer
+  currentSelectedLiteratureTab <<- NULL
+
+  observeEvent(input$literatureToolTabsPanel, {
+    currentSelectedLiteratureTab <<- input$literatureToolTabsPanel
+    currentSelectedToolTab <<- input$literatureToolTabsPanel
+
+    if (is.null(currentSelectedLiteratureTab) || currentSelectedLiteratureTab == "") {
+      return()
+    }
+
+    # Check if this run needs deferred control panel updates
+    if (currentSelectedLiteratureTab %in% literatureRunsPendingControlUpdate) {
+      literatureRunsPendingControlUpdate <<- setdiff(literatureRunsPendingControlUpdate, currentSelectedLiteratureTab)
+      fullRunKey <- paste("literature", currentSelectedLiteratureTab, sep = "_")
+      updatePlotControlPanelsForRun(fullRunKey)
     }
   }, ignoreInit = FALSE, ignoreNULL = TRUE)
 

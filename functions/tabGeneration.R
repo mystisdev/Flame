@@ -386,6 +386,99 @@ generateManhattanPanelForRun <- function(fullRunKey) {
   )
 }
 
+# ============================================================================
+# Literature Enrichment Tab Generation (Multi-Run Mode)
+# ============================================================================
+
+# Main function to generate the full tab content for a literature enrichment run
+generateToolPanelForLiteratureRun <- function(toolName, uniqueId) {
+  fullRunKey <- paste("literature", toolName, uniqueId, sep = "_")
+
+  return(
+    tags$div(
+      tags$br(),
+      generateParametersBoxForRun(fullRunKey),
+      tabsetPanel(
+        generateResultsPanelForLiteratureRun(fullRunKey),
+        generatePlotsPanelForRun("literature", toolName, fullRunKey)
+      )
+    )
+  )
+}
+
+# Results panel for literature enrichment (PUBMED datasource only)
+generateResultsPanelForLiteratureRun <- function(fullRunKey) {
+  # Literature enrichment only uses PUBMED datasource
+  sourcesPanel <- tabsetPanel(
+    id = paste(fullRunKey, "sources_panel", sep = "_"),
+    tabPanel("PUBMED", tags$br(),
+             DT::dataTableOutput(paste(fullRunKey, "table_pubmed", sep = "_")))
+  )
+
+  return(
+    tabPanel(
+      title = "Results",
+      icon = icon("table"),
+      tags$div(
+        id = paste(fullRunKey, "resultsDiv", sep = "_"),
+        class = "enrichmentResultsDiv",
+        tags$br(),
+        sourcesPanel
+      ),
+      tags$br(),
+      tags$div(
+        id = paste(fullRunKey, "conversionBoxes", sep = "_"),
+        style = "display: none;",
+        box(
+          title = "Conversion Table",
+          width = NULL,
+          status = "primary",
+          solidHeader = TRUE,
+          collapsible = TRUE,
+          collapsed = TRUE,
+          tabsetPanel(
+            tabPanel("Input List", DT::dataTableOutput(paste(fullRunKey, "conversionTable_input", sep = "_"))),
+            tabPanel("Reference Background",
+                     div(id = paste(fullRunKey, "conversionTable_genome_div", sep = "_"),
+                         h3("No custom background was submitted by the user, the entire selected genome was used instead.")),
+                     div(id = paste(fullRunKey, "conversionTable_reference_div", sep = "_"), style = "display:none",
+                         DT::dataTableOutput(paste(fullRunKey, "conversionTable_reference", sep = "_")))
+            )
+          )
+        ),
+        box(
+          title = "Unconverted Inputs",
+          class = "conversionBox",
+          width = NULL,
+          status = "primary",
+          solidHeader = TRUE,
+          collapsible = TRUE,
+          collapsed = TRUE,
+          verbatimTextOutput(paste(fullRunKey, "notConverted_input", sep = "_")),
+          tags$hr(),
+          div(id = paste(fullRunKey, "notConverted_reference_div", sep = "_"), style = "display:none",
+              verbatimTextOutput(paste(fullRunKey, "notConverted_reference", sep = "_"))
+          )
+        )
+      ),
+      box(
+        title = "No-hit Inputs",
+        class = "conversionBox",
+        width = NULL,
+        status = "primary",
+        solidHeader = TRUE,
+        collapsible = TRUE,
+        collapsed = TRUE,
+        verbatimTextOutput(paste(fullRunKey, "genesNotFound", sep = "_"))
+      )
+    )
+  )
+}
+
+# ============================================================================
+# Shared Helper Functions
+# ============================================================================
+
 # Color coding legend for network plots (extracted to avoid global dependency)
 generateColorCodingLegendForRun <- function() {
   fluidRow(

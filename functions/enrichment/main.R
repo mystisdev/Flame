@@ -2,6 +2,9 @@ handleEnrichment <- function(enrichmentType) {
   tryCatch({
     if (existInputGeneLists()) {
       currentEnrichmentType <<- enrichmentType
+      # Get config for this enrichment type
+      config <- getEnrichmentConfig(enrichmentType)
+
       if (existInputOrganism()) {
         if (existEnrichmentTool()) {
           tools <- switch(
@@ -32,63 +35,52 @@ handleEnrichment <- function(enrichmentType) {
             currentEnrichmentTool <<- toolName
             currentSignificanceMetric <<- decideToolMetric()
 
-            if (currentEnrichmentType == "functional") {
-              # Multi-run: Check for matching parameters
-              currentParams <- captureRunParameters()
-              matchResult <- findMatchingRun("functional", toolName, currentParams)
+            # Multi-run: Check for matching parameters (unified for all types)
+            currentParams <- captureRunParameters()
+            matchResult <- findMatchingRun(currentEnrichmentType, toolName, currentParams)
 
-              if (!is.null(matchResult$matchType) && matchResult$matchType == "exact") {
-                # EXACT MATCH: Just select tab and pulse it (no API call)
-                runInfo <- activeRuns[[matchResult$fullRunKey]]
-                updateTabsetPanel(session, "toolTabsPanel", selected = runInfo$runId)
-                # Pulse the tab to indicate where results are
-                session$sendCustomMessage("handler_pulseTab", runInfo$runId)
-                return()
-              }
-
-              if (!is.null(matchResult$matchType) && matchResult$matchType == "datasources_differ") {
-                # DATASOURCES DIFFER: Update existing tab with new results
-                existingRunKey <- matchResult$fullRunKey
-                runInfo <- activeRuns[[existingRunKey]]
-
-                # Use existing run's identifiers (don't create new numbers)
-                currentUniqueId <<- runInfo$uniqueId
-                currentRunNumber <<- runInfo$runNumber
-                currentFullRunKey <<- existingRunKey
-                currentType_Tool <<- existingRunKey
-
-                # Update stored parameters with new datasources
-                updateRunParameters(existingRunKey, currentParams)
-
-                # Clear old results before re-running
-                clearRunResults(existingRunKey)
-
-                # Run enrichment (will populate existing tab)
-                handleEnrichmentWithToolMultiRun(isUpdate = TRUE)
-                return()
-              }
-
-              # NO MATCH: Create new run
-              currentUniqueId <<- getNextUniqueId(toolName)
-              currentRunNumber <<- getNextRunNumber(toolName)
-              runId <- createRunId(toolName, currentUniqueId)
-              currentFullRunKey <<- getFullRunKey("functional", runId)
-              currentType_Tool <<- currentFullRunKey  # For backward compatibility
-
-              # Register the run
-              registerRun("functional", toolName, currentUniqueId, currentRunNumber, currentParams)
-
-              handleEnrichmentWithToolMultiRun(isUpdate = FALSE)
-            } else {
-              # Literature: single-result mode (unchanged)
-              currentType_Tool <<- paste(currentEnrichmentType, currentEnrichmentTool, sep = "_")
-              currentFullRunKey <<- currentType_Tool
-              handleEnrichmentWithToolLiterature()
+            if (!is.null(matchResult$matchType) && matchResult$matchType == "exact") {
+              # EXACT MATCH: Just select tab and pulse it (no API call)
+              runInfo <- activeRuns[[matchResult$fullRunKey]]
+              updateTabsetPanel(session, config$tabsetPanelId, selected = runInfo$runId)
+              session$sendCustomMessage("handler_pulseTab", runInfo$runId)
+              return()
             }
+
+            if (!is.null(matchResult$matchType) && matchResult$matchType == "datasources_differ") {
+              # DATASOURCES DIFFER: Update existing tab with new results
+              existingRunKey <- matchResult$fullRunKey
+              runInfo <- activeRuns[[existingRunKey]]
+
+              # Use existing run's identifiers (don't create new numbers)
+              currentUniqueId <<- runInfo$uniqueId
+              currentRunNumber <<- runInfo$runNumber
+              currentFullRunKey <<- existingRunKey
+              currentType_Tool <<- existingRunKey
+
+              # Update stored parameters with new datasources
+              updateRunParameters(existingRunKey, currentParams)
+              clearRunResults(existingRunKey)
+
+              # Run enrichment (will populate existing tab)
+              handleEnrichmentRun(isUpdate = TRUE)
+              return()
+            }
+
+            # NO MATCH: Create new run
+            currentUniqueId <<- getNextUniqueId(toolName)
+            currentRunNumber <<- getNextRunNumber(toolName)
+            runId <- createRunId(toolName, currentUniqueId)
+            currentFullRunKey <<- getFullRunKey(currentEnrichmentType, runId)
+            currentType_Tool <<- currentFullRunKey
+
+            # Register the run
+            registerRun(currentEnrichmentType, toolName, currentUniqueId, currentRunNumber, currentParams)
+            handleEnrichmentRun(isUpdate = FALSE)
           })
 
-          # Update combination tab visibility (only for functional, needs 2+ runs)
-          if (currentEnrichmentType == "functional") {
+          # Update combination tab visibility (config-driven)
+          if (config$supportsCombination) {
             prepareCombinationTab()
           }
         }
@@ -141,17 +133,22 @@ decideToolMetric <- function() {
       input[[paste0(currentEnrichmentType, "_enrichment_metric")]]
 }
 
-# Multi-run handler for functional enrichment (creates dynamic tabs)
+# Unified multi-run handler for all enrichment types (config-driven)
+# Uses ENRICHMENT_TYPES_CONFIG to handle differences between functional/literature/future types
 # isUpdate: TRUE when updating existing tab with new datasources, FALSE for new run
-handleEnrichmentWithToolMultiRun <- function(isUpdate = FALSE) {
+handleEnrichmentRun <- function(isUpdate = FALSE) {
+  # Get config for current enrichment type
+  config <- getEnrichmentConfig(currentEnrichmentType)
+
   actionText <- if (isUpdate) "Updating" else "Executing"
   renderModal(
     paste0(
       "<h2>Please wait.</h2><br />
-      <p>", actionText, " functional enrichment with ", currentEnrichmentTool,
+      <p>", actionText, " ", config$label, " with ", currentEnrichmentTool,
       " (Run ", currentRunNumber, ").</p>"
     )
   )
+
   if (existDataSources()) {
     # Initialize empty result storage for this run
     enrichmentResults[[currentFullRunKey]] <<- data.frame()
@@ -173,7 +170,7 @@ handleEnrichmentWithToolMultiRun <- function(isUpdate = FALSE) {
       if (validEnrichmentResultMultiRun()) {
         if (!isUpdate) {
           # Create dynamic tab for this run (only for new runs)
-          insertResultTabForRun()
+          insertEnrichmentTab(config)
         }
 
         # Hide all source tabs initially (they'll be shown as results populate)
@@ -181,15 +178,16 @@ handleEnrichmentWithToolMultiRun <- function(isUpdate = FALSE) {
 
         if (!isUpdate) {
           # Show the results panel if this is the first run
-          if (getActiveFunctionalRunCount() == 1) {
-            shinyjs::show("functionalEnrichmentResultsPanel")
-            shinyjs::show("functional_enrichment_all_clear")
-            # Ensure Combination tab stays hidden (it gets auto-shown when panel becomes visible)
-            hideTab(inputId = "toolTabsPanel", target = "Combination")
+          if (getActiveRunCount(currentEnrichmentType) == 1) {
+            shinyjs::show(config$resultsPanelId)
+            shinyjs::show(config$clearButtonId)
+            # For functional enrichment, ensure Combination tab stays hidden initially
+            if (config$supportsCombination) {
+              hideTab(inputId = config$tabsetPanelId, target = "Combination")
+            }
           }
 
           # Register dynamic observers AFTER UI is flushed to the client
-          # This ensures the dynamic UI elements exist before we attach observers
           local({
             runKeyForObservers <- currentFullRunKey
             session$onFlushed(function() {
@@ -202,86 +200,97 @@ handleEnrichmentWithToolMultiRun <- function(isUpdate = FALSE) {
         printParametersMultiRun()
 
         # For new runs, defer shinyjs::show until UI is flushed (element must exist in DOM)
-        # For updates, the UI already exists so we can call immediately
         if (input[[paste0(currentEnrichmentType, "_enrichment_namespace")]] != "USERINPUT") {
           if (!isUpdate) {
-            # Capture values for async callback
             local({
               runKey <- currentFullRunKey
               inputTable <- inputGenesConversionTable
               bgTable <- backgroundGenesConversionTable
               session$onFlushed(function() {
                 shinyjs::show(paste(runKey, "conversionBoxes", sep = "_"))
-                printUnconvertedGenesMultiRun(inputTable, bgTable)
-                printConversionTableMultiRun(inputTable, bgTable)
+                printUnconvertedGenes(inputTable, bgTable, runKey = runKey)
+                printConversionTable(inputTable, bgTable, runKey = runKey)
               }, once = TRUE)
             })
           } else {
             # Update mode: UI already exists
             shinyjs::show(paste(currentFullRunKey, "conversionBoxes", sep = "_"))
-            printUnconvertedGenesMultiRun(inputGenesConversionTable, backgroundGenesConversionTable)
-            printConversionTableMultiRun(inputGenesConversionTable, backgroundGenesConversionTable)
+            printUnconvertedGenes(inputGenesConversionTable, backgroundGenesConversionTable, runKey = currentFullRunKey)
+            printConversionTable(inputGenesConversionTable, backgroundGenesConversionTable, runKey = currentFullRunKey)
           }
         }
 
-        findAndPrintNoHitGenesMultiRun(noHitGenesCheckList)
-        printResultTablesMultiRun()
+        findAndPrintNoHitGenes(noHitGenesCheckList, runKey = currentFullRunKey)
+        printResultTables(runKey = currentFullRunKey)
 
-        # Add run to pending set for deferred control update
+        # Add run to pending set for deferred control update (using config)
         runId <- createRunId(currentEnrichmentTool, currentUniqueId)
-        runsPendingControlUpdate <<- union(runsPendingControlUpdate, runId)
-        updateTabsetPanel(session, "toolTabsPanel", selected = runId)
+        if (currentEnrichmentType == "functional") {
+          runsPendingControlUpdate <<- union(runsPendingControlUpdate, runId)
+        } else {
+          literatureRunsPendingControlUpdate <<- union(literatureRunsPendingControlUpdate, runId)
+        }
+        updateTabsetPanel(session, config$tabsetPanelId, selected = runId)
 
         # Pulse the tab to indicate results are ready
         session$sendCustomMessage("handler_pulseTab", runId)
       } else {
         # Enrichment failed
         if (!isUpdate) {
-          # Only unregister if this was a new run
           unregisterRun(currentFullRunKey)
         }
       }
     } else {
       # Conversion failed
       if (!isUpdate) {
-        # Only unregister if this was a new run
         unregisterRun(currentFullRunKey)
       }
     }
   } else {
     # No datasources
     if (!isUpdate) {
-      # Only unregister if this was a new run
       unregisterRun(currentFullRunKey)
     }
   }
 }
 
-# Insert a new tab for a functional enrichment run
-insertResultTabForRun <- function() {
+# Legacy alias for backward compatibility (remove after full migration)
+handleEnrichmentWithToolMultiRun <- handleEnrichmentRun
+
+# Unified tab insertion function for all enrichment types (config-driven)
+insertEnrichmentTab <- function(config = NULL) {
+  if (is.null(config)) {
+    config <- getEnrichmentConfig(currentEnrichmentType)
+  }
+
   # Use uniqueId for internal Shiny IDs (prevents caching bugs)
   runId <- createRunId(currentEnrichmentTool, currentUniqueId)
 
   # Use displayNumber (currentRunNumber) for user-visible tab title
   tabTitle <- paste0(currentEnrichmentTool, " (", currentRunNumber, ")")
 
-  # Generate tab content using uniqueId (for output IDs)
-  tabContent <- generateToolPanelForRun("functional", currentEnrichmentTool, currentUniqueId)
+  # Generate tab content using the appropriate generator from config
+  tabContent <- if (config$generateTabContent == "generateToolPanelForRun") {
+    generateToolPanelForRun("functional", currentEnrichmentTool, currentUniqueId)
+  } else {
+    generateToolPanelForLiteratureRun(currentEnrichmentTool, currentUniqueId)
+  }
 
-  # Create tab title with close button
+  # Create tab title with close button (using config for event name)
   tabTitleHtml <- tags$span(
     tabTitle,
     tags$button(
       class = "close-run-tab",
       type = "button",
-      onclick = paste0("event.stopPropagation(); Shiny.setInputValue('closeRunTab', '", runId, "', {priority: 'event'});"),
+      onclick = paste0("event.stopPropagation(); Shiny.setInputValue('",
+                       config$closeEvent, "', '", runId, "', {priority: 'event'});"),
       icon("times")
     )
   )
 
-  # Insert the tab at the end (Combination is hidden and will be shown only when 2+ runs exist)
+  # Insert the tab (using config for panel ID)
   insertTab(
-    inputId = "toolTabsPanel",
+    inputId = config$tabsetPanelId,
     tab = tabPanel(
       title = tabTitleHtml,
       value = runId,
@@ -291,46 +300,18 @@ insertResultTabForRun <- function() {
   )
 }
 
-# Literature enrichment handler (single-result mode, unchanged behavior)
-handleEnrichmentWithToolLiterature <- function() {
-  renderModal(
-    paste0(
-      "<h2>Please wait.</h2><br />
-      <p>Executing literature enrichment with STRING.</p>"
-    )
-  )
-  if (existDataSources()) {
-    hideAllSourceTabsForRun(currentType_Tool)
-    resetEnrichmentResults(currentEnrichmentType, currentEnrichmentTool)
+# Legacy alias for backward compatibility
+insertResultTabForRun <- function() {
+  insertEnrichmentTab(getEnrichmentConfig("functional"))
+}
 
-    inputGenesConversionTable <- geneConvert(currentUserList)
-    if (validInputGenesConversionTable(inputGenesConversionTable)) {
-      if(length(currentBackgroundList)==0)
-        backgroundGenesConversionTable <- NULL
-      else
-        backgroundGenesConversionTable <- geneConvert(currentBackgroundList)
-
-      runEnrichmentAnalysis(inputGenesConversionTable$target, backgroundGenesConversionTable$target)
-
-      if (validEnrichmentResult()) {
-        showTab(inputId = "toolTabsPanel", target = currentEnrichmentTool)
-        noHitGenesCheckList <- executeNamespaceRollback(inputGenesConversionTable)
-        printParameters()
-        if (input[[paste0(currentEnrichmentType, "_enrichment_namespace")]] != "USERINPUT") {
-          shinyjs::show(paste(currentType_Tool, "conversionBoxes", sep = "_"))
-          printUnconvertedGenes(inputGenesConversionTable, backgroundGenesConversionTable)
-          printConversionTable(inputGenesConversionTable, backgroundGenesConversionTable)
-        }
-        findAndPrintNoHitGenes(noHitGenesCheckList)
-        printResultTables()
-        # For literature enrichment, there's no toolTabsPanel (unlike functional enrichment)
-        # So we call updatePlotControlPanelsForTool() directly instead of deferring via observer
-        updatePlotControlPanelsForTool(currentEnrichmentType, currentEnrichmentTool)
-        # Set currentSelectedToolTab for plot click handlers (since there's no toolTabsPanel observer)
-        currentSelectedToolTab <<- currentEnrichmentTool
-      }
-    }
-  }
+# Legacy aliases for backward compatibility (use unified functions above)
+handleEnrichmentWithToolLiteratureMultiRun <- handleEnrichmentRun
+insertResultTabForLiteratureRun <- function() {
+  insertEnrichmentTab(getEnrichmentConfig("literature"))
+}
+getActiveLiteratureRunCount <- function() {
+  getActiveRunCount("literature")
 }
 
 existDataSources <- function() {
@@ -594,82 +575,97 @@ decideToolSelectedDatasources <- function() {
   return(inputSelectedDatasources)
 }
 
-printUnconvertedGenes <- function(convertedInputs, convertedOutputs = NULL) {
+# Helper function for rendering gene report text
+# Reduces duplication across gene reporting functions
+renderGeneReport <- function(outputId, genes, messageTemplate) {
+  count <- length(genes)
+  if (count > 0) {
+    geneList <- paste(genes, collapse = ", ")
+    message <- sprintf(messageTemplate, count, geneList)
+    renderShinyText(outputId, message)
+  } else {
+    renderShinyText(outputId, "-")
+  }
+}
+
+printUnconvertedGenes <- function(convertedInputs, convertedOutputs = NULL,
+                                   runKey = currentType_Tool) {
   # Display genes that failed conversion to target namespace
   # Note: This is different from "No-hit Inputs" which are genes that
   # successfully converted but don't appear in any enriched term
+  #
+  # @param runKey The run key for element IDs (defaults to currentType_Tool for
+  #               backwards compatibility, pass currentFullRunKey for multi-run)
 
-  shinyOutputId <- paste(currentType_Tool,
-                         "notConverted_input", sep = "_")
+  # Report unconverted input genes
+  inputOutputId <- paste(runKey, "notConverted_input", sep = "_")
   unconvertedInputs <- currentUserList[!currentUserList %in% convertedInputs$input]
-  unconvertedInputsCount <- length(unconvertedInputs)
-  if (unconvertedInputsCount > 0) {
-    unconvertedInputs <- paste(unconvertedInputs, collapse=", ")
-    prompt <- sprintf(
-      "%d input item(s) could not be converted to the target namespace:\n%s",
-      unconvertedInputsCount,
-      unconvertedInputs
+  renderGeneReport(
+    outputId = inputOutputId,
+    genes = unconvertedInputs,
+    messageTemplate = "%d input item(s) could not be converted to the target namespace:\n%s"
+  )
+
+  # Report unconverted background genes (if provided)
+  refOutputId <- paste(runKey, "notConverted_reference", sep = "_")
+  refDivId <- paste(runKey, "notConverted_reference_div", sep = "_")
+
+  if (!is.null(convertedOutputs)) {
+    unconvertedBackground <- currentBackgroundList[!currentBackgroundList %in% convertedOutputs$input]
+    renderGeneReport(
+      outputId = refOutputId,
+      genes = unconvertedBackground,
+      messageTemplate = "%d reference background item(s) could not be converted to the target namespace:\n%s"
     )
-    renderShinyText(shinyOutputId, prompt)
-  } else
-    renderShinyText(shinyOutputId, "-")
-  
-  if(!is.null(convertedOutputs)) {
-    shinyOutputId_ref <- paste(currentType_Tool,
-                           "notConverted_reference", sep = "_")
-    unconvertedOutputs <- currentBackgroundList[!currentBackgroundList %in% convertedOutputs$input]
-    unconvertedOutputsCount <- length(unconvertedOutputs)
-    if (unconvertedInputsCount > 0) {
-      unconvertedOutputs <- paste(unconvertedOutputs, collapse=", ")
-      prompt_ref <- sprintf(
-        "%d reference background item(s) could not be converted to the target namespace:\n%s",
-        unconvertedOutputsCount,
-        unconvertedOutputs
-      )
-      renderShinyText(shinyOutputId_ref, prompt_ref)
-    } else
-      renderShinyText(shinyOutputId_ref, "-")    
-    shinyjs::show(paste(currentType_Tool, "notConverted_reference_div", sep = "_"))
+    shinyjs::show(refDivId)
+  } else {
+    shinyjs::hide(refDivId)
   }
-  else {
-    shinyjs::hide(paste(currentType_Tool, "notConverted_reference_div", sep = "_"))
-  }
-  
 }
 
-printConversionTable <- function(inputConversionTable, backgroundConversionTable = NULL) {
-  #first, for the input list
-  shinyOutputId <- paste(currentType_Tool, "conversionTable_input", sep = "_")
-  fileName <- paste(currentType_Tool, "conversion_table", sep = "_")
+printConversionTable <- function(inputConversionTable, backgroundConversionTable = NULL,
+                                  runKey = currentType_Tool) {
+  # Display gene conversion table for input list and optional background list
+  # @param runKey The run key for element IDs (defaults to currentType_Tool for
+  #               backwards compatibility, pass currentFullRunKey for multi-run)
+
+  # Render input list conversion table
+  shinyOutputId <- paste(runKey, "conversionTable_input", sep = "_")
+  fileName <- paste(runKey, "conversion_table", sep = "_")
   colnames(inputConversionTable) <- c("Input", "Target", "Name")
-  renderShinyDataTable(shinyOutputId, inputConversionTable,
-                       fileName = fileName)
-  #then, check to see if a custom reference background exists and if so, do the same for the reference
-  if(is.null(backgroundConversionTable)) {
-    shinyjs::show(paste(currentType_Tool, "conversionTable_genome_div", sep = "_"))
-    shinyjs::hide(paste(currentType_Tool, "conversionTable_reference_div", sep = "_"))
-  }
-  else {
-    shinyjs::hide(paste(currentType_Tool, "conversionTable_genome_div", sep = "_"))
-    shinyOutputId <- paste(currentType_Tool, "conversionTable_reference", sep = "_")
-    fileName <- paste(currentType_Tool, "conversion_table_reference", sep = "_")
+  renderShinyDataTable(shinyOutputId, inputConversionTable, fileName = fileName)
+
+  # Handle reference background conversion table
+  genomeDivId <- paste(runKey, "conversionTable_genome_div", sep = "_")
+  refDivId <- paste(runKey, "conversionTable_reference_div", sep = "_")
+
+  if (is.null(backgroundConversionTable)) {
+    shinyjs::show(genomeDivId)
+    shinyjs::hide(refDivId)
+  } else {
+    shinyjs::hide(genomeDivId)
+    shinyOutputId <- paste(runKey, "conversionTable_reference", sep = "_")
+    fileName <- paste(runKey, "conversion_table_reference", sep = "_")
     colnames(backgroundConversionTable) <- c("Input", "Target", "Name")
-    renderShinyDataTable(shinyOutputId, backgroundConversionTable,
-                         fileName = fileName)
-    shinyjs::show(paste(currentType_Tool, "conversionTable_reference_div", sep = "_"))
+    renderShinyDataTable(shinyOutputId, backgroundConversionTable, fileName = fileName)
+    shinyjs::show(refDivId)
   }
 }
 
-findAndPrintNoHitGenes <- function(convertedInputs) {
-  noHitGenes <- findNoHitGenes(convertedInputs)
-  printNoHitGenes(noHitGenes)
+findAndPrintNoHitGenes <- function(convertedInputs, runKey = NULL) {
+  # Find and print genes not found in any enriched term
+  # @param runKey The run key for looking up results (NULL uses legacy lookup)
+  noHitGenes <- findNoHitGenes(convertedInputs, runKey)
+  printNoHitGenes(noHitGenes, runKey)
 }
 
-findNoHitGenes <- function(convertedInputs) {
+findNoHitGenes <- function(convertedInputs, runKey = NULL) {
   # Find genes that successfully converted but don't appear in any enriched term
   #
   # convertedInputs: List of genes that successfully converted (either original symbols
   #                  or tool-specific IDs, depending on rollback setting)
+  # runKey: The run key for looking up enrichment results. If NULL, uses legacy
+  #         lookup via getGlobalEnrichmentResult()
   #
   # Logic:
   # 1. Collect all genes appearing in Positive Hits across ALL enriched terms
@@ -679,7 +675,13 @@ findNoHitGenes <- function(convertedInputs) {
   # Note: This is different from "Unconverted Inputs" which are genes that
   # failed at the conversion step entirely
 
-  enrichmentResult <- getGlobalEnrichmentResult(currentEnrichmentType, currentEnrichmentTool)
+  if (is.null(runKey)) {
+    # Legacy mode: use type_tool lookup
+    enrichmentResult <- getGlobalEnrichmentResult(currentEnrichmentType, currentEnrichmentTool)
+  } else {
+    # Multi-run mode: use direct runKey lookup
+    enrichmentResult <- enrichmentResults[[runKey]]
+  }
 
   # Collect all genes from Positive Hits column across all enriched terms
   allHitGenes <- paste(enrichmentResult$`Positive Hits`, collapse = ",")
@@ -691,78 +693,83 @@ findNoHitGenes <- function(convertedInputs) {
   return(noHitGenes)
 }
 
-printNoHitGenes <- function(noHitGenes) {
-  shinyOutputId <- paste(currentType_Tool, "genesNotFound", sep = "_")
-  noHitGenesCount <- length(noHitGenes)
-  if (noHitGenesCount > 0) {
-    noHitGenes <- paste(noHitGenes, collapse=", ")
-    prompt <- sprintf(
-      "%d input item(s) not found in any result term:\n%s",
-      noHitGenesCount,
-      noHitGenes
-    )
-    renderShinyText(shinyOutputId, prompt)
-  } else
-    renderShinyText(shinyOutputId, "-")
-}
-
-printResultTables <- function() {
-  formatResultTable()
-  switch(
-    currentEnrichmentType,
-    "functional" = printFunctionalResultTable(),
-    "literature" = printLiteratureResultTable()
+printNoHitGenes <- function(noHitGenes, runKey = currentType_Tool) {
+  # Display genes not found in any enriched term
+  # @param runKey The run key for element IDs (defaults to currentType_Tool for
+  #               backwards compatibility, pass currentFullRunKey for multi-run)
+  shinyOutputId <- paste(runKey, "genesNotFound", sep = "_")
+  renderGeneReport(
+    outputId = shinyOutputId,
+    genes = noHitGenes,
+    messageTemplate = "%d input item(s) not found in any result term:\n%s"
   )
 }
 
-formatResultTable <- function() {
-  enrichmentResults[[currentType_Tool]] <<-
-    enrichmentResults[[currentType_Tool]][order(
-      -enrichmentResults[[currentType_Tool]]$`-log10Pvalue`), ]
-  
-  if (is.null(enrichmentResults[[currentType_Tool]]$Term_ID_noLinks)) { # if no links returned from tool
-    enrichmentResults[[currentType_Tool]]$Term_ID_noLinks <<-
-      enrichmentResults[[currentType_Tool]]$Term_ID
-    
+printResultTables <- function(runKey = currentType_Tool) {
+  # Print all result tables for an enrichment run
+  # @param runKey The run key for element IDs and result lookup
+  formatResultTable(runKey)
+  switch(
+    currentEnrichmentType,
+    "functional" = printFunctionalResultTable(runKey),
+    "literature" = printLiteratureResultTable(runKey)
+  )
+}
+
+formatResultTable <- function(runKey = currentType_Tool) {
+  # Format and sort enrichment results, add database links
+  # @param runKey The run key for result lookup
+  enrichmentResults[[runKey]] <<-
+    enrichmentResults[[runKey]][order(
+      -enrichmentResults[[runKey]]$`-log10Pvalue`), ]
+
+  if (is.null(enrichmentResults[[runKey]]$Term_ID_noLinks)) {
+    enrichmentResults[[runKey]]$Term_ID_noLinks <<-
+      enrichmentResults[[runKey]]$Term_ID
+
     switch(
       currentEnrichmentType,
-      "functional" = attachDBLinks(),
+      "functional" = attachDBLinks(runKey),
       "literature" = attachLinks("PUBMED", "https://pubmed.ncbi.nlm.nih.gov/", gSub = "PMID:")
     )
   }
 }
 
-printFunctionalResultTable <- function() {
-  shinyOutputId <- paste(currentType_Tool, "table_all", sep = "_")
+printFunctionalResultTable <- function(runKey = currentType_Tool) {
+  # Print functional enrichment result tables for all datasources
+  # @param runKey The run key for element IDs and result lookup
+  shinyOutputId <- paste(runKey, "table_all", sep = "_")
   tabPosition <- 0
-  printResultTable(shinyOutputId, tabPosition, "all")
+  printResultTable(shinyOutputId, tabPosition, "all", runKey)
   datasources <- input$functional_enrichment_datasources
   lapply(datasources, function(datasource) {
     partialId <- as.character(TAB_NAMES[datasource])
-    shinyOutputId <- paste(currentType_Tool, "table", partialId, sep = "_")
+    shinyOutputId <- paste(runKey, "table", partialId, sep = "_")
     tabPosition <- match(datasource, ENRICHMENT_DATASOURCES)
-    printResultTable(shinyOutputId, tabPosition, datasource)
+    printResultTable(shinyOutputId, tabPosition, datasource, runKey)
   })
 }
 
-printResultTable <- function(shinyOutputId, tabPosition, datasource) {
+printResultTable <- function(shinyOutputId, tabPosition, datasource,
+                              runKey = currentType_Tool) {
+  # Print a single result table for a datasource
+  # @param runKey The run key for result lookup
   if (datasource == "all" || datasource == "pubmed") {
-    transformedResultPartial <- enrichmentResults[[currentType_Tool]]
+    transformedResultPartial <- enrichmentResults[[runKey]]
   } else {
     pattern <- paste0("^", datasource, "$")
-    matches <- grepl(pattern, enrichmentResults[[currentType_Tool]]$Source)
-    transformedResultPartial <-
-      enrichmentResults[[currentType_Tool]][matches, ]
+    matches <- grepl(pattern, enrichmentResults[[runKey]]$Source)
+    transformedResultPartial <- enrichmentResults[[runKey]][matches, ]
   }
 
   if (nrow(transformedResultPartial) > 0) {
     transformedResultPartial$`Positive Hits` <-
       gsub(",", ", ", transformedResultPartial$`Positive Hits`)
 
-    showSourceTabForRun(currentType_Tool, datasource)
+    showSourceTabForRun(runKey, datasource)
 
     caption = "Enrichment Results"
-    fileName <- paste(currentType_Tool, datasource, sep = "_")
+    fileName <- paste(runKey, datasource, sep = "_")
     mode <- "Positive Hits"
     # With rownames=FALSE: 0=⊕, ..., 10=Positive Hits, 11=Term_ID_noLinks
     hiddenColumns <- c(10, 11)
@@ -779,10 +786,12 @@ printResultTable <- function(shinyOutputId, tabPosition, datasource) {
   }
 }
 
-printLiteratureResultTable <- function() {
-  shinyOutputId <- paste(currentType_Tool, "table_pubmed", sep = "_")
+printLiteratureResultTable <- function(runKey = currentType_Tool) {
+  # Print literature enrichment result table
+  # @param runKey The run key for element IDs
+  shinyOutputId <- paste(runKey, "table_pubmed", sep = "_")
   tabPosition <- 0
-  printResultTable(shinyOutputId, tabPosition, "pubmed")
+  printResultTable(shinyOutputId, tabPosition, "pubmed", runKey)
 }
 
 handleEnrichmentResultClear <- function(enrichmentType, toolName) {
@@ -808,9 +817,26 @@ handleMultiClear <- function() {
   prepareCombinationTab()
 }
 
-# Clear a single run completely (data, state, tab)
-clearRunCompletely <- function(fullRunKey) {
+# Clear all literature enrichment runs
+handleLiteratureMultiClear <- function() {
+  # Clear ALL active literature runs
+  for (fullRunKey in names(activeRuns)) {
+    if (startsWith(fullRunKey, "literature_")) {
+      clearLiteratureRunCompletely(fullRunKey)
+    }
+  }
+  # Reset STRING run counter so numbering starts fresh
+  resetRunCounterForTool("STRING")
+  # Hide the results panel
+  shinyjs::hide("literatureEnrichmentResultsPanel")
+  shinyjs::hide("literature_enrichment_all_clear")
+}
+
+# Unified function to clear a single run completely (data, state, tab)
+# Uses config to determine correct panel IDs
+clearEnrichmentRun <- function(fullRunKey) {
   runInfo <- parseFullRunKey(fullRunKey)
+  config <- getEnrichmentConfig(runInfo$enrichmentType)
 
   # Clear enrichment results
   enrichmentResults[[fullRunKey]] <<- NULL
@@ -823,7 +849,7 @@ clearRunCompletely <- function(fullRunKey) {
   # Clear background sizes
   enrichmentBackgroundSizes[[toupper(fullRunKey)]] <<- NULL
 
-  # Clear gProfiler results cache if applicable
+  # Clear gProfiler results cache if applicable (only for functional)
   if (runInfo$toolName == "gProfiler") {
     gprofilerResults[[fullRunKey]] <<- NULL
   }
@@ -831,12 +857,16 @@ clearRunCompletely <- function(fullRunKey) {
   # Clear plot state for this run
   clearPlotStateForRun(fullRunKey)
 
-  # Remove the tab
-  removeTab(inputId = "toolTabsPanel", target = runInfo$runId)
+  # Remove the tab (using config for panel ID)
+  removeTab(inputId = config$tabsetPanelId, target = runInfo$runId)
 
   # Unregister the run
   unregisterRun(fullRunKey)
 }
+
+# Legacy aliases for backward compatibility
+clearRunCompletely <- clearEnrichmentRun
+clearLiteratureRunCompletely <- clearEnrichmentRun
 
 # Multi-Run Helper Functions
 
@@ -870,171 +900,27 @@ printParametersMultiRun <- function() {
   renderShinyText(paste(currentFullRunKey, "enrichment_parameters", sep = "_"), parametersOutput)
 }
 
-printUnconvertedGenesMultiRun <- function(convertedInputs, convertedOutputs = NULL) {
-  shinyOutputId <- paste(currentFullRunKey, "notConverted_input", sep = "_")
-  unconvertedInputs <- currentUserList[!currentUserList %in% convertedInputs$input]
-  unconvertedInputsCount <- length(unconvertedInputs)
-  if (unconvertedInputsCount > 0) {
-    unconvertedInputs <- paste(unconvertedInputs, collapse=", ")
-    prompt <- sprintf(
-      "%d input item(s) could not be converted to the target namespace:\n%s",
-      unconvertedInputsCount,
-      unconvertedInputs
-    )
-    renderShinyText(shinyOutputId, prompt)
-  } else {
-    renderShinyText(shinyOutputId, "-")
-  }
-
-  if(!is.null(convertedOutputs)) {
-    shinyOutputId_ref <- paste(currentFullRunKey, "notConverted_reference", sep = "_")
-    unconvertedOutputs <- currentBackgroundList[!currentBackgroundList %in% convertedOutputs$input]
-    unconvertedOutputsCount <- length(unconvertedOutputs)
-    if (unconvertedOutputsCount > 0) {
-      unconvertedOutputs <- paste(unconvertedOutputs, collapse=", ")
-      prompt_ref <- sprintf(
-        "%d reference background item(s) could not be converted to the target namespace:\n%s",
-        unconvertedOutputsCount,
-        unconvertedOutputs
-      )
-      renderShinyText(shinyOutputId_ref, prompt_ref)
-    } else {
-      renderShinyText(shinyOutputId_ref, "-")
-    }
-    shinyjs::show(paste(currentFullRunKey, "notConverted_reference_div", sep = "_"))
-  } else {
-    shinyjs::hide(paste(currentFullRunKey, "notConverted_reference_div", sep = "_"))
-  }
-}
-
-printConversionTableMultiRun <- function(inputConversionTable, backgroundConversionTable = NULL) {
-  shinyOutputId <- paste(currentFullRunKey, "conversionTable_input", sep = "_")
-  fileName <- paste(currentFullRunKey, "conversion_table", sep = "_")
-  colnames(inputConversionTable) <- c("Input", "Target", "Name")
-  renderShinyDataTable(shinyOutputId, inputConversionTable, fileName = fileName)
-
-  if(is.null(backgroundConversionTable)) {
-    shinyjs::show(paste(currentFullRunKey, "conversionTable_genome_div", sep = "_"))
-    shinyjs::hide(paste(currentFullRunKey, "conversionTable_reference_div", sep = "_"))
-  } else {
-    shinyjs::hide(paste(currentFullRunKey, "conversionTable_genome_div", sep = "_"))
-    shinyOutputId <- paste(currentFullRunKey, "conversionTable_reference", sep = "_")
-    fileName <- paste(currentFullRunKey, "conversion_table_reference", sep = "_")
-    colnames(backgroundConversionTable) <- c("Input", "Target", "Name")
-    renderShinyDataTable(shinyOutputId, backgroundConversionTable, fileName = fileName)
-    shinyjs::show(paste(currentFullRunKey, "conversionTable_reference_div", sep = "_"))
-  }
-}
-
-findAndPrintNoHitGenesMultiRun <- function(convertedInputs) {
-  noHitGenes <- findNoHitGenesMultiRun(convertedInputs)
-  printNoHitGenesMultiRun(noHitGenes)
-}
-
-findNoHitGenesMultiRun <- function(convertedInputs) {
-  enrichmentResult <- enrichmentResults[[currentFullRunKey]]
-  allHitGenes <- paste(enrichmentResult$`Positive Hits`, collapse = ",")
-  allHitGenes <- strsplit(allHitGenes, ",")[[1]]
-  allHitGenes <- unique(allHitGenes)
-  noHitGenes <- convertedInputs[!convertedInputs %in% allHitGenes]
-  return(noHitGenes)
-}
-
-printNoHitGenesMultiRun <- function(noHitGenes) {
-  shinyOutputId <- paste(currentFullRunKey, "genesNotFound", sep = "_")
-  noHitGenesCount <- length(noHitGenes)
-  if (noHitGenesCount > 0) {
-    noHitGenes <- paste(noHitGenes, collapse=", ")
-    prompt <- sprintf(
-      "%d input item(s) not found in any result term:\n%s",
-      noHitGenesCount,
-      noHitGenes
-    )
-    renderShinyText(shinyOutputId, prompt)
-  } else {
-    renderShinyText(shinyOutputId, "-")
-  }
-}
-
-printResultTablesMultiRun <- function() {
-  formatResultTableMultiRun()
-  printFunctionalResultTableMultiRun()
-}
-
-formatResultTableMultiRun <- function() {
-  enrichmentResults[[currentFullRunKey]] <<-
-    enrichmentResults[[currentFullRunKey]][order(
-      -enrichmentResults[[currentFullRunKey]]$`-log10Pvalue`), ]
-
-  if (is.null(enrichmentResults[[currentFullRunKey]]$Term_ID_noLinks)) {
-    enrichmentResults[[currentFullRunKey]]$Term_ID_noLinks <<-
-      enrichmentResults[[currentFullRunKey]]$Term_ID
-    attachDBLinksMultiRun()
-  }
-}
-
-attachDBLinksMultiRun <- function() {
-  # Reuse the standard link attachment logic with the multi-run result key
-  attachDBLinks(currentFullRunKey)
-}
-
-printFunctionalResultTableMultiRun <- function() {
-  shinyOutputId <- paste(currentFullRunKey, "table_all", sep = "_")
-  tabPosition <- 0
-  printResultTableMultiRun(shinyOutputId, tabPosition, "all")
-
-  datasources <- input$functional_enrichment_datasources
-  lapply(datasources, function(datasource) {
-    partialId <- as.character(TAB_NAMES[datasource])
-    shinyOutputId <- paste(currentFullRunKey, "table", partialId, sep = "_")
-    tabPosition <- match(datasource, ENRICHMENT_DATASOURCES)
-    printResultTableMultiRun(shinyOutputId, tabPosition, datasource)
-  })
-}
-
-printResultTableMultiRun <- function(shinyOutputId, tabPosition, datasource) {
-  if (datasource == "all") {
-    transformedResultPartial <- enrichmentResults[[currentFullRunKey]]
-  } else {
-    pattern <- paste0("^", datasource, "$")
-    matches <- grepl(pattern, enrichmentResults[[currentFullRunKey]]$Source)
-    transformedResultPartial <- enrichmentResults[[currentFullRunKey]][matches, ]
-  }
-
-  if (nrow(transformedResultPartial) > 0) {
-    transformedResultPartial$`Positive Hits` <-
-      gsub(",", ", ", transformedResultPartial$`Positive Hits`)
-
-    showSourceTabForRun(currentFullRunKey, datasource)
-
-    caption = "Enrichment Results"
-    fileName <- paste(currentFullRunKey, datasource, sep = "_")
-    mode <- "Positive Hits"
-    # With rownames=FALSE: 0=⊕, ..., 10=Positive Hits, 11=Term_ID_noLinks
-    hiddenColumns <- c(10, 11)
-    expandableColumn <- 10
-
-    transformedResultPartial$Source <- as.factor(transformedResultPartial$Source)
-
-    renderEnrichmentTable(shinyOutputId, transformedResultPartial,
-                          caption, fileName, mode,
-                          hiddenColumns, expandableColumn, filter = 'top')
-  }
-}
-
 # Helper functions for hiding/showing source tabs using Shiny's built-in functions
 hideAllSourceTabsForRun <- function(fullRunKey) {
   sourcePanelId <- paste(fullRunKey, "sources_panel", sep = "_")
-  # Hide all datasource tabs (all tab names from TAB_NAMES)
-  lapply(names(TAB_NAMES), function(tabTitle) {
-    hideTab(inputId = sourcePanelId, target = tabTitle)
-  })
+
+  # Determine which tabs to hide based on enrichment type
+  runInfo <- parseFullRunKey(fullRunKey)
+  if (runInfo$enrichmentType == "literature") {
+    # Literature enrichment only has PUBMED tab
+    hideTab(inputId = sourcePanelId, target = "PUBMED")
+  } else {
+    # Functional enrichment has multiple datasource tabs
+    lapply(names(TAB_NAMES), function(tabTitle) {
+      hideTab(inputId = sourcePanelId, target = tabTitle)
+    })
+  }
 }
 
 showSourceTabForRun <- function(fullRunKey, datasource) {
   sourcePanelId <- paste(fullRunKey, "sources_panel", sep = "_")
-  # Map datasource to tab title (for "all" -> "ALL", others are the same)
-  tabTitle <- if (datasource == "all") "ALL" else datasource
+  # Map datasource to tab title
+  tabTitle <- if (datasource == "all") "ALL" else if (datasource == "pubmed") "PUBMED" else datasource
   showTab(inputId = sourcePanelId, target = tabTitle)
 }
 

@@ -189,6 +189,17 @@ registerTableObservers <- function(fullRunKey) {
 # Handler wrappers for run-based operations
 # These delegate to the existing handlers with the fullRunKey
 
+# Higher-order function to set global context and call a handler
+# This eliminates duplication across all the ForRun wrapper functions
+withRunContext <- function(fullRunKey, handler, ...) {
+  runInfo <- parseFullRunKey(fullRunKey)
+  currentEnrichmentType <<- runInfo$enrichmentType
+  currentEnrichmentTool <<- runInfo$toolName
+  currentFullRunKey <<- fullRunKey
+  currentType_Tool <<- fullRunKey
+  handler(runInfo$enrichmentType, runInfo$runId, ...)
+}
+
 handleDatasourcePickerForRun <- function(fullRunKey, componentId) {
   tryCatch({
     datasources <- input[[paste(fullRunKey, componentId, "sourceSelect", sep = "_")]]
@@ -222,72 +233,41 @@ calculateMaxSliderValueForRun <- function(fullRunKey, datasources) {
 }
 
 # Wrapper handlers for plot generation
-# These set the global context and delegate to existing handlers
+# These use withRunContext() to set global context and delegate to existing handlers
 # NOTE: We pass runInfo$runId (e.g., "gProfiler_1") as toolName parameter
 # so handlers construct the correct key (e.g., "functional_gProfiler_1")
 
 handleEnrichmentNetworkForRun <- function(fullRunKey, networkId) {
-  runInfo <- parseFullRunKey(fullRunKey)
-  currentEnrichmentType <<- runInfo$enrichmentType
-  currentEnrichmentTool <<- runInfo$toolName
-  currentFullRunKey <<- fullRunKey
-  currentType_Tool <<- fullRunKey
-  # Pass runId (includes run number) so handler constructs correct type_Tool
-  handleEnrichmentNetwork(runInfo$enrichmentType, runInfo$runId, networkId)
+  withRunContext(fullRunKey, handleEnrichmentNetwork, networkId)
 }
 
 arenaHandlerForRun <- function(fullRunKey, networkId) {
-  runInfo <- parseFullRunKey(fullRunKey)
-  currentEnrichmentType <<- runInfo$enrichmentType
-  currentEnrichmentTool <<- runInfo$toolName
-  currentFullRunKey <<- fullRunKey
-  currentType_Tool <<- fullRunKey
-  arenaHandler(runInfo$enrichmentType, runInfo$runId, networkId)
+  withRunContext(fullRunKey, arenaHandler, networkId)
 }
 
 handleHeatmapForRun <- function(fullRunKey, heatmapId) {
-  runInfo <- parseFullRunKey(fullRunKey)
-  currentEnrichmentType <<- runInfo$enrichmentType
-  currentEnrichmentTool <<- runInfo$toolName
-  currentFullRunKey <<- fullRunKey
-  currentType_Tool <<- fullRunKey
-  handleHeatmap(runInfo$enrichmentType, runInfo$runId, heatmapId)
+  withRunContext(fullRunKey, handleHeatmap, heatmapId)
 }
 
 handleBarchartForRun <- function(fullRunKey) {
-  runInfo <- parseFullRunKey(fullRunKey)
-  currentEnrichmentType <<- runInfo$enrichmentType
-  currentEnrichmentTool <<- runInfo$toolName
-  currentFullRunKey <<- fullRunKey
-  currentType_Tool <<- fullRunKey
-  handleBarchart(runInfo$enrichmentType, runInfo$runId)
+  withRunContext(fullRunKey, handleBarchart)
 }
 
 handleScatterPlotForRun <- function(fullRunKey) {
-  runInfo <- parseFullRunKey(fullRunKey)
-  currentEnrichmentType <<- runInfo$enrichmentType
-  currentEnrichmentTool <<- runInfo$toolName
-  currentFullRunKey <<- fullRunKey
-  currentType_Tool <<- fullRunKey
-  handleScatterPlot(runInfo$enrichmentType, runInfo$runId)
+  withRunContext(fullRunKey, handleScatterPlot)
 }
 
 handleDotPlotForRun <- function(fullRunKey) {
-  runInfo <- parseFullRunKey(fullRunKey)
-  currentEnrichmentType <<- runInfo$enrichmentType
-  currentEnrichmentTool <<- runInfo$toolName
-  currentFullRunKey <<- fullRunKey
-  currentType_Tool <<- fullRunKey
-  handleDotPlot(runInfo$enrichmentType, runInfo$runId)
+  withRunContext(fullRunKey, handleDotPlot)
 }
 
 handleManhattanPlotForRun <- function(fullRunKey) {
+  # Manhattan is special - it takes fullRunKey directly, not (type, runId)
   runInfo <- parseFullRunKey(fullRunKey)
   currentEnrichmentType <<- runInfo$enrichmentType
   currentEnrichmentTool <<- runInfo$toolName
   currentFullRunKey <<- fullRunKey
   currentType_Tool <<- fullRunKey
-  # Manhattan uses gprofilerResults[[fullRunKey]] for per-run data
   handleManhattanPlot(fullRunKey)
 }
 
@@ -349,9 +329,20 @@ updatePlotDataSourcesForRun <- function(fullRunKey) {
   result <- enrichmentResults[[fullRunKey]]
   if (is.null(result) || nrow(result) == 0) return(NULL)
 
-  sources <- ENRICHMENT_DATASOURCES[
-    which(ENRICHMENT_DATASOURCES %in% unique(result$Source))
-  ]
+  # Extract enrichment type from run key to get valid datasources
+  runInfo <- parseFullRunKey(fullRunKey)
+  enrichmentType <- runInfo$enrichmentType
+
+  # Use config to get valid datasources for this type
+  # This fixes the bug where PUBMED wasn't found for literature enrichment
+  validDatasources <- getValidDatasources(enrichmentType)
+
+  # Filter against what's actually in results
+  availableSources <- unique(result$Source)
+  sources <- validDatasources[which(validDatasources %in% availableSources)]
+
+  if (length(sources) == 0) return(NULL)
+
   selected <- sources[1]
 
   lapply(ALL_PLOT_IDS, function(plotId) {

@@ -193,6 +193,11 @@ getActiveFunctionalRunCount <- function() {
   length(getActiveFunctionalRuns())
 }
 
+# Get count of active runs for any enrichment type (config-driven)
+getActiveRunCount <- function(enrichmentType) {
+  length(getActiveRunsByType(enrichmentType))
+}
+
 # Initialize run counters for all tools
 initializeRunCounters <- function() {
   lapply(ENRICHMENT_TOOLS, function(tool) {
