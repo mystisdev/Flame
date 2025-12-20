@@ -173,6 +173,9 @@ handleEnrichmentRun <- function(isUpdate = FALSE) {
         if (!isUpdate) {
           # Create dynamic tab for this run (only for new runs)
           insertEnrichmentTab(config)
+
+          # Register outputs for cleanup
+          registerOutputsForRun(currentFullRunKey)
         }
 
         # Hide all source tabs initially (they'll be shown as results populate)
@@ -800,13 +803,6 @@ printLiteratureResultTable <- function(runKey = currentType_Tool) {
   printResultTable(shinyOutputId, tabPosition, "pubmed", runKey)
 }
 
-handleEnrichmentResultClear <- function(enrichmentType, toolName) {
-  resetCombination()
-  resetEnrichmentResults(enrichmentType, toolName)
-  hideTab(inputId = "toolTabsPanel", target = toolName)
-  prepareCombinationTab()
-}
-
 handleMultiClear <- function() {
   resetCombination()
   # Clear ALL active runs
@@ -862,6 +858,13 @@ clearEnrichmentRun <- function(fullRunKey) {
 
   # Clear plot state for this run
   clearPlotStateForRun(fullRunKey)
+
+  # Destroy dynamic observers via registry. Observers FIRST, then Outputs
+  # (Observers may reference outputs; destroy watchers before data)
+  observerRegistry$clearRun(fullRunKey)
+
+  # Clear Shiny outputs via registry
+  outputRegistry$clearRun(fullRunKey, output)
 
   # Remove the tab (using config for panel ID)
   removeTab(inputId = config$tabsetPanelId, target = runInfo$runId)
@@ -945,8 +948,8 @@ clearRunResults <- function(fullRunKey) {
   # Clear plot state (internal tracking variables)
   clearPlotStateForRun(fullRunKey)
 
-  # Clear rendered plot outputs (so users don't see stale data)
-  resetPlots(fullRunKey)
+  # Clear rendered outputs via registry (keeps outputs registered for re-use)
+  outputRegistry$clearOutputs(fullRunKey, output)
 
   # Hide all source tabs (will be shown again as results populate)
   hideAllSourceTabsForRun(fullRunKey)

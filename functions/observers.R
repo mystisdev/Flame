@@ -1,9 +1,15 @@
-# Dynamic Observer Registration for Multi-Run Architecture
+# ============================================================================
+# Dynamic Observer Registration
+# ============================================================================
 #
 # This file contains functions to dynamically register Shiny observers
 # when a new enrichment run tab is created. This is necessary because
 # functional enrichment now supports multiple runs per tool, each with
 # unique input IDs (e.g., functional_gProfiler_1_barchart_button).
+#
+# All observers are registered with observerRegistry for cleanup
+# when tabs are closed. All observers per run MUST be destroyed to prevent
+# memory leaks and race conditions from orphaned observers.
 
 # Register all observers for a new functional enrichment run
 registerObserversForRun <- function(fullRunKey) {
@@ -12,126 +18,154 @@ registerObserversForRun <- function(fullRunKey) {
   toolName <- runInfo$toolName
   runNumber <- runInfo$runNumber
 
-  # Register datasource picker observers
-  registerDatasourcePickerObservers(fullRunKey)
+  # Register datasource picker observers and track for cleanup
+  datasourceObservers <- registerDatasourcePickerObservers(fullRunKey)
+  observerRegistry$registerObservers(fullRunKey, datasourceObservers)
 
-  # Register plot button observers
-  registerPlotButtonObservers(fullRunKey, enrichmentType, toolName)
+  # Register plot button observers and track for cleanup
+  plotButtonObservers <- registerPlotButtonObservers(fullRunKey, enrichmentType, toolName)
+  observerRegistry$registerObservers(fullRunKey, plotButtonObservers)
 
-  # Register table filter and reset view observers
-  registerTableObservers(fullRunKey)
+  # Register table filter and reset view observers and track for cleanup
+  tableObservers <- registerTableObservers(fullRunKey)
+  observerRegistry$registerObservers(fullRunKey, tableObservers)
 }
 
 # Register observers for datasource pickers (ALL_PLOT_IDS)
+# Returns: list of 9 observer handles (one per plot component)
 registerDatasourcePickerObservers <- function(fullRunKey) {
-  lapply(ALL_PLOT_IDS, function(plotId) {
+  observers <- lapply(ALL_PLOT_IDS, function(plotId) {
     inputId <- paste(fullRunKey, plotId, "sourceSelect", sep = "_")
     observeEvent(input[[inputId]], {
       handleDatasourcePickerForRun(fullRunKey, plotId)
     }, ignoreInit = TRUE, ignoreNULL = FALSE)
   })
+  return(observers)
 }
 
 # Register observers for plot Generate buttons
+# Returns: list of 12-13 observer handles (13 if gProfiler for Manhattan)
 registerPlotButtonObservers <- function(fullRunKey, enrichmentType, toolName) {
-  # Network buttons
-  lapply(NETWORK_IDS, function(networkId) {
+  observers <- list()
+
+  # Network buttons (3 observers)
+  networkButtonObservers <- lapply(NETWORK_IDS, function(networkId) {
     buttonId <- paste(fullRunKey, networkId, "button", sep = "_")
     observeEvent(input[[buttonId]], {
       handleEnrichmentNetworkForRun(fullRunKey, networkId)
     }, ignoreInit = TRUE)
   })
+  observers <- append(observers, networkButtonObservers)
 
-  # Network Arena buttons
-  lapply(NETWORK_IDS, function(networkId) {
+  # Network Arena buttons (3 observers)
+  arenaButtonObservers <- lapply(NETWORK_IDS, function(networkId) {
     arenaId <- paste(fullRunKey, networkId, "arena", sep = "_")
     observeEvent(input[[arenaId]], {
       arenaHandlerForRun(fullRunKey, networkId)
     }, ignoreInit = TRUE)
   })
+  observers <- append(observers, arenaButtonObservers)
 
-  # Heatmap buttons
-  lapply(HEATMAP_IDS, function(heatmapId) {
+  # Heatmap buttons (3 observers)
+  heatmapButtonObservers <- lapply(HEATMAP_IDS, function(heatmapId) {
     buttonId <- paste(fullRunKey, heatmapId, "button", sep = "_")
     observeEvent(input[[buttonId]], {
       handleHeatmapForRun(fullRunKey, heatmapId)
     }, ignoreInit = TRUE)
   })
+  observers <- append(observers, heatmapButtonObservers)
 
-  # Barchart button
+  # Barchart button (1 observer)
   barchartButtonId <- paste(fullRunKey, "barchart_button", sep = "_")
-  observeEvent(input[[barchartButtonId]], {
+  barchartObserver <- observeEvent(input[[barchartButtonId]], {
     handleBarchartForRun(fullRunKey)
   }, ignoreInit = TRUE)
+  observers <- append(observers, list(barchartObserver))
 
-  # Scatter plot button
+  # Scatter plot button (1 observer)
   scatterButtonId <- paste(fullRunKey, "scatterPlot_button", sep = "_")
-  observeEvent(input[[scatterButtonId]], {
+  scatterObserver <- observeEvent(input[[scatterButtonId]], {
     handleScatterPlotForRun(fullRunKey)
   }, ignoreInit = TRUE)
+  observers <- append(observers, list(scatterObserver))
 
-  # Dot plot button
+  # Dot plot button (1 observer)
   dotPlotButtonId <- paste(fullRunKey, "dotPlot_button", sep = "_")
-  observeEvent(input[[dotPlotButtonId]], {
+  dotPlotObserver <- observeEvent(input[[dotPlotButtonId]], {
     handleDotPlotForRun(fullRunKey)
   }, ignoreInit = TRUE)
+  observers <- append(observers, list(dotPlotObserver))
 
-  # Manhattan button (only for gProfiler)
+  # Manhattan button (only for gProfiler - 1 observer)
   if (toolName == "gProfiler") {
     manhattanButtonId <- paste(fullRunKey, "manhattan_button", sep = "_")
-    observeEvent(input[[manhattanButtonId]], {
+    manhattanObserver <- observeEvent(input[[manhattanButtonId]], {
       handleManhattanPlotForRun(fullRunKey)
     }, ignoreInit = TRUE)
+    observers <- append(observers, list(manhattanObserver))
   }
+
+  return(observers)
 }
 
 # Register observers for table filters and Reset View buttons
+# Returns: list of ~30 observer handles (6 simple + 6 heatmap + 18 network)
 registerTableObservers <- function(fullRunKey) {
-  # Simple plot table filters (barchart, scatter, dot)
+  observers <- list()
+
+  # Simple plot table filters (barchart, scatter, dot) - 6 observers (2 per plot)
   for (plotId in c("barchart", "scatterPlot", "dotPlot")) {
     tableId <- paste(fullRunKey, plotId, "table_rows_all", sep = "_")
     resetId <- paste(fullRunKey, plotId, "resetView", sep = "_")
 
-    local({
+    localObservers <- local({
       # Capture ALL variables used in observeEvent expressions
       localTableId <- tableId
       localResetId <- resetId
       localFullRunKey <- fullRunKey
       localPlotId <- plotId
 
-      observeEvent(input[[localTableId]], {
+      tableObs <- observeEvent(input[[localTableId]], {
         handleTableFilterChangeForRun(localFullRunKey, localPlotId)
       }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
-      observeEvent(input[[localResetId]], {
+      resetObs <- observeEvent(input[[localResetId]], {
         handleResetViewForRun(localFullRunKey, localPlotId)
       }, ignoreInit = TRUE)
+
+      # Return observers from local() scope
+      list(tableObs, resetObs)
     })
+    observers <- append(observers, localObservers)
   }
 
-  # Heatmap table filters
+  # Heatmap table filters - 6 observers (2 per heatmap)
   for (heatmapId in c("heatmap1", "heatmap2", "heatmap3")) {
     tableId <- paste(fullRunKey, heatmapId, "table_rows_all", sep = "_")
     resetId <- paste(fullRunKey, heatmapId, "resetView", sep = "_")
 
-    local({
+    localObservers <- local({
       # Capture ALL variables used in observeEvent expressions
       localTableId <- tableId
       localResetId <- resetId
       localFullRunKey <- fullRunKey
       localHeatmapId <- heatmapId
 
-      observeEvent(input[[localTableId]], {
+      tableObs <- observeEvent(input[[localTableId]], {
         handleTableFilterChangeForRun(localFullRunKey, localHeatmapId)
       }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
-      observeEvent(input[[localResetId]], {
+      resetObs <- observeEvent(input[[localResetId]], {
         handleResetViewForRun(localFullRunKey, localHeatmapId)
       }, ignoreInit = TRUE)
+
+      # Return observers from local() scope
+      list(tableObs, resetObs)
     })
+    observers <- append(observers, localObservers)
   }
 
-  # Network table observers (enrichment table, edgelist table, reset view)
+  # Network table observers - 18 observers (6 per network)
   for (networkId in NETWORK_IDS) {
     networkInputId <- paste(fullRunKey, networkId, sep = "_")
     tableId <- paste(fullRunKey, networkId, "table_rows_all", sep = "_")
@@ -141,7 +175,7 @@ registerTableObservers <- function(fullRunKey) {
     selectedId <- paste(networkInputId, "selected", sep = "_")
     deselectId <- paste(networkInputId, "deselect", sep = "_")
 
-    local({
+    localObservers <- local({
       # Capture ALL variables used in observeEvent expressions
       localFullRunKey <- fullRunKey
       localNetworkId <- networkId
@@ -153,37 +187,43 @@ registerTableObservers <- function(fullRunKey) {
       localDeselectId <- deselectId
 
       # Network click event (handles both node and edge clicks)
-      observeEvent(input[[localClickId]], {
+      clickObs <- observeEvent(input[[localClickId]], {
         handleNetworkNodeClickForRun(localFullRunKey, localNetworkId)
         handleNetworkEdgeClickForRun(localFullRunKey, localNetworkId)
       }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
       # Multi-node selection
-      observeEvent(input[[localSelectedId]], {
+      selectedObs <- observeEvent(input[[localSelectedId]], {
         handleNetworkSelectionForRun(localFullRunKey, localNetworkId)
       }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
       # Deselection - restore view when nodes are deselected
-      observeEvent(input[[localDeselectId]], {
+      deselectObs <- observeEvent(input[[localDeselectId]], {
         handleNetworkDeselectionForRun(localFullRunKey, localNetworkId)
       }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
       # Enrichment table filter -> network update
-      observeEvent(input[[localTableId]], {
+      tableObs <- observeEvent(input[[localTableId]], {
         handleNetworkEnrichmentTableFilterForRun(localFullRunKey, localNetworkId)
       }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
       # Edgelist table filter -> network update
-      observeEvent(input[[localEdgelistId]], {
+      edgelistObs <- observeEvent(input[[localEdgelistId]], {
         handleNetworkEdgelistTableFilterForRun(localFullRunKey, localNetworkId)
       }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
       # Reset View button
-      observeEvent(input[[localResetId]], {
+      resetObs <- observeEvent(input[[localResetId]], {
         handleNetworkResetViewForRun(localFullRunKey, localNetworkId)
       }, ignoreInit = TRUE)
+
+      # Return observers from local() scope
+      list(clickObs, selectedObs, deselectObs, tableObs, edgelistObs, resetObs)
     })
+    observers <- append(observers, localObservers)
   }
+
+  return(observers)
 }
 
 # Handler wrappers for run-based operations

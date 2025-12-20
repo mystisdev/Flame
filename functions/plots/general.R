@@ -940,6 +940,23 @@ getHeatmapCategoryArrays <- function(type_Tool, plotId, enrichmentData) {
 
 # Plot Click and Selection Handlers
 
+# Derives enrichment type from current sidebar selection
+# Using input$sideBarId instead of currentEnrichmentType global
+# because the global can become stale (only updated by withRunContext),
+# while sidebar accurately reflects what the user is currently viewing.
+deriveEnrichmentTypeFromSidebar <- function() {
+  sidebarTab <- input$sideBarId
+  if (is.null(sidebarTab)) return(NULL)
+
+  if (sidebarTab == "functional_enrichment") {
+    return("functional")
+  } else if (sidebarTab == "literature_enrichment") {
+    return("literature")
+  }
+
+  return(NULL)
+}
+
 # Handles plot click events: toggles term selection and updates table
 # Plot is NOT re-rendered to preserve zoom state
 handlePlotClick <- function(plotId, plotSource, session = NULL) {
@@ -947,7 +964,11 @@ handlePlotClick <- function(plotId, plotSource, session = NULL) {
     selectedTool <- currentSelectedToolTab
     if (is.null(selectedTool) || selectedTool == "" || selectedTool == "Combination") return()
 
-    type_Tool <- paste(currentEnrichmentType, selectedTool, sep = "_")
+    # Use sidebar to determine enrichment type (fixes stale global bug)
+    enrichmentType <- deriveEnrichmentTypeFromSidebar()
+    if (is.null(enrichmentType)) return()
+
+    type_Tool <- paste(enrichmentType, selectedTool, sep = "_")
     if (is.null(type_Tool) || type_Tool == "") return()
 
     clickData <- event_data("plotly_click", source = plotSource)
@@ -1051,7 +1072,12 @@ handlePlotSelection <- function(plotId, plotSource, session = NULL) {
   tryCatch({
     selectedTool <- currentSelectedToolTab
     if (is.null(selectedTool) || selectedTool == "" || selectedTool == "Combination") return()
-    type_Tool <- paste(currentEnrichmentType, selectedTool, sep = "_")
+
+    # Use sidebar to determine enrichment type (fixes stale global bug)
+    enrichmentType <- deriveEnrichmentTypeFromSidebar()
+    if (is.null(enrichmentType)) return()
+
+    type_Tool <- paste(enrichmentType, selectedTool, sep = "_")
     if (is.null(type_Tool) || type_Tool == "") return()
 
     # Heatmaps don't support lasso well (use click for cells)

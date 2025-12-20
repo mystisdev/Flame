@@ -47,6 +47,13 @@ function(input, output, session) {
   source("functions/stringNetwork.R", local = T)
   source("functions/conversion.R", local = T)
   source("functions/tabGeneration.R", local = T)
+  source("functions/registry.R", local = T)
+
+  # Output Registry for cleanup management. Instantiate per-session
+  outputRegistry <- OutputRegistry$new()
+
+  # Observer Registry for cleanup management. Instantiate per-session
+  observerRegistry <- ObserverRegistry$new()
 
   # API ####
   observeEvent(session$clientData$url_search, {
@@ -288,16 +295,7 @@ function(input, output, session) {
       handleEnrichment(enrichmentType)
     }, ignoreInit = T)
   })
-  
-  lapply(ENRICHMENT_TYPES, function(enrichmentType) {
-    lapply(ENRICHMENT_TOOLS, function(toolName) {
-      observeEvent(input[[
-        paste(enrichmentType, toolName, "clear", sep = "_")]], {
-          handleEnrichmentResultClear(enrichmentType, toolName)
-        }, ignoreInit = T)
-    })
-  })
-  
+
   observeEvent(input$functional_enrichment_all_clear, {
     handleMultiClear()
   }, ignoreInit = T)

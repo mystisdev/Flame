@@ -1,6 +1,12 @@
 prepareCombinationTab <- function() {
   if (existTwoToolResults()) {
     showTab(inputId = "toolTabsPanel", target = "Combination")
+
+    # Register combination outputs for cleanup
+    if (!outputRegistry$hasOutputs(COMBINATION_REGISTRY_KEY)) {
+      registerCombinationOutputs()
+    }
+
     createGlobalComboTable()
 
     choices <- ENRICHMENT_DATASOURCES[

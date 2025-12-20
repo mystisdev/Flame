@@ -1,4 +1,6 @@
+# ============================================================================
 # Dynamic Tab Generation Functions for Multi-Run Architecture
+# ============================================================================
 #
 # These functions generate UI components for dynamically created enrichment run tabs.
 # All functions are parameterized (no global state modification) to work safely
@@ -509,4 +511,91 @@ generateColorCodingLegendForRun <- function() {
       )
     )
   )
+}
+
+# ============================================================================
+# Output Registration for Cleanup
+# ============================================================================
+
+# Register all outputs created for an enrichment run tab
+# Called immediately after tab is generated in handleEnrichmentRun()
+registerOutputsForRun <- function(fullRunKey) {
+  runInfo <- parseFullRunKey(fullRunKey)
+  enrichmentType <- runInfo$enrichmentType
+  toolName <- runInfo$toolName
+
+  # Parameters box
+  outputRegistry$registerOutput(fullRunKey,
+    paste(fullRunKey, "enrichment_parameters", sep = "_"), "text")
+
+  # No-hit genes
+  outputRegistry$registerOutput(fullRunKey,
+    paste(fullRunKey, "genesNotFound", sep = "_"), "text")
+
+  # Conversion boxes
+  outputRegistry$registerOutputs(fullRunKey, c(
+    paste(fullRunKey, "conversionTable_input", sep = "_"),
+    paste(fullRunKey, "conversionTable_reference", sep = "_")
+  ), "datatable")
+  outputRegistry$registerOutputs(fullRunKey, c(
+    paste(fullRunKey, "notConverted_input", sep = "_"),
+    paste(fullRunKey, "notConverted_reference", sep = "_")
+  ), "text")
+
+  # Result tables (all datasources)
+  if (enrichmentType == "functional") {
+    for (tabCode in TAB_NAMES_CODES) {
+      outputRegistry$registerOutput(fullRunKey,
+        paste(fullRunKey, "table", tabCode, sep = "_"), "datatable")
+    }
+  } else {
+    # Literature enrichment: PUBMED only
+    outputRegistry$registerOutput(fullRunKey,
+      paste(fullRunKey, "table_pubmed", sep = "_"), "datatable")
+  }
+
+  # Simple plots (barchart, scatter, dot)
+  for (plotId in c("barchart", "scatterPlot", "dotPlot")) {
+    outputRegistry$registerOutput(fullRunKey,
+      paste(fullRunKey, plotId, sep = "_"), "plotly")
+    outputRegistry$registerOutput(fullRunKey,
+      paste(fullRunKey, plotId, "table", sep = "_"), "datatable")
+  }
+
+  # Heatmaps
+  for (heatmapId in HEATMAP_IDS) {
+    outputRegistry$registerOutput(fullRunKey,
+      paste(fullRunKey, heatmapId, sep = "_"), "plotly")
+    outputRegistry$registerOutput(fullRunKey,
+      paste(fullRunKey, heatmapId, "table", sep = "_"), "datatable")
+  }
+
+  # Networks
+  for (networkId in NETWORK_IDS) {
+    outputRegistry$registerOutput(fullRunKey,
+      paste(fullRunKey, networkId, sep = "_"), "visNetwork")
+    outputRegistry$registerOutput(fullRunKey,
+      paste(fullRunKey, networkId, "table", sep = "_"), "datatable")
+    outputRegistry$registerOutput(fullRunKey,
+      paste(fullRunKey, networkId, "edgelist", sep = "_"), "datatable")
+  }
+
+  # Manhattan (gProfiler only)
+  if (toolName == "gProfiler") {
+    outputRegistry$registerOutput(fullRunKey,
+      paste(fullRunKey, "manhattan", sep = "_"), "plotly")
+    outputRegistry$registerOutput(fullRunKey,
+      paste(fullRunKey, "manhattan_table", sep = "_"), "datatable")
+  }
+}
+
+# Register combination tab outputs
+# Called when combination tab is first shown
+registerCombinationOutputs <- function() {
+  key <- COMBINATION_REGISTRY_KEY
+  outputRegistry$registerOutput(key, "combo_table", "datatable")
+  outputRegistry$registerOutput(key, "combo_upsetClick_table", "datatable")
+  outputRegistry$registerOutput(key, "combo_network_table", "datatable")
+  outputRegistry$registerOutput(key, "combo_visNetwork", "visNetwork")
+  outputRegistry$registerOutput(key, "upsetjsCombo", "upsetjs")
 }
