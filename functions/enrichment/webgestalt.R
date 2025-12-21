@@ -78,14 +78,11 @@ WebGestaltStrategy <- R6::R6Class("WebGestaltStrategy",
         hostName = "https://www.webgestalt.org/"
       ))
 
-      # Store background size (still using global for now)
-      if (exists("currentType_Tool")) {
-        if (is.null(backgroundList)) {
-          enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<-
-            getWebgestaltBackgroundSize(organism = organismName)
-        } else {
-          enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<- length(backgroundList)
-        }
+      # Calculate background size before validation (need organismName var)
+      backgroundSize <- if (is.null(backgroundList)) {
+        getWebgestaltBackgroundSize(organism = organismName)
+      } else {
+        length(backgroundList)
       }
 
       if (!isResultValid(result)) {
@@ -93,7 +90,23 @@ WebGestaltStrategy <- R6::R6Class("WebGestaltStrategy",
       }
 
       # Parse result (includes link attachment inline to avoid timing issues)
-      return(private$parseResult(result, length(inputList), params$datasources))
+      result <- private$parseResult(result, length(inputList), params$datasources)
+
+      # Filter by datasources using params (no global dependency)
+      if (!is.null(params$datasources) && length(params$datasources) > 0) {
+        result <- result[result$Source %in% params$datasources, ]
+      }
+
+      if (nrow(result) == 0) {
+        return(NULL)
+      }
+
+      # Return structured result (no global writes)
+      return(list(
+        result = result,
+        backgroundSize = backgroundSize,
+        rawResult = NULL
+      ))
     },
 
     convertIDs = function(geneList, organism, targetNamespace) {

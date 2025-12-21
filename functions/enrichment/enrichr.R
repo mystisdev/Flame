@@ -65,10 +65,12 @@ parseEnrichrTermsForDb <- function(enrichrResult, config) {
 }
 
 # Main function to split all term IDs based on organism-specific patterns
-splitEnrichrTermIds <- function(enrichrResult, organismTaxid = NULL) {
-  # Accept organism parameter instead of reading global
-  # Fall back to global for backward compatibility
-  if (is.null(organismTaxid)) organismTaxid <- currentOrganism
+splitEnrichrTermIds <- function(enrichrResult, organismTaxid) {
+  # Organism parameter is required - no global fallback
+  if (is.null(organismTaxid)) {
+    warning("splitEnrichrTermIds: organismTaxid is required")
+    return(enrichrResult)
+  }
 
   terms <- c()
   ids <- c()
@@ -162,11 +164,8 @@ EnrichRStrategy <- R6::R6Class("EnrichRStrategy",
       threshold <- as.numeric(params$threshold)
       enrichrResult <- enrichrResult[enrichrResult$Adjusted.P.value <= threshold, ]
 
-      # Store background size (still using global for now - will be refactored)
-      if (exists("currentType_Tool")) {
-        enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<-
-          getEnrichrBackgroundSize(site, databases)
-      }
+      # Calculate background size before validation (need site and databases vars)
+      backgroundSize <- getEnrichrBackgroundSize(site, databases)
 
       # Check if we have valid results
       if (!isResultValid(enrichrResult)) {
@@ -176,7 +175,21 @@ EnrichRStrategy <- R6::R6Class("EnrichRStrategy",
       # Parse results into standard format
       enrichrResult <- private$parseResult(enrichrResult, length(inputList), organism)
 
-      return(enrichrResult)
+      # Filter by datasources using params (no global dependency)
+      if (!is.null(params$datasources) && length(params$datasources) > 0) {
+        enrichrResult <- enrichrResult[enrichrResult$Source %in% params$datasources, ]
+      }
+
+      if (nrow(enrichrResult) == 0) {
+        return(NULL)
+      }
+
+      # Return structured result (no global writes)
+      return(list(
+        result = enrichrResult,
+        backgroundSize = backgroundSize,
+        rawResult = NULL
+      ))
     },
 
     # enrichR uses gene symbols directly - no conversion needed

@@ -74,6 +74,7 @@ ORAEnrichmentRun <- R6::R6Class("ORAEnrichmentRun",
     convertedList = NULL,
     convertedBackground = NULL,
     significanceMetric = NULL,
+    backgroundSize = NULL,  # Returned by strategy, stored here
 
     # === ORA-specific initialization ===
     initialize = function(enrichmentType, toolName, organism,
@@ -90,6 +91,12 @@ ORAEnrichmentRun <- R6::R6Class("ORAEnrichmentRun",
     # This method replaces runEnrichmentAnalysis() by using the Run object directly.
     # It stores results in BOTH the Run object AND globals for UI compatibility.
     #
+    # Strategies return structured result:
+    #   list(result = df, backgroundSize = num, rawResult = raw)
+    # - result: Parsed enrichment results data frame
+    # - backgroundSize: Number of genes in background/domain
+    # - rawResult: Optional raw API response (gProfiler needs this for Manhattan)
+    #
     # @param convertedInputList Gene list after ID conversion (from geneConvert)
     # @param convertedBackgroundList Background list after ID conversion (or NULL)
     # @return TRUE if successful, FALSE if strategy missing or no results
@@ -104,25 +111,39 @@ ORAEnrichmentRun <- R6::R6Class("ORAEnrichmentRun",
         return(FALSE)
       }
 
-      # Set currentType_Tool to run ID before strategy execution
-      # Strategies use this global to store background sizes and per-run caches
-      currentType_Tool <<- self$id
-
-      # Get strategy and execute
+      # Get strategy and execute - returns structured result
       strategy <- toolRegistry$get(self$enrichmentType, self$toolName)
-      result <- strategy$run(
+      strategyOutput <- strategy$run(
         convertedInputList,
         self$organism,
         convertedBackgroundList,
         self$parameters
       )
 
+      # Handle NULL output (no results)
+      if (is.null(strategyOutput)) {
+        return(FALSE)
+      }
+
+      # Unpack structured result
+      result <- strategyOutput$result
+      backgroundSize <- strategyOutput$backgroundSize
+      rawResult <- strategyOutput$rawResult  # May be NULL (only gProfiler uses this)
+
       # Store in Run object
       self$results <- result
+      self$backgroundSize <- backgroundSize
 
-      # Store in global for UI compatibility (TEMPORARY - will be removed)
+      # Store in globals for UI compatibility (TEMPORARY - will be removed)
       if (!is.null(result) && nrow(result) > 0) {
         enrichmentResults[[self$id]] <<- transformEnrichmentResultTable(result)
+        enrichmentBackgroundSizes[[toupper(self$id)]] <<- backgroundSize
+
+        # gProfiler-specific: Store raw result for Manhattan plot
+        if (!is.null(rawResult)) {
+          gprofilerResults[[self$id]] <<- rawResult
+        }
+
         return(TRUE)
       }
 

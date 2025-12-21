@@ -176,22 +176,28 @@ PANTHERStrategy <- R6::R6Class("PANTHERStrategy",
         return(NULL)
       }
 
-      # Filter by datasources
-      if (exists("currentEnrichmentType")) {
-        result <- filterEnrichmentByDataSources(result, currentEnrichmentType)
+      # Filter by datasources using params (no global dependency)
+      if (!is.null(params$datasources) && length(params$datasources) > 0) {
+        originalRowCount <- nrow(result)
+        result <- result[result$Source %in% params$datasources, ]
+        if (nrow(result) == 0 && originalRowCount > 0) {
+          renderWarning(paste0(
+            "Data source filtering removed all results. ",
+            "Check that your selected datasources match PANTHER's available sources."
+          ))
+        }
       }
 
       if (nrow(result) == 0) {
         return(NULL)
       }
 
-      # Store background size (still using global for now)
-      if (exists("currentType_Tool")) {
-        enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<-
-          getSimpleBackgroundSize(backgroundList)
-      }
-
-      return(result)
+      # Return structured result (no global writes)
+      return(list(
+        result = result,
+        backgroundSize = getSimpleBackgroundSize(backgroundList),
+        rawResult = NULL
+      ))
     },
 
     convertIDs = function(geneList, organism, targetNamespace) {

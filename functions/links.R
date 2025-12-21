@@ -47,10 +47,9 @@ attachVariantTableLinks <- function(df) {
   
 }
 
-attachDBLinks <- function(resultKey = NULL, organism = NULL, toolName = NULL, namespace = NULL) {
+attachDBLinks <- function(resultKey, organism = NULL, toolName = NULL, namespace = NULL) {
   # Accept organism, toolName, namespace parameters to pass to KEGG link generation
   # Transfac HPA CORUMLinks - unavailable
-  if (is.null(resultKey)) resultKey <- currentType_Tool
 
   # Gene Ontology - stopChar=":" prevents matching "GOSLIM:*"
   attachLinks("GO", "https://www.ebi.ac.uk/QuickGO/term/", stopChar = ":", resultKey = resultKey)
@@ -94,8 +93,8 @@ attachDBLinks <- function(resultKey = NULL, organism = NULL, toolName = NULL, na
   attachKEGGLinks(resultKey, organism, toolName, namespace)
 }
 
-attachLinks <- function(sourceId, url, stopChar = "$", gSub = NULL, urlSuffix = "", resultKey = NULL) {
-  if (is.null(resultKey)) resultKey <- currentType_Tool
+attachLinks <- function(sourceId, url, stopChar = "$", gSub = NULL, urlSuffix = "", resultKey) {
+  # resultKey is required - no fallback to global
 
   linksVector <-
     enrichmentResults[[resultKey]][grepl(
@@ -115,11 +114,10 @@ attachLinks <- function(sourceId, url, stopChar = "$", gSub = NULL, urlSuffix = 
 
 MAX_KEGG_HIGHLIGHTED_GENES <- 10
 
-attachKEGGLinks <- function(resultKey = NULL, organism = NULL, toolName = NULL, namespace = NULL) {
+attachKEGGLinks <- function(resultKey, organism = NULL, toolName = NULL, namespace = NULL) {
   # Accept organism, toolName, and namespace parameters instead of reading globals
-  if (is.null(resultKey)) resultKey <- currentType_Tool
 
-  # Derive missing parameters from Run object or fall back to globals
+  # Derive missing parameters from Run object (no global fallback)
   if (is.null(organism) || is.null(toolName) || is.null(namespace)) {
     run <- activeRuns[[resultKey]]
     if (!is.null(run)) {
@@ -127,10 +125,9 @@ attachKEGGLinks <- function(resultKey = NULL, organism = NULL, toolName = NULL, 
       if (is.null(toolName)) toolName <- run$toolName
       if (is.null(namespace)) namespace <- run$parameters$namespace
     } else {
-      # Fall back to globals if Run object not available
-      if (is.null(organism)) organism <- currentOrganism
-      if (is.null(toolName)) toolName <- currentEnrichmentTool
-      if (is.null(namespace)) namespace <- currentNamespace
+      # Run object required - cannot proceed without context
+      warning("attachKEGGLinks: Run object not found for ", resultKey)
+      return()
     }
   }
 
@@ -247,11 +244,16 @@ createEntrezAccConversionTable <- function(tempEnrichmentDF, shortName, namespac
   return(conversionTable)
 }
 
-calculateConversionTable <- function(inputToConvert, shortName, namespace = NULL, enrichmentType = NULL) {
-  # Accept namespace and enrichmentType parameters instead of reading globals
-  # Fall back to globals only if not provided (backward compatibility during migration)
-  if (is.null(namespace)) namespace <- currentNamespace
-  if (is.null(enrichmentType)) enrichmentType <- currentEnrichmentType
+calculateConversionTable <- function(inputToConvert, shortName, namespace, enrichmentType) {
+  # All parameters now required - no global fallbacks
+  if (is.null(namespace)) {
+    warning("calculateConversionTable: namespace is required")
+    return(NULL)
+  }
+  if (is.null(enrichmentType)) {
+    warning("calculateConversionTable: enrichmentType is required")
+    return(NULL)
+  }
 
   # Safely read input conversion choice from Shiny input
   # Note: 'input' is Shiny's session input object (global in reactive context)
@@ -281,9 +283,8 @@ calculateConversionTable <- function(inputToConvert, shortName, namespace = NULL
   return(conversionTable)
 }
 
-convertPositiveHitsToEntrezAcc <- function(tempEnrichmentDF, conversionTable, resultKey = NULL) {
-  # Accept resultKey parameter instead of reading currentType_Tool global
-  if (is.null(resultKey)) resultKey <- currentType_Tool
+convertPositiveHitsToEntrezAcc <- function(tempEnrichmentDF, conversionTable, resultKey) {
+  # resultKey is required - no fallback to global
 
   tempEnrichmentDF <- tidyr::separate_rows(tempEnrichmentDF,
                                            `Positive Hits`, sep = ",")
@@ -304,9 +305,8 @@ convertPositiveHitsToEntrezAcc <- function(tempEnrichmentDF, conversionTable, re
   return(tempEnrichmentDF)
 }
 
-attachWebgestaltLinks <- function(links, resultKey = NULL) {
-  # Accept resultKey parameter instead of reading currentType_Tool global
-  if (is.null(resultKey)) resultKey <- currentType_Tool
+attachWebgestaltLinks <- function(links, resultKey) {
+  # resultKey is required - no fallback to global
 
   enrichmentResults[[resultKey]]$Term_ID_noLinks <<-
     enrichmentResults[[resultKey]]$Term_ID

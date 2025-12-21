@@ -31,16 +31,6 @@ currentUpsetMode <- ""
 currentConversionResult <- data.frame()
 currentOrthologyResult <- data.frame()
 
-# === Enrichment Input State ===
-# These are set during input parsing in handleEnrichment() before Run object creation
-currentUserList <- c()
-currentEnrichmentType <- ""
-currentOrganism <- ""
-currentEnrichmentTool <- ""
-currentNamespace <- ""
-currentSignificanceMetric <- ""
-currentBackgroundList <- c()
-
 # === UI Panel State ===
 # Set by generateToolPanel() for UI generation and used as default parameter values
 # in various printing and update functions

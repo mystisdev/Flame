@@ -104,27 +104,24 @@ GProfilerStrategy <- R6::R6Class("GProfilerStrategy",
         custom_bg = custom_bg
       )
 
-      # Store background size (still using global for now)
-      if (exists("currentType_Tool")) {
-        if (is.null(backgroundList)) {
-          enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<-
-            private$getBackgroundSize(result)
-        } else {
-          enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<- length(backgroundList)
-        }
-        # Store raw result for Manhattan plot (per-run cache)
-        gprofilerResults[[currentType_Tool]] <<- result
-        # Also update legacy global for backward compatibility
-        gprofilerResult <<- result
-      }
-
       # Check if valid
       if (is.null(result) || length(result) == 0) {
         return(NULL)
       }
 
-      # Parse result
-      return(private$parseResult(result))
+      # Calculate background size
+      backgroundSize <- if (is.null(backgroundList)) {
+        private$getBackgroundSize(result)
+      } else {
+        length(backgroundList)
+      }
+
+      # Return structured result (no global writes)
+      return(list(
+        result = private$parseResult(result),
+        backgroundSize = backgroundSize,
+        rawResult = result  # For Manhattan plot
+      ))
     },
 
     # gProfiler uses its own ID conversion

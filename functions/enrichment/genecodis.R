@@ -322,22 +322,29 @@ GeneCodisStrategy <- R6::R6Class("GeneCodisStrategy",
         return(NULL)
       }
 
-      # Filter by datasources
-      if (exists("currentEnrichmentType")) {
-        result <- filterEnrichmentByDataSources(result, currentEnrichmentType, warn_on_empty = TRUE)
+      # Filter by datasources using params (no global dependency)
+      if (!is.null(params$datasources) && length(params$datasources) > 0) {
+        filteredResult <- result[result$Source %in% params$datasources, ]
+        if (nrow(filteredResult) == 0 && nrow(result) > 0) {
+          renderWarning(paste0(
+            "Data source filtering removed all results. ",
+            "Results had sources: ", paste(unique(result$Source), collapse = ", "),
+            " but you selected: ", paste(params$datasources, collapse = ", ")
+          ))
+        }
+        result <- filteredResult
       }
 
       if (nrow(result) == 0) {
         return(NULL)
       }
 
-      # Store background size (still using global)
-      if (exists("currentType_Tool")) {
-        enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<-
-          getSimpleBackgroundSize(backgroundList)
-      }
-
-      return(result)
+      # Return structured result (no global writes)
+      return(list(
+        result = result,
+        backgroundSize = getSimpleBackgroundSize(backgroundList),
+        rawResult = NULL
+      ))
     },
 
     convertIDs = function(geneList, organism, targetNamespace) {

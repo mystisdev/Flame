@@ -101,13 +101,12 @@ STRINGStrategy <- R6::R6Class("STRINGStrategy",
         return(NULL)
       }
 
-      # Store background size (still using global for now)
-      if (exists("currentType_Tool")) {
-        enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<-
-          getSimpleBackgroundSize(backgroundList)
-      }
-
-      return(result)
+      # Return structured result (no global writes)
+      return(list(
+        result = result,
+        backgroundSize = getSimpleBackgroundSize(backgroundList),
+        rawResult = NULL
+      ))
     },
 
     convertIDs = function(geneList, organism, targetNamespace) {

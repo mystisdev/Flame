@@ -52,42 +52,45 @@ parseFullRunKey <- function(fullRunKey) {
 
 # Capture current enrichment parameters from input
 # Resolves "Default" placeholders to tool-specific values for consistent comparison
-captureRunParameters <- function() {
-  # Get raw input values
-  rawNamespace <- input[[paste0(currentEnrichmentType, "_enrichment_namespace")]]
-  rawMetric <- input[[paste0(currentEnrichmentType, "_enrichment_metric")]]
+# Parameters:
+#   enrichmentType: "functional" or "literature"
+#   toolName: e.g., "gProfiler", "STRING", etc.
+#   organism: organism taxid (e.g., 9606 for human)
+captureRunParameters <- function(enrichmentType, toolName, organism) {
+  # Get raw input values using enrichmentType parameter
+  rawNamespace <- input[[paste0(enrichmentType, "_enrichment_namespace")]]
+  rawMetric <- input[[paste0(enrichmentType, "_enrichment_metric")]]
 
-  # Resolve namespace default to tool-specific value
-  # Note: Uses globals set in handleEnrichment before this function is called
+  # Resolve namespace default to tool-specific value using parameters
   resolvedNamespace <- if (rawNamespace == DEFAULT_NAMESPACE_TEXT) {
-    getDefaultTargetNamespace(currentEnrichmentTool, currentOrganism)
+    getDefaultTargetNamespace(toolName, organism)
   } else {
     rawNamespace
   }
 
-  # Resolve metric default to tool-specific value
+  # Resolve metric default to tool-specific value using toolName parameter
+  backgroundMode <- input[[paste0(enrichmentType, "_enrichment_background_choice")]]
   resolvedMetric <- if (rawMetric == DEFAULT_METRIC_TEXT) {
-    backgroundMode <- input[[paste0(currentEnrichmentType, "_enrichment_background_choice")]]
     if (backgroundMode == "genome") {
-      DEFAULT_METRICS_GENOME[[toupper(currentEnrichmentTool)]]
+      DEFAULT_METRICS_GENOME[[toupper(toolName)]]
     } else {
-      DEFAULT_METRICS_USERBACKGROUND[[toupper(currentEnrichmentTool)]]
+      DEFAULT_METRICS_USERBACKGROUND[[toupper(toolName)]]
     }
   } else {
     rawMetric
   }
 
   list(
-    geneListName = input[[paste0(currentEnrichmentType, "_enrichment_file")]],
-    organism = input[[paste0(currentEnrichmentType, "_enrichment_organism")]],
-    threshold = input[[paste0(currentEnrichmentType, "_enrichment_threshold")]],
-    datasources = sort(input[[paste0(currentEnrichmentType, "_enrichment_datasources")]]),
+    geneListName = input[[paste0(enrichmentType, "_enrichment_file")]],
+    organism = input[[paste0(enrichmentType, "_enrichment_organism")]],
+    threshold = input[[paste0(enrichmentType, "_enrichment_threshold")]],
+    datasources = sort(input[[paste0(enrichmentType, "_enrichment_datasources")]]),
     namespace = resolvedNamespace,
-    backgroundMode = input[[paste0(currentEnrichmentType, "_enrichment_background_choice")]],
-    backgroundList = if (input[[paste0(currentEnrichmentType, "_enrichment_background_choice")]] == "genome") {
+    backgroundMode = backgroundMode,
+    backgroundList = if (backgroundMode == "genome") {
       NULL
     } else {
-      input[[paste0(currentEnrichmentType, "_enrichment_background_list")]]
+      input[[paste0(enrichmentType, "_enrichment_background_list")]]
     },
     metric = resolvedMetric
   )

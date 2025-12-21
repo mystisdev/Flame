@@ -1,43 +1,41 @@
 handleEnrichment <- function(enrichmentType) {
   tryCatch({
     if (existInputGeneLists()) {
-      currentEnrichmentType <<- enrichmentType
-      # Get config for this enrichment type
+      # Get config for this enrichment type (no global assignment)
       config <- getEnrichmentConfig(enrichmentType)
 
-      if (existInputOrganism()) {
-        if (existEnrichmentTool()) {
+      if (existInputOrganism(enrichmentType)) {
+        if (existEnrichmentTool(enrichmentType)) {
           tools <- switch(
-            currentEnrichmentType,
+            enrichmentType,
             "functional" = input$functional_enrichment_tool,
             "literature" = "STRING"
           )
 
-          currentUserList <<-
-            unlist(userInputLists[names(userInputLists) ==
-                                    input[[paste0(currentEnrichmentType,
+          # Extract values into LOCAL variables (no globals)
+          userList <- unlist(userInputLists[names(userInputLists) ==
+                                    input[[paste0(enrichmentType,
                                                   "_enrichment_file")]]][[1]])
-          currentOrganism <<-
-            ORGANISMS[ORGANISMS$print_name ==
-                                  input[[paste0(currentEnrichmentType,
+          organism <- ORGANISMS[ORGANISMS$print_name ==
+                                  input[[paste0(enrichmentType,
                                                 "_enrichment_organism")]], ]$taxid
 
-          if(input[[paste0(currentEnrichmentType, "_enrichment_background_choice")]] == "genome") {
-            currentBackgroundList <<- c()
-          }
-          else {
-            currentBackgroundList <<-  unlist(userInputLists[names(userInputLists) ==
-                                    input[[paste0(currentEnrichmentType,
+          backgroundList <- if(input[[paste0(enrichmentType, "_enrichment_background_choice")]] == "genome") {
+            NULL
+          } else {
+            unlist(userInputLists[names(userInputLists) ==
+                                    input[[paste0(enrichmentType,
                                                   "_enrichment_background_list")]]][[1]])
           }
 
           lapply(tools, function(toolName) {
-            currentEnrichmentTool <<- toolName
-            currentSignificanceMetric <<- decideToolMetric()
+            # All values are local - no globals needed
+            significanceMetric <- decideToolMetric(enrichmentType, toolName)
 
             # Multi-run: Check for matching parameters (unified for all types)
-            currentParams <- captureRunParameters()
-            matchResult <- findMatchingRun(currentEnrichmentType, toolName, currentParams)
+            # Pass explicit parameters instead of relying on globals inside captureRunParameters
+            currentParams <- captureRunParameters(enrichmentType, toolName, organism)
+            matchResult <- findMatchingRun(enrichmentType, toolName, currentParams)
 
             if (!is.null(matchResult$matchType) && matchResult$matchType == "exact") {
               # EXACT MATCH: Just select tab and pulse it (no API call)
@@ -57,9 +55,9 @@ handleEnrichment <- function(enrichmentType) {
               existingRun$timestamp <- Sys.time()
 
               # Update gene list and background in case they changed
-              existingRun$geneList <- currentUserList
-              existingRun$backgroundList <- if (length(currentBackgroundList) > 0) currentBackgroundList else NULL
-              existingRun$significanceMetric <- currentSignificanceMetric
+              existingRun$geneList <- userList
+              existingRun$backgroundList <- backgroundList
+              existingRun$significanceMetric <- significanceMetric
 
               clearRunResults(existingRunKey)
 
@@ -70,12 +68,12 @@ handleEnrichment <- function(enrichmentType) {
 
             # NO MATCH: Create new run using ORAEnrichmentRun
             run <- ORAEnrichmentRun$new(
-              enrichmentType = currentEnrichmentType,
+              enrichmentType = enrichmentType,
               toolName = toolName,
-              organism = currentOrganism,
-              geneList = currentUserList,
-              backgroundList = if (length(currentBackgroundList) > 0) currentBackgroundList else NULL,
-              significanceMetric = currentSignificanceMetric
+              organism = organism,
+              geneList = userList,
+              backgroundList = backgroundList,
+              significanceMetric = significanceMetric
             )
             run$parameters <- currentParams
 
@@ -112,34 +110,37 @@ existInputGeneLists <- function() {
   return(exist)
 }
 
-existInputOrganism <- function() {
+existInputOrganism <- function(enrichmentType) {
   notEmpty <- F
-  if (input[[paste0(currentEnrichmentType, "_enrichment_organism")]] != "")
+  if (input[[paste0(enrichmentType, "_enrichment_organism")]] != "")
     notEmpty <- T
   else
     renderWarning("Select an organism from the list.")
   return(notEmpty)
 }
 
-existEnrichmentTool <- function() {
+existEnrichmentTool <- function(enrichmentType) {
   exist <- F
-  if (!is.null(input[[paste0(currentEnrichmentType, "_enrichment_tool")]]))
+  if (!is.null(input[[paste0(enrichmentType, "_enrichment_tool")]]))
     exist <- T
   else
     renderWarning("Select at least one enrichment tool.")
   return(exist)
 }
 
-decideToolMetric <- function() {
-  if (input[[paste0(currentEnrichmentType, "_enrichment_metric")]] == DEFAULT_METRIC_TEXT) {
-    if(input[[paste0(currentEnrichmentType, "_enrichment_background_choice")]] == "genome")
-      currentSignificanceMetric <<- DEFAULT_METRICS_GENOME[[toupper(currentEnrichmentTool)]]
+# Returns the significance metric instead of setting global
+# Parameters:
+#   enrichmentType: "functional" or "literature"
+#   toolName: e.g., "gProfiler", "STRING", etc.
+decideToolMetric <- function(enrichmentType, toolName) {
+  if (input[[paste0(enrichmentType, "_enrichment_metric")]] == DEFAULT_METRIC_TEXT) {
+    if(input[[paste0(enrichmentType, "_enrichment_background_choice")]] == "genome")
+      return(DEFAULT_METRICS_GENOME[[toupper(toolName)]])
     else
-      currentSignificanceMetric <<- DEFAULT_METRICS_USERBACKGROUND[[toupper(currentEnrichmentTool)]]
+      return(DEFAULT_METRICS_USERBACKGROUND[[toupper(toolName)]])
   }
   else
-    currentSignificanceMetric <<-
-      input[[paste0(currentEnrichmentType, "_enrichment_metric")]]
+    return(input[[paste0(enrichmentType, "_enrichment_metric")]])
 }
 
 # Unified multi-run handler for all enrichment types (config-driven)
@@ -244,16 +245,21 @@ handleEnrichmentRun <- function(run, isUpdate = FALSE) {
               runKey <- run$id
               inputTable <- inputGenesConversionTable
               bgTable <- backgroundGenesConversionTable
+              origInputs <- run$geneList
+              origBackground <- run$backgroundList
               session$onFlushed(function() {
                 shinyjs::show(paste(runKey, "conversionBoxes", sep = "_"))
-                printUnconvertedGenes(inputTable, bgTable, runKey = runKey)
+                printUnconvertedGenes(inputTable, bgTable, runKey = runKey,
+                                       originalInputs = origInputs, originalBackground = origBackground)
                 printConversionTable(inputTable, bgTable, runKey = runKey)
               }, once = TRUE)
             })
           } else {
             # Update mode: UI already exists
             shinyjs::show(paste(run$id, "conversionBoxes", sep = "_"))
-            printUnconvertedGenes(inputGenesConversionTable, backgroundGenesConversionTable, runKey = run$id)
+            printUnconvertedGenes(inputGenesConversionTable, backgroundGenesConversionTable,
+                                   runKey = run$id, originalInputs = run$geneList,
+                                   originalBackground = run$backgroundList)
             printConversionTable(inputGenesConversionTable, backgroundGenesConversionTable, runKey = run$id)
           }
         }
@@ -368,8 +374,7 @@ geneConvert <- function(geneList, enrichmentType, organism, toolName) {
   if (namespace == DEFAULT_NAMESPACE_TEXT)
     namespace <- getDefaultTargetNamespace(toolName, organism)
 
-  # Update global for backward compatibility (deprecated - will be removed)
-  currentNamespace <<- namespace
+  # Namespace is passed through run$parameters$namespace - no global needed
 
   if (namespace != "USERINPUT") {
     if (toolName == "STRING") {
@@ -519,7 +524,7 @@ executeNamespaceRollback <- function(inputGenesConversionTable, run) {
     # Convert Positive Hits back from tool-specific IDs to original gene symbols
     enrichmentResults[[resultKey]] <<-
       rollBackConvertedNames(enrichmentResults[[resultKey]],
-                             inputGenesConversionTable)
+                             inputGenesConversionTable, run$toolName)
 
     # For no-hit calculation: use original gene symbols that successfully converted
     noHitGenesCheckList <- inputGenesConversionTable$input
@@ -531,7 +536,7 @@ executeNamespaceRollback <- function(inputGenesConversionTable, run) {
   return(noHitGenesCheckList)
 }
 
-rollBackConvertedNames <- function(enrichmentOutput, inputGenesConversionTable) {
+rollBackConvertedNames <- function(enrichmentOutput, inputGenesConversionTable, toolName) {
   # Check if all Positive Hits are empty (safety check for tools without gene lists)
   all_empty <- all(enrichmentOutput$`Positive Hits` == "" | is.na(enrichmentOutput$`Positive Hits`))
 
@@ -550,7 +555,7 @@ rollBackConvertedNames <- function(enrichmentOutput, inputGenesConversionTable) 
     "Positive Hits"
   enrichmentOutput <- enrichmentOutput %>% group_by(Term_ID) %>%
     mutate(`Positive Hits` = paste(`Positive Hits`, collapse = ","))
-  if (currentEnrichmentTool == "WebGestalt") # Term_ID_noLinks already generated
+  if (toolName == "WebGestalt") # Term_ID_noLinks already generated
     enrichmentOutput <-
     enrichmentOutput[, c("Source", "Term_ID", "Function",  "P-value",
                          "-log10Pvalue", "Term Size", "Query size",
@@ -561,11 +566,15 @@ rollBackConvertedNames <- function(enrichmentOutput, inputGenesConversionTable) 
 
 
 # Pass parameters instead of reading globals
-decideToolSelectedDatasources <- function(enrichmentType, toolName = NULL) {
+decideToolSelectedDatasources <- function(enrichmentType, toolName) {
   inputSelectedDatasources <-
     input[[paste0(enrichmentType, "_enrichment_datasources")]]
-  # If toolName not provided, use the global as fallback (for legacy callers)
-  tool <- if (!is.null(toolName)) toolName else currentEnrichmentTool
+  # toolName is required - no global fallback
+  if (is.null(toolName)) {
+    warning("decideToolSelectedDatasources: toolName is required")
+    return("")
+  }
+  tool <- toolName
   prefix <- ""
   if (tool == "enrichR")
     prefix <- getEnrichrVariablePrefix()
@@ -590,17 +599,18 @@ renderGeneReport <- function(outputId, genes, messageTemplate) {
 }
 
 printUnconvertedGenes <- function(convertedInputs, convertedOutputs = NULL,
-                                   runKey = currentType_Tool) {
+                                   runKey, originalInputs, originalBackground = NULL) {
   # Display genes that failed conversion to target namespace
   # Note: This is different from "No-hit Inputs" which are genes that
   # successfully converted but don't appear in any enriched term
   #
-  # @param runKey The run key for element IDs (defaults to currentType_Tool for
-  #               backwards compatibility, pass currentFullRunKey for multi-run)
+  # @param runKey The run key for element IDs (required)
+  # @param originalInputs The original input gene list (from run$geneList)
+  # @param originalBackground The original background gene list (from run$backgroundList)
 
   # Report unconverted input genes
   inputOutputId <- paste(runKey, "notConverted_input", sep = "_")
-  unconvertedInputs <- currentUserList[!currentUserList %in% convertedInputs$input]
+  unconvertedInputs <- originalInputs[!originalInputs %in% convertedInputs$input]
   renderGeneReport(
     outputId = inputOutputId,
     genes = unconvertedInputs,
@@ -611,8 +621,8 @@ printUnconvertedGenes <- function(convertedInputs, convertedOutputs = NULL,
   refOutputId <- paste(runKey, "notConverted_reference", sep = "_")
   refDivId <- paste(runKey, "notConverted_reference_div", sep = "_")
 
-  if (!is.null(convertedOutputs)) {
-    unconvertedBackground <- currentBackgroundList[!currentBackgroundList %in% convertedOutputs$input]
+  if (!is.null(convertedOutputs) && !is.null(originalBackground)) {
+    unconvertedBackground <- originalBackground[!originalBackground %in% convertedOutputs$input]
     renderGeneReport(
       outputId = refOutputId,
       genes = unconvertedBackground,
@@ -625,10 +635,9 @@ printUnconvertedGenes <- function(convertedInputs, convertedOutputs = NULL,
 }
 
 printConversionTable <- function(inputConversionTable, backgroundConversionTable = NULL,
-                                  runKey = currentType_Tool) {
+                                  runKey) {
   # Display gene conversion table for input list and optional background list
-  # @param runKey The run key for element IDs (defaults to currentType_Tool for
-  #               backwards compatibility, pass currentFullRunKey for multi-run)
+  # @param runKey The run key for element IDs (required)
 
   # Render input list conversion table
   shinyOutputId <- paste(runKey, "conversionTable_input", sep = "_")
@@ -660,13 +669,12 @@ findAndPrintNoHitGenes <- function(convertedInputs, runKey = NULL) {
   printNoHitGenes(noHitGenes, runKey)
 }
 
-findNoHitGenes <- function(convertedInputs, runKey = NULL) {
+findNoHitGenes <- function(convertedInputs, runKey) {
   # Find genes that successfully converted but don't appear in any enriched term
   #
   # convertedInputs: List of genes that successfully converted (either original symbols
   #                  or tool-specific IDs, depending on rollback setting)
-  # runKey: The run key for looking up enrichment results. If NULL, uses legacy
-  #         lookup via getGlobalEnrichmentResult()
+  # runKey: The run key for looking up enrichment results (required)
   #
   # Logic:
   # 1. Collect all genes appearing in Positive Hits across ALL enriched terms
@@ -676,13 +684,7 @@ findNoHitGenes <- function(convertedInputs, runKey = NULL) {
   # Note: This is different from "Unconverted Inputs" which are genes that
   # failed at the conversion step entirely
 
-  if (is.null(runKey)) {
-    # Legacy mode: use type_tool lookup
-    enrichmentResult <- getGlobalEnrichmentResult(currentEnrichmentType, currentEnrichmentTool)
-  } else {
-    # Multi-run mode: use direct runKey lookup
-    enrichmentResult <- enrichmentResults[[runKey]]
-  }
+  enrichmentResult <- enrichmentResults[[runKey]]
 
   # Collect all genes from Positive Hits column across all enriched terms
   allHitGenes <- paste(enrichmentResult$`Positive Hits`, collapse = ",")
@@ -694,10 +696,9 @@ findNoHitGenes <- function(convertedInputs, runKey = NULL) {
   return(noHitGenes)
 }
 
-printNoHitGenes <- function(noHitGenes, runKey = currentType_Tool) {
+printNoHitGenes <- function(noHitGenes, runKey) {
   # Display genes not found in any enriched term
-  # @param runKey The run key for element IDs (defaults to currentType_Tool for
-  #               backwards compatibility, pass currentFullRunKey for multi-run)
+  # @param runKey The run key for element IDs (required)
   shinyOutputId <- paste(runKey, "genesNotFound", sep = "_")
   renderGeneReport(
     outputId = shinyOutputId,
@@ -706,21 +707,23 @@ printNoHitGenes <- function(noHitGenes, runKey = currentType_Tool) {
   )
 }
 
-printResultTables <- function(runKey = currentType_Tool) {
+printResultTables <- function(runKey) {
   # Print all result tables for an enrichment run
-  # @param runKey The run key for element IDs and result lookup
+  # @param runKey The run key for element IDs and result lookup (required)
   formatResultTable(runKey)
+  # Derive enrichment type from runKey instead of reading global
+  runInfo <- parseFullRunKey(runKey)
   switch(
-    currentEnrichmentType,
+    runInfo$enrichmentType,
     "functional" = printFunctionalResultTable(runKey),
     "literature" = printLiteratureResultTable(runKey)
   )
 }
 
 # Pass Run object directly instead of reading globals
-formatResultTable <- function(runKey = currentType_Tool) {
+formatResultTable <- function(runKey) {
   # Format and sort enrichment results, add database links
-  # @param runKey The run key for result lookup
+  # @param runKey The run key for result lookup (required)
   enrichmentResults[[runKey]] <<-
     enrichmentResults[[runKey]][order(
       -enrichmentResults[[runKey]]$`-log10Pvalue`), ]
@@ -754,9 +757,9 @@ formatResultTable <- function(runKey = currentType_Tool) {
   }
 }
 
-printFunctionalResultTable <- function(runKey = currentType_Tool) {
+printFunctionalResultTable <- function(runKey) {
   # Print functional enrichment result tables for all datasources
-  # @param runKey The run key for element IDs and result lookup
+  # @param runKey The run key for element IDs and result lookup (required)
   shinyOutputId <- paste(runKey, "table_all", sep = "_")
   tabPosition <- 0
   printResultTable(shinyOutputId, tabPosition, "all", runKey)
@@ -770,9 +773,9 @@ printFunctionalResultTable <- function(runKey = currentType_Tool) {
 }
 
 printResultTable <- function(shinyOutputId, tabPosition, datasource,
-                              runKey = currentType_Tool) {
+                              runKey) {
   # Print a single result table for a datasource
-  # @param runKey The run key for result lookup
+  # @param runKey The run key for result lookup (required)
   if (datasource == "all" || datasource == "pubmed") {
     transformedResultPartial <- enrichmentResults[[runKey]]
   } else {
@@ -805,9 +808,9 @@ printResultTable <- function(shinyOutputId, tabPosition, datasource,
   }
 }
 
-printLiteratureResultTable <- function(runKey = currentType_Tool) {
+printLiteratureResultTable <- function(runKey) {
   # Print literature enrichment result table
-  # @param runKey The run key for element IDs
+  # @param runKey The run key for element IDs (required)
   shinyOutputId <- paste(runKey, "table_pubmed", sep = "_")
   tabPosition <- 0
   printResultTable(shinyOutputId, tabPosition, "pubmed", runKey)
@@ -913,15 +916,19 @@ validEnrichmentResultMultiRun <- function(run) {
 
 # Pass Run object directly instead of reading globals
 printParametersMultiRun <- function(run) {
+  # Handle NULL backgroundSize gracefully (occurs with genome background for some tools)
+  bgSize <- enrichmentBackgroundSizes[[toupper(run$id)]]
+  bgSizeDisplay <- if (is.null(bgSize)) "Genome-wide (tool default)" else bgSize
+
   parametersOutput <- paste0(
     "Run: ", run$toolName, " (", run$runNumber, ")",
     "\nFile: ", input[[paste0(run$enrichmentType, "_enrichment_file")]],
     "\nOrganism: ", ORGANISMS[ORGANISMS$taxid == run$organism, ]$print_name,
     "\nBackground: ", input[[
       paste0(run$enrichmentType, "_enrichment_background_choice")]],
-    "\nBackground size (no. of genes): ", enrichmentBackgroundSizes[[toupper(run$id)]],
+    "\nBackground size (no. of genes): ", bgSizeDisplay,
     "\nDatasources: ", decideToolSelectedDatasources(run$enrichmentType, run$toolName),
-    "\nNamespace: ", currentNamespace,
+    "\nNamespace: ", run$parameters$namespace,
     "\nSignificance metric: ", run$significanceMetric,
     "\nSignificance threshold: ", input[[
       paste0(run$enrichmentType, "_enrichment_threshold")]]

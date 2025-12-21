@@ -187,50 +187,6 @@ getAvailableSignificanceMetrics <- function(toolCapitalNames) {
   return(options)
 }
 
-updatePlotControlPanels <- function() {
-  selectedDataSource <- updatePlotDataSources()
-  updatePlotSliderInputs(selectedDataSource)
-}
-
-updatePlotDataSources <- function(){
-  sources <- switch(
-    currentEnrichmentType,
-    "functional" = ENRICHMENT_DATASOURCES[
-      which(ENRICHMENT_DATASOURCES %in% unique(enrichmentResults[[currentType_Tool]]$Source))
-    ],
-    "literature" = "PUBMED"
-  )
-  selected <- sources[1]
-  
-  lapply(ALL_PLOT_IDS, function(plotId) {
-    updatePickerInput(
-      session, paste(currentType_Tool, plotId, "sourceSelect", sep = "_"),
-      choices = sources, selected = selected
-    )
-  })
-  return(selected)
-}
-
-updatePlotSliderInputs <- function(selectedDataSource) {
-  maxSliderValue <- switch(
-    currentEnrichmentType,
-    "functional" = nrow(enrichmentResults[[currentType_Tool]][grepl(
-        selectedDataSource, enrichmentResults[[currentType_Tool]]$Source), ]),
-    "literature" = nrow(enrichmentResults[[currentType_Tool]])
-  )
-  if (maxSliderValue > MAX_SLIDER_VALUE)
-    maxSliderValue <- MAX_SLIDER_VALUE
-  
-  lapply(ALL_PLOT_IDS, function(plotId) {
-    updateShinySliderInput(
-      shinyOutputId = paste(currentType_Tool, plotId, "slider", sep = "_"),
-      minSliderValue = 1, maxSliderValue)
-  })
-  updateShinySliderInput(
-    shinyOutputId = paste(currentType_Tool, "network3_thresholdSlider", sep = "_"),
-    minSliderValue = 1, maxSliderValue)
-}
-
 updateShinySliderInput <- function(shinyOutputId, minSliderValue, maxSliderValue,
                                    value = DEFAULT_SLIDER_VALUE, step = 1) {
   updateSliderInput(
