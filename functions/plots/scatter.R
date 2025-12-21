@@ -1,19 +1,18 @@
-handleScatterPlot <- function(enrichmentType, enrichmentTool) {
+handleScatterPlot <- function(run) {
   tryCatch({
     renderModal("<h2>Please wait.</h2><br /><p>Rendering Scatter Plot.</p>")
-    if (existEnrichmentResults(enrichmentType, enrichmentTool)){
-      type_Tool <- paste(enrichmentType, enrichmentTool, sep = "_")
-      sourceSelect <- input[[paste(type_Tool, "scatterPlot_sourceSelect", sep = "_")]]
+    if (run$hasResults()) {
+      sourceSelect <- input[[run$getInputId("scatterPlot_sourceSelect")]]
 
       if (isSourceNotNull(sourceSelect)) {
         enrichmentFilteredData <- filterAndPrintTable(
-          enrichmentType, enrichmentTool,
-          outputId = paste(type_Tool, "scatterPlot", sep = "_"),
+          run$enrichmentType, run$id,
+          outputId = run$getInputId("scatterPlot"),
           sourceSelect = sourceSelect,
-          mode = input[[paste(type_Tool, "scatterPlot_mode", sep = "_")]],
-          slider = input[[paste(type_Tool, "scatterPlot_slider", sep = "_")]])
-        
-        constructScatterPlot(type_Tool, enrichmentFilteredData)
+          mode = input[[run$getInputId("scatterPlot_mode")]],
+          slider = input[[run$getInputId("scatterPlot_slider")]])
+
+        constructScatterPlot(run$id, enrichmentFilteredData)
       }
     }
   }, error = function(e) {

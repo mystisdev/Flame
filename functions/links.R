@@ -47,7 +47,9 @@ attachVariantTableLinks <- function(df) {
   
 }
 
-attachDBLinks <- function(resultKey = NULL) { # Transfac HPA CORUMLinks, unavailable
+attachDBLinks <- function(resultKey = NULL, organism = NULL, toolName = NULL, namespace = NULL) {
+  # Accept organism, toolName, namespace parameters to pass to KEGG link generation
+  # Transfac HPA CORUMLinks - unavailable
   if (is.null(resultKey)) resultKey <- currentType_Tool
 
   # Gene Ontology - stopChar=":" prevents matching "GOSLIM:*"
@@ -88,7 +90,8 @@ attachDBLinks <- function(resultKey = NULL) { # Transfac HPA CORUMLinks, unavail
   attachLinks("PharmGKB", "https://www.clinpgx.org/chemical/", resultKey = resultKey)
   # LINCS: No external links available - terms displayed as plain text
 
-  attachKEGGLinks(resultKey)
+  # Pass context to KEGG link generation for gene highlighting
+  attachKEGGLinks(resultKey, organism, toolName, namespace)
 }
 
 attachLinks <- function(sourceId, url, stopChar = "$", gSub = NULL, urlSuffix = "", resultKey = NULL) {
@@ -112,8 +115,28 @@ attachLinks <- function(sourceId, url, stopChar = "$", gSub = NULL, urlSuffix = 
 
 MAX_KEGG_HIGHLIGHTED_GENES <- 10
 
-attachKEGGLinks <- function(resultKey = NULL) {
+attachKEGGLinks <- function(resultKey = NULL, organism = NULL, toolName = NULL, namespace = NULL) {
+  # Accept organism, toolName, and namespace parameters instead of reading globals
   if (is.null(resultKey)) resultKey <- currentType_Tool
+
+  # Derive missing parameters from Run object or fall back to globals
+  if (is.null(organism) || is.null(toolName) || is.null(namespace)) {
+    run <- activeRuns[[resultKey]]
+    if (!is.null(run)) {
+      if (is.null(organism)) organism <- run$organism
+      if (is.null(toolName)) toolName <- run$toolName
+      if (is.null(namespace)) namespace <- run$parameters$namespace
+    } else {
+      # Fall back to globals if Run object not available
+      if (is.null(organism)) organism <- currentOrganism
+      if (is.null(toolName)) toolName <- currentEnrichmentTool
+      if (is.null(namespace)) namespace <- currentNamespace
+    }
+  }
+
+  # Derive enrichmentType from resultKey for parameter passing
+  runInfo <- parseFullRunKey(resultKey)
+  enrichmentType <- runInfo$enrichmentType
 
   # KEGG organism codes and supported organisms reference:
   # https://www.kegg.jp/kegg/tables/br08606.html
@@ -126,19 +149,19 @@ attachKEGGLinks <- function(resultKey = NULL) {
     ), ][, c("Source", "Positive Hits", "Term_ID")]
 
   if (nrow(tempEnrichmentDF) > 0) {
-    shortName <- ORGANISMS[ORGANISMS$taxid == currentOrganism, ]$short_name
-    keggName <- ORGANISMS[ORGANISMS$taxid == currentOrganism, ]$kegg_name
+    shortName <- ORGANISMS[ORGANISMS$taxid == organism, ]$short_name
+    keggName <- ORGANISMS[ORGANISMS$taxid == organism, ]$kegg_name
 
-    if (currentEnrichmentTool == "STRING") {
+    if (toolName == "STRING") {
       # STRING already provides organism-specific KEGG IDs (e.g., "eco00260", "hsa05224")
       # No kegg_name needed, STRING already provides the organism kegg name (e.g., "hsa") in the Term_ID
 
       if (!is.na(shortName)) {
         # Add gene highlighting using g:Profiler conversion
-        conversionTable <- createEntrezAccConversionTable(tempEnrichmentDF, shortName)
+        conversionTable <- createEntrezAccConversionTable(tempEnrichmentDF, shortName, namespace, enrichmentType)
         if (!is.null(conversionTable)) {
           tempEnrichmentDFWithEntrezAcc <-
-            convertPositiveHitsToEntrezAcc(tempEnrichmentDF, conversionTable)
+            convertPositiveHitsToEntrezAcc(tempEnrichmentDF, conversionTable, resultKey)
           linksVector <- tempEnrichmentDFWithEntrezAcc$Term_ID
           geneHighlights <- gsub(",", "+", tempEnrichmentDFWithEntrezAcc$`Positive Hits EntrezAcc`)
           # Limit highlighting per pathway to avoid "Request-URI Too Long" errors
@@ -171,11 +194,11 @@ attachKEGGLinks <- function(resultKey = NULL) {
 
         # Try gene highlighting if organism supported by gProfiler
         if (!is.na(shortName)) {
-          conversionTable <- createEntrezAccConversionTable(tempEnrichmentDF, shortName)
+          conversionTable <- createEntrezAccConversionTable(tempEnrichmentDF, shortName, namespace, enrichmentType)
           if (!is.null(conversionTable)) {
             # Conversion succeeded - create links WITH gene highlighting
             tempEnrichmentDFWithEntrezAcc <-
-              convertPositiveHitsToEntrezAcc(tempEnrichmentDF, conversionTable)
+              convertPositiveHitsToEntrezAcc(tempEnrichmentDF, conversionTable, resultKey)
             linksVector <- tempEnrichmentDFWithEntrezAcc$Term_ID
             geneHighlights <- gsub(",", "+", tempEnrichmentDFWithEntrezAcc$`Positive Hits EntrezAcc`)
             # Limit highlighting per pathway to avoid "Request-URI Too Long" errors
@@ -209,13 +232,14 @@ attachKEGGLinks <- function(resultKey = NULL) {
   }
 }
 
-createEntrezAccConversionTable <- function(tempEnrichmentDF, shortName) {
+createEntrezAccConversionTable <- function(tempEnrichmentDF, shortName, namespace = NULL, enrichmentType = NULL) {
+  # Accept namespace and enrichmentType parameters and pass them down
   inputToConvert <- unique(unlist(strsplit(paste(
     tempEnrichmentDF[grepl("^KEGG$", tempEnrichmentDF$Source), ]$`Positive Hits`,
     collapse = ","), ",")))
 
-  conversionTable <- calculateConversionTable(inputToConvert, shortName)
-  
+  conversionTable <- calculateConversionTable(inputToConvert, shortName, namespace, enrichmentType)
+
   if (!is.null(conversionTable)) {
     conversionTable <- dplyr::distinct(conversionTable[, c("input", "target")])
     colnames(conversionTable)[1] <- "Positive Hits"
@@ -223,9 +247,22 @@ createEntrezAccConversionTable <- function(tempEnrichmentDF, shortName) {
   return(conversionTable)
 }
 
-calculateConversionTable <- function(inputToConvert, shortName) {
-  if (currentNamespace == "ENTREZGENE_ACC" &&
-      input$functional_enrichment_inputConversion == "Converted input names")
+calculateConversionTable <- function(inputToConvert, shortName, namespace = NULL, enrichmentType = NULL) {
+  # Accept namespace and enrichmentType parameters instead of reading globals
+  # Fall back to globals only if not provided (backward compatibility during migration)
+  if (is.null(namespace)) namespace <- currentNamespace
+  if (is.null(enrichmentType)) enrichmentType <- currentEnrichmentType
+
+  # Safely read input conversion choice from Shiny input
+  # Note: 'input' is Shiny's session input object (global in reactive context)
+  inputConversionChoice <- NULL
+  if (!is.null(enrichmentType) && exists("input") && !is.null(input)) {
+    inputId <- paste0(enrichmentType, "_enrichment_inputConversion")
+    inputConversionChoice <- input[[inputId]]
+  }
+
+  if (!is.null(namespace) && namespace == "ENTREZGENE_ACC" &&
+      !is.null(inputConversionChoice) && inputConversionChoice == "Converted input names")
     conversionTable <- data.frame(
       "input" = inputToConvert,
       "target" = inputToConvert
@@ -244,7 +281,10 @@ calculateConversionTable <- function(inputToConvert, shortName) {
   return(conversionTable)
 }
 
-convertPositiveHitsToEntrezAcc <- function(tempEnrichmentDF, conversionTable) {
+convertPositiveHitsToEntrezAcc <- function(tempEnrichmentDF, conversionTable, resultKey = NULL) {
+  # Accept resultKey parameter instead of reading currentType_Tool global
+  if (is.null(resultKey)) resultKey <- currentType_Tool
+
   tempEnrichmentDF <- tidyr::separate_rows(tempEnrichmentDF,
                                            `Positive Hits`, sep = ",")
   tempEnrichmentDF <- plyr::join(tempEnrichmentDF, conversionTable,
@@ -258,32 +298,35 @@ convertPositiveHitsToEntrezAcc <- function(tempEnrichmentDF, conversionTable) {
     dplyr::mutate(`Positive Hits EntrezAcc` = paste(`Positive Hits EntrezAcc`,
                                                     collapse = ","))
   tempEnrichmentDF <- dplyr::distinct(tempEnrichmentDF)
-  tempEnrichmentDF <- plyr::join(enrichmentResults[[currentType_Tool]][grepl(
-    "^KEGG$", enrichmentResults[[currentType_Tool]]$Source), ],
+  tempEnrichmentDF <- plyr::join(enrichmentResults[[resultKey]][grepl(
+    "^KEGG$", enrichmentResults[[resultKey]]$Source), ],
     tempEnrichmentDF, type = "left", by = "Term_ID")
   return(tempEnrichmentDF)
 }
 
-attachWebgestaltLinks <- function(links) {
-  enrichmentResults[[currentType_Tool]]$Term_ID_noLinks <<- 
-    enrichmentResults[[currentType_Tool]]$Term_ID
-  enrichmentResults[[currentType_Tool]]$Term_ID <<-
+attachWebgestaltLinks <- function(links, resultKey = NULL) {
+  # Accept resultKey parameter instead of reading currentType_Tool global
+  if (is.null(resultKey)) resultKey <- currentType_Tool
+
+  enrichmentResults[[resultKey]]$Term_ID_noLinks <<-
+    enrichmentResults[[resultKey]]$Term_ID
+  enrichmentResults[[resultKey]]$Term_ID <<-
     paste0(
       "<a href='",
       links,
       "' target='_blank'>",
-      enrichmentResults[[currentType_Tool]]$Term_ID,
+      enrichmentResults[[resultKey]]$Term_ID,
       "</a>"
     )
   # quick and dirty fix for changed DISGENET links
-  if("DISGENET" %in% enrichmentResults[[currentType_Tool]]$Source) {
-    enrichmentResults[[currentType_Tool]][enrichmentResults[[currentType_Tool]]$Source == "DISGENET",]$Term_ID <<-
+  if("DISGENET" %in% enrichmentResults[[resultKey]]$Source) {
+    enrichmentResults[[resultKey]][enrichmentResults[[resultKey]]$Source == "DISGENET",]$Term_ID <<-
       paste0(
         "<a href='https://www.disgenet.org/search/0/",
-        enrichmentResults[[currentType_Tool]][enrichmentResults[[currentType_Tool]]$Source == "DISGENET",]$Term_ID_noLinks,
+        enrichmentResults[[resultKey]][enrichmentResults[[resultKey]]$Source == "DISGENET",]$Term_ID_noLinks,
         "/' target='_blank'>",
-        enrichmentResults[[currentType_Tool]][enrichmentResults[[currentType_Tool]]$Source == "DISGENET",]$Term_ID_noLinks,
+        enrichmentResults[[resultKey]][enrichmentResults[[resultKey]]$Source == "DISGENET",]$Term_ID_noLinks,
         "</a>"
-      )  
+      )
   }
 }

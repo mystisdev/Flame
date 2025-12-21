@@ -1,100 +1,4 @@
-runPanther <- function(userInputList, taxid, user_reference = NULL) {
-  # userInputList contains gene identifiers that PANTHER API accepts
-  # PANTHER supports: ENSEMBL gene/protein/transcript, ENTREZ, gene symbols,
-  # NCBI GI, HGNC, IPI, UniGene, UniProt accession/ID
-
-  # Send enrichment request to PANTHER API
-  pantherResult <- sendPantherRequest(userInputList, taxid, user_reference)
-
-  if (isPantherResponseValid(pantherResult)) {
-    # Parse API response into FLAME-compatible format
-    pantherParsedResult <- parsePantherResult(pantherResult)
-
-    if (isEnrichmentResultValid(pantherParsedResult)) {
-      # Filter by user's selected data sources (GO, REAC, etc.)
-      pantherParsedResult <- filterEnrichmentByDataSources(pantherParsedResult, currentEnrichmentType)
-
-      if (nrow(pantherParsedResult) > 0) {
-        # Store results in global structure after adding -log10Pvalue and enrichment scores
-        enrichmentResults[[currentType_Tool]] <<-
-          transformEnrichmentResultTable(pantherParsedResult)
-
-      }
-    }
-  }
-
-  # Always store background size for statistics display
-  enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<- getSimpleBackgroundSize(user_reference)
-}
-
-sendPantherRequest <- function(userInputList, taxid, user_reference = NULL) {
-  url <- "https://pantherdb.org/services/oai/pantherdb/enrich/overrep"
-
-  # Get selected data sources and map to PANTHER annotation dataset IDs
-  selectedDataSources <- input[[paste0(currentEnrichmentType, "_enrichment_datasources")]]
-  pantherDatasets <- mapDataSourcesToPantherDatasets(selectedDataSources)
-
-  # PANTHER expects comma-separated gene lists using PANTHER accession IDs
-  identifiers <- paste0(userInputList, collapse = ",")
-
-  # Get significance metric setting and map to PANTHER correction parameter
-  significanceMetric <- currentSignificanceMetric
-  correction <- switch(
-    significanceMetric,
-    "False discovery rate" = "FDR",
-    "P-value" = "NONE",
-    "Bonferroni" = "BONFERRONI",
-    DEFAULT_METRIC_TEXT = "FDR"
-  )
-
-  # Send requests for each selected annotation dataset
-  allResults <- list()
-
-  for (dataset in pantherDatasets) {
-    if (is.null(user_reference)) {
-      # Genome-wide background analysis
-      params <- list(
-        geneInputList = identifiers,
-        organism = taxid,
-        annotDataSet = dataset,
-        correction = correction,
-        enrichmentTestType = "FISHER",
-        mappedInfo = "COMP_LIST"  # Request gene-term associations
-      )
-    } else {
-      # Custom background analysis
-      background <- paste0(user_reference, collapse = ",")
-      params <- list(
-        geneInputList = identifiers,
-        organism = taxid,
-        refInputList = background,
-        refOrganism = taxid,
-        annotDataSet = dataset,
-        correction = correction,
-        enrichmentTestType = "FISHER",
-        mappedInfo = "COMP_LIST"  # Request gene-term associations
-      )
-    }
-
-    response <- httr::POST(url, body = params, encode = "form")
-    allResults[[dataset]] <- response
-  }
-
-  return(allResults)
-}
-
-isPantherResponseValid <- function(responseList) {
-  isValid <- TRUE
-  for (dataset in names(responseList)) {
-    response <- responseList[[dataset]]
-    if (response$status_code != 200) {
-      isValid <- FALSE
-      renderWarning(paste("Connection to PANTHER could not be established for", dataset, ". Please try again later."))
-      break
-    }
-  }
-  return(isValid)
-}
+# Helper functions used by PANTHERStrategy
 
 extractPantherGeneList <- function(input_list_column) {
   # Extract PANTHER protein IDs from PANTHER's input_list column
@@ -112,9 +16,27 @@ extractPantherGeneList <- function(input_list_column) {
     return("")
   }
 
+  # Determine number of items - handle both data.frame and list inputs
+  # nrow() returns NULL for lists, which causes seq_len(NULL) to error
+  if (is.data.frame(input_list_column)) {
+    n <- nrow(input_list_column)
+  } else {
+    n <- length(input_list_column)
+  }
+
+  # Guard against NULL/0 - seq_len(NULL) or seq_len(0) would fail or return empty
+  if (is.null(n) || n == 0) {
+    return("")
+  }
+
   # Extract mapped_panther_ids (PANTHER protein accessions) from each row
-  gene_lists <- sapply(seq_len(nrow(input_list_column)), function(i) {
-    row_data <- input_list_column[i, ]
+  gene_lists <- sapply(seq_len(n), function(i) {
+    # Handle both data.frame row access and list element access
+    if (is.data.frame(input_list_column)) {
+      row_data <- input_list_column[i, ]
+    } else {
+      row_data <- input_list_column[[i]]
+    }
     if (!is.null(row_data$mapped_panther_ids) && !is.na(row_data$mapped_panther_ids)) {
       return(as.character(row_data$mapped_panther_ids))
     } else {
@@ -123,128 +45,6 @@ extractPantherGeneList <- function(input_list_column) {
   })
 
   return(gene_lists)
-}
-
-parsePantherResult <- function(responseList) {
-  # Parse JSON responses from PANTHER API and combine results
-  allResults <- data.frame()
-
-  # Select the p-value column based on user's metric choice
-  significanceColumnName <- switch(
-    currentSignificanceMetric,
-    "False discovery rate" = "fdr",
-    "P-value" = "pValue",
-    "Bonferroni" = "pValue",  # PANTHER applies Bonferroni to pValue when correction=BONFERRONI
-    DEFAULT_METRIC_TEXT = "fdr"
-  )
-
-  for (dataset in names(responseList)) {
-    response <- responseList[[dataset]]
-    responseBody <- rawToChar(httr::content(response, "raw"))
-
-    # Skip if empty response
-    if (nchar(responseBody) == 0) next
-
-    # Parse JSON with error handling
-    tryCatch({
-      pantherResult <- jsonlite::fromJSON(responseBody)
-    }, error = function(e) {
-      renderWarning(paste("Failed to parse PANTHER response for dataset", dataset, ":", e$message))
-      next
-    })
-
-    # Extract enrichment results
-    if ("results" %in% names(pantherResult) && "result" %in% names(pantherResult$results)) {
-      results <- pantherResult$results$result
-
-      if (length(results) > 0 && is.data.frame(results)) {
-        # Add source annotation dataset information
-        results$annotation_dataset <- dataset
-
-        # Map dataset to FLAME data source name
-        results$flame_source <- mapPantherDatasetToFlameSource(dataset)
-
-        # Extract term information - results$term is already a data.frame with id and label columns
-        results$term_id <- results$term$id
-        results$term_label <- results$term$label
-
-        # Calculate query size from number_in_list (assuming this represents unique genes)
-        # PANTHER doesn't provide total query size directly, so we estimate from results
-        if (nrow(allResults) == 0) {
-          query_size <- max(results$number_in_list, na.rm = TRUE)
-        } else {
-          query_size <- max(c(allResults$query_size[1], max(results$number_in_list, na.rm = TRUE)), na.rm = TRUE)
-        }
-        results$query_size <- query_size
-
-
-        # Apply user's significance filtering (same as other tools)
-        threshold <- as.numeric(input$functional_enrichment_threshold)
-
-        # Filter based on user's selected significance metric
-        if (currentSignificanceMetric == "False discovery rate") {
-          significant_mask <- results[[significanceColumnName]] < threshold
-        } else {
-          # P-value or Bonferroni - use pValue column
-          significant_mask <- results$pValue < threshold
-        }
-
-        results <- results[significant_mask, ]
-
-        if (nrow(results) == 0) {
-          next  # Skip this dataset if no significant results
-        }
-
-        # Filter out unclassified terms
-        # PANTHER returns "UNCLASSIFIED" terms with null term_id that
-        # provide no functional information. These appear across all
-        # annotation categories and can have significant p-values.
-        unclassified_mask <- is.na(results$term_id) |
-          is.na(results$term_label) |
-          results$term_label == "" |
-          toupper(results$term_label) == "UNCLASSIFIED"
-
-        results <- results[!unclassified_mask, ]
-
-        if (nrow(results) == 0) {
-          next  # Skip this dataset if no valid results after filtering
-        }
-
-        # Extract gene lists from input_list column (if available from mappedInfo=COMP_LIST)
-        positive_hits <- if ("input_list" %in% names(results)) {
-          extractPantherGeneList(results$input_list)
-        } else {
-          rep("", nrow(results))  # Fallback to empty strings if no gene data
-        }
-
-        # Select columns we need and rename to FLAME format
-        pantherSelected <- data.frame(
-          Source = results$flame_source,
-          Term_ID = results$term_id,
-          Function = results$term_label,
-          Pvalue = results[[significanceColumnName]],
-          Term_Size = results$number_in_reference,
-          Query_size = results$query_size,
-          Intersection_Size = results$number_in_list,
-          Positive_Hits = positive_hits,
-          stringsAsFactors = FALSE
-        )
-
-        # Rename columns to FLAME's standard names
-        colnames(pantherSelected) <- ENRICHMENT_DF_COLNAMES
-
-        allResults <- rbind(allResults, pantherSelected)
-      }
-    }
-  }
-
-  if (nrow(allResults) > 0) {
-    # Apply PANTHER-specific data processing
-    allResults <- alterPantherSourceKeywords(allResults)
-    allResults <- mapPantherTermIds(allResults)
-  }
-
-  return(allResults)
 }
 
 alterPantherSourceKeywords <- function(pantherResult) {
@@ -333,3 +133,218 @@ mapPantherDatasetToFlameSource <- function(dataset) {
     return(dataset)  # Return original if no mapping found
   }
 }
+
+
+# =============================================================================
+# PANTHERStrategy - Tool Strategy Implementation
+# =============================================================================
+
+PANTHERStrategy <- R6::R6Class("PANTHERStrategy",
+
+  inherit = ToolStrategy,
+
+  public = list(
+    initialize = function() {
+      super$initialize("PANTHER")
+    },
+
+    run = function(inputList, organism, backgroundList, params) {
+      # Map datasources to PANTHER dataset IDs
+      pantherDatasets <- mapDataSourcesToPantherDatasets(params$datasources)
+
+      # Map metric to PANTHER correction parameter
+      correction <- switch(params$metric,
+        "False discovery rate" = "FDR",
+        "P-value" = "NONE",
+        "Bonferroni" = "BONFERRONI",
+        "FDR"  # default
+      )
+
+      # Send requests for each dataset
+      allResponses <- private$sendRequests(
+        inputList, organism, backgroundList, pantherDatasets, correction
+      )
+
+      if (!private$areResponsesValid(allResponses)) {
+        return(NULL)
+      }
+
+      # Parse and combine results
+      result <- private$parseResponses(allResponses, params$metric, params$threshold)
+
+      if (!isEnrichmentResultValid(result)) {
+        return(NULL)
+      }
+
+      # Filter by datasources
+      if (exists("currentEnrichmentType")) {
+        result <- filterEnrichmentByDataSources(result, currentEnrichmentType)
+      }
+
+      if (nrow(result) == 0) {
+        return(NULL)
+      }
+
+      # Store background size (still using global for now)
+      if (exists("currentType_Tool")) {
+        enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<-
+          getSimpleBackgroundSize(backgroundList)
+      }
+
+      return(result)
+    },
+
+    convertIDs = function(geneList, organism, targetNamespace) {
+      return(geneList)
+    },
+
+    getValidDatasources = function(organism) {
+      return(DATASOURCES[["PANTHER"]])
+    },
+
+    getDefaultMetric = function(hasBackground) {
+      return("FDR")
+    }
+  ),
+
+  private = list(
+    sendRequests = function(inputList, taxid, backgroundList, datasets, correction) {
+      url <- "https://pantherdb.org/services/oai/pantherdb/enrich/overrep"
+      identifiers <- paste0(inputList, collapse = ",")
+      allResults <- list()
+
+      for (dataset in datasets) {
+        if (is.null(backgroundList)) {
+          params <- list(
+            geneInputList = identifiers,
+            organism = taxid,
+            annotDataSet = dataset,
+            correction = correction,
+            enrichmentTestType = "FISHER",
+            mappedInfo = "COMP_LIST"
+          )
+        } else {
+          background <- paste0(backgroundList, collapse = ",")
+          params <- list(
+            geneInputList = identifiers,
+            organism = taxid,
+            refInputList = background,
+            refOrganism = taxid,
+            annotDataSet = dataset,
+            correction = correction,
+            enrichmentTestType = "FISHER",
+            mappedInfo = "COMP_LIST"
+          )
+        }
+
+        response <- httr::POST(url, body = params, encode = "form")
+        allResults[[dataset]] <- response
+      }
+
+      return(allResults)
+    },
+
+    areResponsesValid = function(responseList) {
+      for (dataset in names(responseList)) {
+        if (responseList[[dataset]]$status_code != 200) {
+          renderWarning(paste("Connection to PANTHER failed for", dataset))
+          return(FALSE)
+        }
+      }
+      return(TRUE)
+    },
+
+    parseResponses = function(responseList, metric, threshold) {
+      allResults <- data.frame()
+      threshold <- as.numeric(threshold)
+
+      sigColumn <- switch(metric,
+        "False discovery rate" = "fdr",
+        "P-value" = "pValue",
+        "Bonferroni" = "pValue",
+        "fdr"
+      )
+
+      for (dataset in names(responseList)) {
+        response <- responseList[[dataset]]
+        responseBody <- rawToChar(httr::content(response, "raw"))
+
+        if (nchar(responseBody) == 0) next
+
+        tryCatch({
+          pantherResult <- jsonlite::fromJSON(responseBody)
+        }, error = function(e) {
+          next
+        })
+
+        if (!"results" %in% names(pantherResult)) next
+        if (!"result" %in% names(pantherResult$results)) next
+
+        results <- pantherResult$results$result
+        if (length(results) == 0 || !is.data.frame(results)) next
+
+        results$annotation_dataset <- dataset
+        results$flame_source <- mapPantherDatasetToFlameSource(dataset)
+        results$term_id <- results$term$id
+        results$term_label <- results$term$label
+
+        query_size <- if (nrow(allResults) == 0) {
+          max(results$number_in_list, na.rm = TRUE)
+        } else {
+          max(c(allResults$query_size[1], max(results$number_in_list, na.rm = TRUE)), na.rm = TRUE)
+        }
+        results$query_size <- query_size
+
+        # Filter by threshold
+        if (metric == "False discovery rate") {
+          significant_mask <- results[[sigColumn]] < threshold
+        } else {
+          significant_mask <- results$pValue < threshold
+        }
+        results <- results[significant_mask, ]
+
+        if (nrow(results) == 0) next
+
+        # Filter unclassified
+        unclassified_mask <- is.na(results$term_id) |
+          is.na(results$term_label) |
+          results$term_label == "" |
+          toupper(results$term_label) == "UNCLASSIFIED"
+        results <- results[!unclassified_mask, ]
+
+        if (nrow(results) == 0) next
+
+        positive_hits <- if ("input_list" %in% names(results)) {
+          extractPantherGeneList(results$input_list)
+        } else {
+          rep("", nrow(results))
+        }
+
+        pantherSelected <- data.frame(
+          Source = results$flame_source,
+          Term_ID = results$term_id,
+          Function = results$term_label,
+          Pvalue = results[[sigColumn]],
+          Term_Size = results$number_in_reference,
+          Query_size = results$query_size,
+          Intersection_Size = results$number_in_list,
+          Positive_Hits = positive_hits,
+          stringsAsFactors = FALSE
+        )
+
+        colnames(pantherSelected) <- ENRICHMENT_DF_COLNAMES
+        allResults <- rbind(allResults, pantherSelected)
+      }
+
+      if (nrow(allResults) > 0) {
+        allResults <- alterPantherSourceKeywords(allResults)
+        allResults <- mapPantherTermIds(allResults)
+      }
+
+      return(allResults)
+    }
+  )
+)
+
+# Register the strategy
+toolRegistry$register("functional", "PANTHER", PANTHERStrategy$new())

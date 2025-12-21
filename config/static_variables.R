@@ -31,14 +31,17 @@ currentUpsetMode <- ""
 currentConversionResult <- data.frame()
 currentOrthologyResult <- data.frame()
 
+# === Enrichment Input State ===
+# These are set during input parsing in handleEnrichment() before Run object creation
 currentUserList <- c()
 currentEnrichmentType <- ""
 currentOrganism <- ""
 currentEnrichmentTool <- ""
-currentType_Tool <- ""
-currentFullRunKey <- ""      # For multi-run: includes run number (e.g., "functional_gProfiler_1")
-currentRunNumber <- 0        # Current display number (shown in tab title)
-currentUniqueId <- 0         # Current unique ID (used for internal Shiny IDs, never reused)
 currentNamespace <- ""
 currentSignificanceMetric <- ""
 currentBackgroundList <- c()
+
+# === UI Panel State ===
+# Set by generateToolPanel() for UI generation and used as default parameter values
+# in various printing and update functions
+currentType_Tool <- ""

@@ -1,52 +1,5 @@
-runEnrichr <- function(userInputList) {
-  site <- setEnrichrOrganism()
-  databases <- setEnrichrDatabases()
-  
-  result <- enrichR::enrichr(userInputList, databases)
-  
-  enrichrResult <- do.call(rbind, result) # extracting df from list of lists
-  enrichrResult <- filterSignificance(enrichrResult)
-  
-  enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<- getEnrichrBackgroundSize(site, databases)
-  
-  if (isResultValid(enrichrResult)) {
-    enrichrResult <- parseEnirchrResult(enrichrResult, length(userInputList))
-    enrichmentResults[[currentType_Tool]] <<-
-      transformEnrichmentResultTable(enrichrResult)
-  }
-}
-
-setEnrichrOrganism <- function() {
-  site <- switch(
-    ORGANISMS[ORGANISMS$taxid == currentOrganism, ]$short_name,
-    "hsapiens" = "Enrichr",
-    "mmusculus" = "Enrichr",
-    "dmelanogaster" = "FlyEnrichr",
-    "celegans" = "WormEnrichr",
-    "scerevisiae" = "YeastEnrichr",
-    "drerio" = "FishEnrichr",
-    "btaurus" = "OxEnrichr"
-  )
-  enrichR::setEnrichrSite(site)
-  return(site)
-}
-
-setEnrichrDatabases <- function() {
-  toolSources <- getEnrichrOrganismSourceCodes()
-  selectedDatasources <-
-    input[[paste0(currentEnrichmentType, "_enrichment_datasources")]]
-  databases <- as.character(toolSources[
-    selectedDatasources[which(selectedDatasources %in% names(toolSources))]
-  ])
-  return(databases)
-}
-
-getEnrichrOrganismSourceCodes <- function() {
-  prefix <- getEnrichrVariablePrefix()
-  toolSources <- DATASOURCES_CODES[[paste0(prefix, "ENRICHR")]]
-  return(toolSources)
-}
-
+# Get organism-specific prefix for EnrichR database codes
+# Used by UI update functions to get correct datasource options
 getEnrichrVariablePrefix <- function() {
   return(
     switch(
@@ -60,41 +13,6 @@ getEnrichrVariablePrefix <- function() {
       "btaurus" = "OX_"
     )
   )
-}
-
-filterSignificance <- function(enrichrResult) {
-  threshold <- as.numeric(input$functional_enrichment_threshold)
-  enrichrResult <- enrichrResult[enrichrResult$Adjusted.P.value <= threshold, ]
-  return(enrichrResult)
-}
-
-parseEnirchrResult <- function(enrichrResult, numInputs) {
-  enrichrResult$database <- appendEnrichrDatabases(rownames(enrichrResult))
-  rownames(enrichrResult) <- NULL
-  toolSources <- getEnrichrOrganismSourceCodes()
-  enrichrResult$database <- 
-    unlistDatasourceCodes(enrichrResult$database, toolSources)
-  enrichrResult$querySize <- numInputs
-  enrichrResult$Genes <- gsub(";", ",", enrichrResult$Genes)
-  enrichrResult <- enrichrResult %>%
-    tidyr::separate(Overlap, c("overlap", "size"), sep="\\/")
-  enrichrResult$overlap <- as.numeric(enrichrResult$overlap)
-  enrichrResult$size <- as.numeric(enrichrResult$size)
-  result <- splitEnrichrTermIds(enrichrResult)
-  enrichrResult$Term <- result$terms
-  enrichrResult$TermId <- result$ids
-  
-  enrichrResult <-
-    enrichrResult[, c(
-      "database", "TermId", "Term", "Adjusted.P.value",
-      "size", "querySize", "overlap", "Genes")]
-  colnames(enrichrResult) <- ENRICHMENT_DF_COLNAMES
-  enrichrResult <- mapKEGGIds(enrichrResult)
-  return(enrichrResult)
-}
-
-appendEnrichrDatabases <- function(rowNames) {
-  return(sapply((strsplit(rowNames, "\\.")), "[[", 1))
 }
 
 # Configuration-driven term parsing patterns
@@ -147,10 +65,14 @@ parseEnrichrTermsForDb <- function(enrichrResult, config) {
 }
 
 # Main function to split all term IDs based on organism-specific patterns
-splitEnrichrTermIds <- function(enrichrResult) {
+splitEnrichrTermIds <- function(enrichrResult, organismTaxid = NULL) {
+  # Accept organism parameter instead of reading global
+  # Fall back to global for backward compatibility
+  if (is.null(organismTaxid)) organismTaxid <- currentOrganism
+
   terms <- c()
   ids <- c()
-  organism <- ORGANISMS[ORGANISMS$taxid == currentOrganism, ]$short_name
+  organism <- ORGANISMS[ORGANISMS$taxid == organismTaxid, ]$short_name
 
   # Define which patterns to use based on organism
   patternsToUse <- c("GO", "REAC", "WP", "DO", "WBP", "WBBT", "ORPHA", "HP")
@@ -191,3 +113,176 @@ getEnrichrBackgroundSize <- function(site, selected_dbs) {
     size <- NULL
   return(size)
 }
+
+
+# =============================================================================
+# EnrichRStrategy - Tool Strategy Implementation
+# =============================================================================
+#
+# Implements the ToolStrategy interface for enrichR.
+# This class wraps the existing enrichR functions but:
+# - Takes explicit parameters instead of reading globals
+# - Returns results instead of storing in globals
+
+EnrichRStrategy <- R6::R6Class("EnrichRStrategy",
+
+  inherit = ToolStrategy,
+
+  public = list(
+    initialize = function() {
+      super$initialize("enrichR")
+    },
+
+    # Execute enrichR analysis
+    # @param inputList Character vector of gene symbols
+    # @param organism Organism taxid
+    # @param backgroundList Not used by enrichR (always uses database background)
+    # @param params List with: datasources, threshold
+    # @return Data frame of enrichment results, or NULL
+    run = function(inputList, organism, backgroundList, params) {
+      # Set up enrichR site based on organism
+      site <- private$getEnrichrSite(organism)
+      enrichR::setEnrichrSite(site)
+
+      # Get database codes for selected datasources
+      databases <- private$getDatabaseCodes(organism, params$datasources)
+
+      if (length(databases) == 0) {
+        warning("No valid enrichR databases selected")
+        return(NULL)
+      }
+
+      # Call enrichR API
+      result <- enrichR::enrichr(inputList, databases)
+
+      # Combine results from all databases
+      enrichrResult <- do.call(rbind, result)
+
+      # Filter by significance threshold
+      threshold <- as.numeric(params$threshold)
+      enrichrResult <- enrichrResult[enrichrResult$Adjusted.P.value <= threshold, ]
+
+      # Store background size (still using global for now - will be refactored)
+      if (exists("currentType_Tool")) {
+        enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<-
+          getEnrichrBackgroundSize(site, databases)
+      }
+
+      # Check if we have valid results
+      if (!isResultValid(enrichrResult)) {
+        return(NULL)
+      }
+
+      # Parse results into standard format
+      enrichrResult <- private$parseResult(enrichrResult, length(inputList), organism)
+
+      return(enrichrResult)
+    },
+
+    # enrichR uses gene symbols directly - no conversion needed
+    convertIDs = function(geneList, organism, targetNamespace) {
+      return(geneList)
+    },
+
+    # Get valid datasources for enrichR based on organism
+    getValidDatasources = function(organism) {
+      prefix <- private$getVariablePrefix(organism)
+      return(names(DATASOURCES_CODES[[paste0(prefix, "ENRICHR")]]))
+    },
+
+    # enrichR only supports FDR (Adjusted.P.value)
+    getDefaultMetric = function(hasBackground) {
+      return("fdr")
+    }
+  ),
+
+  private = list(
+    # Map organism taxid to enrichR site name
+    getEnrichrSite = function(organism) {
+      shortName <- ORGANISMS[ORGANISMS$taxid == organism, ]$short_name
+      site <- switch(shortName,
+        "hsapiens" = "Enrichr",
+        "mmusculus" = "Enrichr",
+        "dmelanogaster" = "FlyEnrichr",
+        "celegans" = "WormEnrichr",
+        "scerevisiae" = "YeastEnrichr",
+        "drerio" = "FishEnrichr",
+        "btaurus" = "OxEnrichr",
+        "Enrichr"  # default
+      )
+      return(site)
+    },
+
+    # Get organism-specific variable prefix for datasource lookup
+    getVariablePrefix = function(organism) {
+      shortName <- ORGANISMS[ORGANISMS$taxid == organism, ]$short_name
+      prefix <- switch(shortName,
+        "mmusculus" = "MOUSE_",
+        "dmelanogaster" = "FLY_",
+        "celegans" = "WORM_",
+        "scerevisiae" = "YEAST_",
+        "drerio" = "FISH_",
+        "btaurus" = "OX_",
+        ""  # default (human)
+      )
+      return(prefix)
+    },
+
+    # Convert UI datasource names to enrichR database codes
+    getDatabaseCodes = function(organism, selectedDatasources) {
+      prefix <- private$getVariablePrefix(organism)
+      toolSources <- DATASOURCES_CODES[[paste0(prefix, "ENRICHR")]]
+      databases <- as.character(toolSources[
+        selectedDatasources[which(selectedDatasources %in% names(toolSources))]
+      ])
+      return(databases)
+    },
+
+    # Parse enrichR result into standard format
+    parseResult = function(enrichrResult, numInputs, organism) {
+      # Add database column from rownames
+      enrichrResult$database <- sapply(strsplit(rownames(enrichrResult), "\\."), "[[", 1)
+      rownames(enrichrResult) <- NULL
+
+      # Convert database codes back to display names
+      prefix <- private$getVariablePrefix(organism)
+      toolSources <- DATASOURCES_CODES[[paste0(prefix, "ENRICHR")]]
+      enrichrResult$database <- unlistDatasourceCodes(enrichrResult$database, toolSources)
+
+      enrichrResult$querySize <- numInputs
+      enrichrResult$Genes <- gsub(";", ",", enrichrResult$Genes)
+
+      # Split overlap column
+      enrichrResult <- enrichrResult %>%
+        tidyr::separate(Overlap, c("overlap", "size"), sep = "\\/")
+      enrichrResult$overlap <- as.numeric(enrichrResult$overlap)
+      enrichrResult$size <- as.numeric(enrichrResult$size)
+
+      # Parse term IDs (uses organism-specific patterns)
+      result <- private$splitTermIds(enrichrResult, organism)
+      enrichrResult$Term <- result$terms
+      enrichrResult$TermId <- result$ids
+
+      # Select and rename columns to standard format
+      enrichrResult <- enrichrResult[, c(
+        "database", "TermId", "Term", "Adjusted.P.value",
+        "size", "querySize", "overlap", "Genes"
+      )]
+      colnames(enrichrResult) <- ENRICHMENT_DF_COLNAMES
+
+      # Map KEGG IDs
+      enrichrResult <- mapKEGGIds(enrichrResult)
+
+      return(enrichrResult)
+    },
+
+    # Split term IDs based on organism-specific patterns
+    # Accept organism parameter instead of reading global
+    splitTermIds = function(enrichrResult, organism) {
+      return(splitEnrichrTermIds(enrichrResult, organism))
+    }
+  )
+)
+
+# Register the strategy with the global registry
+toolRegistry$register("functional", "enrichR", EnrichRStrategy$new())

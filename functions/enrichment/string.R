@@ -1,113 +1,4 @@
-runString <- function(userInputList, taxid, user_reference = NULL) {
-  # userInputList and user_reference already contain STRING IDs from FLAME's gene conversion
-  # See geneConvert() calls and stringPOSTConvertENSP in main.R
-
-  # Send enrichment request to STRING API
-  stringResult <- sendStringRequest(userInputList, taxid, user_reference)
-
-  if (isStringResponseValid(stringResult)) {
-    # Parse API response into FLAME-compatible format
-    stringParsedResult <- parseStringResult(stringResult)
-
-    if (isEnrichmentResultValid(stringParsedResult)) {
-      # Filter by user's selected data sources (GO, KEGG, etc.)
-      stringParsedResult <- filterEnrichmentByDataSources(stringParsedResult, currentEnrichmentType)
-
-      # Filter by user's significance threshold (STRING API doesn't support this)
-      stringParsedResult <- filterStringByThreshold(stringParsedResult)
-
-      if (nrow(stringParsedResult) > 0) {
-        # Store results in global structure after adding -log10Pvalue and enrichment scores
-        enrichmentResults[[currentType_Tool]] <<-
-          transformEnrichmentResultTable(stringParsedResult)
-      }
-    }
-  }
-
-  # Always store background size for statistics display
-  enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<- getSimpleBackgroundSize(user_reference)
-}
-
-sendStringRequest <- function(userInputList, taxid, user_reference = NULL) {
-  url <- "https://string-db.org/api/tsv/enrichment"
-
-  # STRING expects carriage return (%0d) separated gene lists
-  identifiers <- paste0(userInputList, collapse = "%0d")
-
-  if (is.null(user_reference)) {
-    # Genome-wide background analysis
-    params <- list(
-      identifiers = identifiers,
-      species = taxid
-    )
-  } else {
-    # Custom background analysis - include background_string_identifiers parameter
-    background <- paste0(user_reference, collapse = "%0d")
-    params <- list(
-      identifiers = identifiers,
-      background_string_identifiers = background,
-      species = taxid
-    )
-  }
-
-  # Use POST instead of GET to avoid 414 Request-URI Too Large errors with large gene lists
-  response <- httr::POST(url, body = params)
-  return(response)
-}
-
-isStringResponseValid <- function(response) {
-  isValid <- TRUE
-  if (response$status_code != 200) {
-    isValid <- FALSE
-    renderWarning("Connection to STRING could not be established. Please try again later.")
-  }
-  return(isValid)
-}
-
-parseStringResult <- function(response) {
-  # Parse TSV response from STRING API
-  responseBody <- rawToChar(httr::content(response, "raw"))
-  stringResult <- read.delim(text = responseBody, header = TRUE)
-
-  if (nrow(stringResult) == 0) {
-    return(NULL)
-  }
-
-  # Select the p-value column based on user's metric choice
-  significanceColumnName <- switch(
-    currentSignificanceMetric,
-    "False discovery rate" = "fdr",
-    "P-value" = "p_value",
-    DEFAULT_METRIC_TEXT = "fdr"
-  )
-
-  # Extract columns we need from STRING's response
-  stringResult <- stringResult[, c(
-    "category", "term", "description", significanceColumnName,
-    "number_of_genes_in_background", "number_of_genes", "inputGenes"
-  )]
-
-  # Calculate query size (total unique genes across all enrichment terms)
-  # This is needed because STRING gives per-term gene counts, but we need overall query size
-  allGenes <- unique(unlist(strsplit(paste(stringResult$inputGenes, collapse = ","), ",")))
-  stringResult$query_size <- length(allGenes)
-
-  # Reorder columns to match FLAME's expected format
-  stringResult <- stringResult[, c(
-    "category", "term", "description", significanceColumnName,
-    "number_of_genes_in_background", "query_size", "number_of_genes", "inputGenes"
-  )]
-
-  # Rename columns to FLAME's standard names
-  colnames(stringResult) <- ENRICHMENT_DF_COLNAMES
-
-  # Clean up and standardize the data
-  stringResult <- parseStringPositiveHits(stringResult)     # Fix gene list formatting
-  stringResult <- alterStringSourceKeywords(stringResult)   # Map category names to FLAME standards
-  stringResult <- mapStringTermIds(stringResult)            # Standardize term IDs for linking
-
-  return(stringResult)
-}
+# Helper functions used by STRINGStrategy
 
 parseStringPositiveHits <- function(stringResult) {
   stringResult$`Positive Hits` <- gsub(",", ",", stringResult$`Positive Hits`)
@@ -133,16 +24,6 @@ alterStringSourceKeywords <- function(stringResult) {
   stringResult$Source <- gsub("^TISSUES$", "BTO", stringResult$Source)
   stringResult$Source <- gsub("^HPO$", "HP", stringResult$Source)
   return(stringResult)
-}
-
-filterStringByThreshold <- function(stringParsedResult) {
-  # STRING API doesn't support threshold filtering, so we filter results after retrieval
-  # This matches behavior of enrichR, PANTHER, and GeneCodis
-  threshold <- as.numeric(input[[paste0(currentEnrichmentType, "_enrichment_threshold")]])
-
-  # The P-value column has already been renamed to "P-value" in parseStringResult
-  filteredResult <- stringParsedResult[stringParsedResult$`P-value` <= threshold, ]
-  return(filteredResult)
 }
 
 mapStringTermIds <- function(stringResult) {
@@ -171,8 +52,144 @@ mapStringTermIds <- function(stringResult) {
     }
   }
 
-  # Note: Other categories already return Term IDs in the correct format that FLAME 
+  # Note: Other categories already return Term IDs in the correct format that FLAME
   # expects, so no mapping needed.
 
   return(stringResult)
 }
+
+
+# =============================================================================
+# STRINGStrategy - Tool Strategy Implementation
+# =============================================================================
+
+STRINGStrategy <- R6::R6Class("STRINGStrategy",
+
+  inherit = ToolStrategy,
+
+  public = list(
+    initialize = function() {
+      super$initialize("STRING")
+    },
+
+    run = function(inputList, organism, backgroundList, params) {
+      # STRING expects STRING IDs (already converted upstream by FLAME's gene conversion)
+      # Send enrichment request
+      response <- private$sendRequest(inputList, organism, backgroundList)
+
+      if (!private$isResponseValid(response)) {
+        return(NULL)
+      }
+
+      # Parse API response
+      result <- private$parseResponse(response, params$metric)
+
+      if (!isEnrichmentResultValid(result)) {
+        return(NULL)
+      }
+
+      # Filter by user's selected datasources using params directly
+      if (!is.null(params$datasources) && length(params$datasources) > 0) {
+        result <- result[result$Source %in% params$datasources, ]
+      }
+
+      # Filter by threshold
+      threshold <- as.numeric(params$threshold)
+      result <- result[result$`P-value` <= threshold, ]
+
+      if (nrow(result) == 0) {
+        return(NULL)
+      }
+
+      # Store background size (still using global for now)
+      if (exists("currentType_Tool")) {
+        enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<-
+          getSimpleBackgroundSize(backgroundList)
+      }
+
+      return(result)
+    },
+
+    convertIDs = function(geneList, organism, targetNamespace) {
+      # STRING ID conversion is handled upstream by FLAME
+      return(geneList)
+    },
+
+    getValidDatasources = function(organism) {
+      return(DATASOURCES[["STRING"]])
+    },
+
+    getDefaultMetric = function(hasBackground) {
+      return("fdr")
+    }
+  ),
+
+  private = list(
+    sendRequest = function(inputList, taxid, backgroundList) {
+      url <- "https://string-db.org/api/tsv/enrichment"
+      identifiers <- paste0(inputList, collapse = "%0d")
+
+      if (is.null(backgroundList)) {
+        params <- list(identifiers = identifiers, species = taxid)
+      } else {
+        background <- paste0(backgroundList, collapse = "%0d")
+        params <- list(
+          identifiers = identifiers,
+          background_string_identifiers = background,
+          species = taxid
+        )
+      }
+
+      return(httr::POST(url, body = params))
+    },
+
+    isResponseValid = function(response) {
+      if (response$status_code != 200) {
+        renderWarning("Connection to STRING could not be established. Please try again later.")
+        return(FALSE)
+      }
+      return(TRUE)
+    },
+
+    parseResponse = function(response, metric) {
+      responseBody <- rawToChar(httr::content(response, "raw"))
+      result <- read.delim(text = responseBody, header = TRUE)
+
+      if (nrow(result) == 0) {
+        return(NULL)
+      }
+
+      # Select p-value column based on metric
+      sigColumn <- switch(metric,
+        "False discovery rate" = "fdr",
+        "P-value" = "p_value",
+        "fdr"  # default
+      )
+
+      result <- result[, c(
+        "category", "term", "description", sigColumn,
+        "number_of_genes_in_background", "number_of_genes", "inputGenes"
+      )]
+
+      allGenes <- unique(unlist(strsplit(paste(result$inputGenes, collapse = ","), ",")))
+      result$query_size <- length(allGenes)
+
+      result <- result[, c(
+        "category", "term", "description", sigColumn,
+        "number_of_genes_in_background", "query_size", "number_of_genes", "inputGenes"
+      )]
+
+      colnames(result) <- ENRICHMENT_DF_COLNAMES
+      result <- parseStringPositiveHits(result)
+      result <- alterStringSourceKeywords(result)
+      result <- mapStringTermIds(result)
+
+      return(result)
+    }
+  )
+)
+
+# Register the strategy for both enrichment types
+# STRING is used in both Functional and Literature enrichment
+toolRegistry$register("functional", "STRING", STRINGStrategy$new())
+toolRegistry$register("literature", "STRING", STRINGStrategy$new())

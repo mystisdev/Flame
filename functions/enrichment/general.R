@@ -11,11 +11,20 @@ transformEnrichmentResultTable <- function(enrichmentParsedResult) {
     enrichmentParsedResult$`Intersection Size`,
     enrichmentParsedResult$`Term Size`
   )
-  enrichmentParsedResult <- enrichmentParsedResult[, c(
+
+  # Define base columns to keep
+  baseColumns <- c(
     "Source", "Term_ID", "Function", "P-value", "-log10Pvalue",
     "Term Size", "Query size", "Intersection Size",
     "Enrichment Score %", "Positive Hits"
-  )]
+  )
+
+  # Preserve Term_ID_noLinks if it exists (WebGestalt includes links pre-attached)
+  if ("Term_ID_noLinks" %in% colnames(enrichmentParsedResult)) {
+    baseColumns <- c(baseColumns, "Term_ID_noLinks")
+  }
+
+  enrichmentParsedResult <- enrichmentParsedResult[, baseColumns]
   return(enrichmentParsedResult)
 }
 

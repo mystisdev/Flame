@@ -1,8 +1,8 @@
-arenaHandler <- function(enrichmentType, enrichmentTool, networkId) {
+arenaHandler <- function(run, networkId) {
   tryCatch({
     renderModal("<h2>Please wait.</h2><p>Building network for Arena3Dweb</p>")
-    currentArenaEdgelist <- arenaEdgelist[[paste(enrichmentType, enrichmentTool,
-                                                 networkId, sep = "_")]]
+    arenaKey <- run$getInputId(networkId)
+    currentArenaEdgelist <- arenaEdgelist[[arenaKey]]
     if (existsNetwork(currentArenaEdgelist)){
       jsonBody <- constructArenaJSONBody(currentArenaEdgelist)
       sendToAPI(ARENA_API_LINK, jsonBody)

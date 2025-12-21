@@ -58,8 +58,9 @@ captureRunParameters <- function() {
   rawMetric <- input[[paste0(currentEnrichmentType, "_enrichment_metric")]]
 
   # Resolve namespace default to tool-specific value
+  # Note: Uses globals set in handleEnrichment before this function is called
   resolvedNamespace <- if (rawNamespace == DEFAULT_NAMESPACE_TEXT) {
-    getDefaultTargetNamespace()
+    getDefaultTargetNamespace(currentEnrichmentTool, currentOrganism)
   } else {
     rawNamespace
   }
@@ -138,32 +139,6 @@ findMatchingRun <- function(enrichmentType, toolName, params) {
     }
   }
   return(list(matchType = NULL, fullRunKey = NULL))
-}
-
-# Update stored parameters for a run (used when datasources change)
-updateRunParameters <- function(fullRunKey, newParams) {
-  activeRuns[[fullRunKey]]$parameters <<- newParams
-  activeRuns[[fullRunKey]]$timestamp <<- Sys.time()
-}
-
-# Register a new run in activeRuns
-# uniqueId: used for internal Shiny IDs (never reused)
-# displayNumber: shown to user in tab title (can reset)
-registerRun <- function(enrichmentType, toolName, uniqueId, displayNumber, params) {
-  runId <- createRunId(toolName, uniqueId)
-  fullRunKey <- getFullRunKey(enrichmentType, runId)
-
-  activeRuns[[fullRunKey]] <<- list(
-    runId = runId,
-    toolName = toolName,
-    uniqueId = uniqueId,
-    runNumber = displayNumber,  # Keep as runNumber for backward compatibility
-    enrichmentType = enrichmentType,
-    timestamp = Sys.time(),
-    parameters = params
-  )
-
-  return(fullRunKey)
 }
 
 # Unregister a run from activeRuns

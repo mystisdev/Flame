@@ -5,30 +5,22 @@ isEventFromManhattan <- function(triggeredEvent) {
   return(isFromManhattan)
 }
 
-handleManhattanPlot <- function(fullRunKey = NULL) {
+handleManhattanPlot <- function(run) {
   tryCatch({
     renderModal("<h2>Please wait.</h2><br /><p>Rendering Manhattan Plot.</p>")
-    # Use fullRunKey if provided, otherwise fall back to currentType_Tool
-    type_Tool <- if (!is.null(fullRunKey)) fullRunKey else currentType_Tool
 
-    enrichmentResult <- enrichmentResults[[type_Tool]]
-    if (!is.null(enrichmentResult) && nrow(enrichmentResult) > 0) {
-      # Build output IDs: dynamic for multi-run, hardcoded for legacy tab
-      if (!is.null(fullRunKey)) {
-        plotOutputId <- paste(fullRunKey, "manhattan", sep = "_")
-        tableOutputId <- paste(fullRunKey, "manhattan_table", sep = "_")
-      } else {
-        plotOutputId <- "manhattan"
-        tableOutputId <- "manhattan_table"
-      }
+    if (run$hasResults()) {
+      plotOutputId <- run$getInputId("manhattan")
+      tableOutputId <- run$getInputId("manhattan_table")
 
-      # Store table ID for click handlers to use
-      currentManhattanTableId <<- tableOutputId
+      # Removed global currentManhattanTableId assignment
+      # Click handlers now derive table ID from run object
 
-      if (isGprofilerResultValid()) {
-        renderManhattanPlot(plotOutputId, type_Tool)
+      # Manhattan plot is only available for gProfiler
+      if (run$toolName == "gProfiler" && isGprofilerResultValid(run$id)) {
+        renderManhattanPlot(plotOutputId, run$id)
         # Show full enrichment table immediately
-        renderManhattanEnrichmentTable(tableOutputId, enrichmentResult)
+        renderManhattanEnrichmentTable(tableOutputId, run$getResults())
       } else {
         renderWarning("The Manhattan plot is currently available
                       only for the GPROFILER analysis pipeline.")
@@ -44,26 +36,54 @@ handleManhattanPlot <- function(fullRunKey = NULL) {
   })
 }
 
+# Updated to derive run context from current state instead of reading globals
+# Updated to use run object to derive table ID instead of global currentManhattanTableId
 handleManhattanClick <- function(currentTermID) {
   tryCatch({
+    # Derive run context (same pattern as handlePlotClick)
+    selectedTool <- currentSelectedToolTab
+    if (is.null(selectedTool) || selectedTool == "") return()
+
+    enrichmentType <- deriveEnrichmentTypeFromSidebar()
+    if (is.null(enrichmentType)) return()
+
+    fullRunKey <- paste(enrichmentType, selectedTool, sep = "_")
+    run <- activeRuns[[fullRunKey]]
+    if (is.null(run)) return()
+
     currentTermID <- mapGProfilerIDs(currentTermID)
-    manhattanTable <- enrichmentResults[[currentType_Tool]][match(
-      currentTermID, enrichmentResults[[currentType_Tool]]$Term_ID_noLinks), ]
-    renderManhattanEnrichmentTable(currentManhattanTableId, manhattanTable)
+    results <- run$getResults()
+    manhattanTable <- results[match(currentTermID, results$Term_ID_noLinks), ]
+    # Updated to derive table ID from run instead of global
+    tableOutputId <- run$getInputId("manhattan_table")
+    renderManhattanEnrichmentTable(tableOutputId, manhattanTable)
   }, error = function(e) {
     cat(paste0("Error: ", e))
     renderWarning("Could not print selected entries.")
   })
 }
 
+# Updated to derive run context from current state instead of reading globals
+# Updated to use run object to derive table ID instead of global currentManhattanTableId
 handleManhattanSelect <- function(currentTermIDs) {
   tryCatch({
+    # Derive run context (same pattern as handlePlotClick)
+    selectedTool <- currentSelectedToolTab
+    if (is.null(selectedTool) || selectedTool == "") return()
+
+    enrichmentType <- deriveEnrichmentTypeFromSidebar()
+    if (is.null(enrichmentType)) return()
+
+    fullRunKey <- paste(enrichmentType, selectedTool, sep = "_")
+    run <- activeRuns[[fullRunKey]]
+    if (is.null(run)) return()
+
     currentTermIDs <- mapGProfilerIDs(currentTermIDs)
-    manhattanTable <-
-      enrichmentResults[[currentType_Tool]][which(
-        enrichmentResults[[currentType_Tool]]$Term_ID_noLinks %in% currentTermIDs
-      ), ]
-    renderManhattanEnrichmentTable(currentManhattanTableId, manhattanTable)
+    results <- run$getResults()
+    manhattanTable <- results[which(results$Term_ID_noLinks %in% currentTermIDs), ]
+    # Updated to derive table ID from run instead of global
+    tableOutputId <- run$getInputId("manhattan_table")
+    renderManhattanEnrichmentTable(tableOutputId, manhattanTable)
   }, error = function(e) {
     cat(paste0("Error: ", e))
     renderWarning("Could not print selected entries.")

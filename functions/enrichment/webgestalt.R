@@ -1,86 +1,162 @@
-runWebgestalt <- function(userInputList, user_reference = NULL) {
-  datasources <- as.character(DATASOURCES_CODES[["WEBGESTALT"]][
-    input[[paste0(currentEnrichmentType, "_enrichment_datasources")]]
-  ])
-  organism <- ORGANISMS[ORGANISMS$taxid == currentOrganism, ]$short_name
-  # different short name between gprofiler and webgestalt
-  if (organism == "clfamiliaris")
-    organism <- "cfamiliaris"
-  namespace <- 
-    ifelse(input[[paste0(currentEnrichmentType, "_enrichment_namespace")]] == "USERINPUT",
-           "genesymbol", "entrezgene")
-  
-  if(currentSignificanceMetric == "top") {
-    sigMethod <- "top"
-    fdrMethod <- "BH"
-  }
-  else {
-    sigMethod <- "fdr"
-    fdrMethod <- currentSignificanceMetric
-  }
-  
-  
-  if(is.null(user_reference)) {
-    referenceSet <- "genome"
-    referenceGene <- NULL
-    referenceGeneType <- NULL
-    enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<- getWebgestaltBackgroundSize(organism = organism)
-  }
-  else {
-    referenceSet <- NULL
-    referenceGene <- user_reference
-    referenceGeneType <- namespace
-    enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<- length(user_reference)
-  }
-  
-  result <- suppressWarnings(WebGestaltR::WebGestaltR(
-    organism = organism,
-    enrichDatabase = datasources,
-    interestGene = userInputList,
-    interestGeneType = namespace,
-    referenceGene = referenceGene,
-    referenceGeneType = referenceGeneType,
-    referenceSet = referenceSet,
-    sigMethod = sigMethod,
-    fdrMethod = fdrMethod,
-    fdrThr = as.numeric(input$functional_enrichment_threshold),
-    topThr = 100,
-    isOutput = F, # doesn't create extra load with folders
-    hostName = "https://www.webgestalt.org/"
-  ))
-  
-  if (isResultValid(result)) {
-    webgestaltResult <- parseWebgestaltResult(result, length(userInputList))
-    enrichmentResults[[currentType_Tool]] <<-
-      transformEnrichmentResultTable(webgestaltResult)
-    attachWebgestaltLinks(result$link)
-  }
-}
-
-parseWebgestaltResult <- function(webgestaltResult, numInputs) {
-  if (is.null(webgestaltResult$database))
-    webgestaltResult$database <- as.character(DATASOURCES_CODES[["WEBGESTALT"]][
-      input[[paste0(currentEnrichmentType, "_enrichment_datasources")]]
-    ])
-  webgestaltResult$database <- 
-    unlistDatasourceCodes(webgestaltResult$database, DATASOURCES_CODES[["WEBGESTALT"]])
-  if (is.null(webgestaltResult$userId)) # straight from entrezgene namespace
-    webgestaltResult$userId <- webgestaltResult$overlapId
-  webgestaltResult$userId <- gsub(";", ",", webgestaltResult$userId)
-  webgestaltResult$querySize <- numInputs
-  
-  webgestaltResult <-
-    webgestaltResult[, c(
-      "database", "geneSet", "description", "pValue",
-      "size", "querySize", "overlap", "userId")]
-  colnames(webgestaltResult) <- ENRICHMENT_DF_COLNAMES
-  webgestaltResult <- mapKEGGIds(webgestaltResult)
-  return(webgestaltResult)
-}
-
-
 getWebgestaltBackgroundSize <- function(organism = "hsapiens", referenceSet = "genome_protein-coding") {
   url <- sprintf("https://www.webgestalt.org/api/reference?organism=%s&referenceSet=%s", organism, referenceSet)
   x <- read.csv(url(url), header=F)
   return(length(x$V1))
 }
+
+
+# =============================================================================
+# WebGestaltStrategy - Tool Strategy Implementation
+# =============================================================================
+
+WebGestaltStrategy <- R6::R6Class("WebGestaltStrategy",
+
+  inherit = ToolStrategy,
+
+  public = list(
+    initialize = function() {
+      super$initialize("WebGestalt")
+    },
+
+    run = function(inputList, organism, backgroundList, params) {
+      # Get datasource codes
+      datasources <- as.character(DATASOURCES_CODES[["WEBGESTALT"]][params$datasources])
+      datasources <- datasources[!is.na(datasources)]
+
+      if (length(datasources) == 0) {
+        return(NULL)
+      }
+
+      # Get organism short name (WebGestalt uses different name for dog)
+      organismName <- ORGANISMS[ORGANISMS$taxid == organism, ]$short_name
+      if (organismName == "clfamiliaris") {
+        organismName <- "cfamiliaris"
+      }
+
+      # Determine namespace
+      namespace <- if (!is.null(params$namespace) && params$namespace != "USERINPUT") {
+        "entrezgene"
+      } else {
+        "genesymbol"
+      }
+
+      # Determine significance method
+      metric <- params$metric
+      if (metric == "top") {
+        sigMethod <- "top"
+        fdrMethod <- "BH"
+      } else {
+        sigMethod <- "fdr"
+        fdrMethod <- metric
+      }
+
+      # Determine background
+      if (is.null(backgroundList)) {
+        referenceSet <- "genome"
+        referenceGene <- NULL
+        referenceGeneType <- NULL
+      } else {
+        referenceSet <- NULL
+        referenceGene <- backgroundList
+        referenceGeneType <- namespace
+      }
+
+      # Call WebGestalt API
+      result <- suppressWarnings(WebGestaltR::WebGestaltR(
+        organism = organismName,
+        enrichDatabase = datasources,
+        interestGene = inputList,
+        interestGeneType = namespace,
+        referenceGene = referenceGene,
+        referenceGeneType = referenceGeneType,
+        referenceSet = referenceSet,
+        sigMethod = sigMethod,
+        fdrMethod = fdrMethod,
+        fdrThr = as.numeric(params$threshold),
+        topThr = 100,
+        isOutput = FALSE,
+        hostName = "https://www.webgestalt.org/"
+      ))
+
+      # Store background size (still using global for now)
+      if (exists("currentType_Tool")) {
+        if (is.null(backgroundList)) {
+          enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<-
+            getWebgestaltBackgroundSize(organism = organismName)
+        } else {
+          enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<- length(backgroundList)
+        }
+      }
+
+      if (!isResultValid(result)) {
+        return(NULL)
+      }
+
+      # Parse result (includes link attachment inline to avoid timing issues)
+      return(private$parseResult(result, length(inputList), params$datasources))
+    },
+
+    convertIDs = function(geneList, organism, targetNamespace) {
+      return(geneList)
+    },
+
+    getValidDatasources = function(organism) {
+      return(names(DATASOURCES_CODES[["WEBGESTALT"]]))
+    },
+
+    getDefaultMetric = function(hasBackground) {
+      return("BH")
+    }
+  ),
+
+  private = list(
+    parseResult = function(result, numInputs, selectedDatasources) {
+      if (is.null(result$database)) {
+        result$database <- as.character(DATASOURCES_CODES[["WEBGESTALT"]][selectedDatasources])
+      }
+      result$database <- unlistDatasourceCodes(result$database, DATASOURCES_CODES[["WEBGESTALT"]])
+
+      if (is.null(result$userId)) {
+        result$userId <- result$overlapId
+      }
+      result$userId <- gsub(";", ",", result$userId)
+      result$querySize <- numInputs
+
+      # Preserve original Term_ID before creating linked version
+      termIdNoLinks <- result$geneSet
+
+      # Create linked Term_IDs if links are available
+      if (!is.null(result$link)) {
+        linkedTermId <- paste0(
+          "<a href='", result$link, "' target='_blank'>",
+          result$geneSet, "</a>"
+        )
+        # Handle DISGENET special case (same as attachWebgestaltLinks)
+        if ("DISGENET" %in% result$database) {
+          disgenetMask <- result$database == "DISGENET"
+          linkedTermId[disgenetMask] <- paste0(
+            "<a href='https://www.disgenet.org/search/0/",
+            result$geneSet[disgenetMask], "/' target='_blank'>",
+            result$geneSet[disgenetMask], "</a>"
+          )
+        }
+        result$geneSet <- linkedTermId
+      }
+
+      result <- result[, c(
+        "database", "geneSet", "description", "pValue",
+        "size", "querySize", "overlap", "userId"
+      )]
+      colnames(result) <- ENRICHMENT_DF_COLNAMES
+      result <- mapKEGGIds(result)
+
+      # Add Term_ID_noLinks column (formatResultTable checks for this)
+      result$Term_ID_noLinks <- termIdNoLinks
+
+      return(result)
+    }
+  )
+)
+
+# Register the strategy
+toolRegistry$register("functional", "WebGestalt", WebGestaltStrategy$new())

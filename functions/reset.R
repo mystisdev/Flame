@@ -17,9 +17,9 @@ resetCombination <- function() {
 # Output clearing is now handled exclusively by outputRegistry$clearOutputs() 
 # for consistency
 
-resetEdgelist_ViewAndArenaObjects <- function(enrichmentType, enrichmentTool, networkId) {
-  arenaEdgelist[[paste(enrichmentType, enrichmentTool, networkId, sep = "_")]] <<- data.frame()
-  output[[paste(enrichmentType, enrichmentTool, networkId, "edgelist", sep = "_")]] <- renderDataTable(c())
-  output[[paste(enrichmentType, enrichmentTool, networkId, sep = "_")]] <- renderVisNetwork({})
-  shinyjs::hide(paste(enrichmentType, enrichmentTool, networkId, sep = "_"))
+resetEdgelist_ViewAndArenaObjects <- function(runKey, networkId) {
+  arenaEdgelist[[paste(runKey, networkId, sep = "_")]] <<- data.frame()
+  output[[paste(runKey, networkId, "edgelist", sep = "_")]] <- renderDataTable(c())
+  output[[paste(runKey, networkId, sep = "_")]] <- renderVisNetwork({})
+  shinyjs::hide(paste(runKey, networkId, sep = "_"))
 }

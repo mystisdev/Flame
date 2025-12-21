@@ -1,19 +1,18 @@
-handleBarchart <- function(enrichmentType, enrichmentTool) {
+handleBarchart <- function(run) {
   tryCatch({
     renderModal("<h2>Please wait.</h2><br /><p>Rendering Barchart.</p>")
-    if (existEnrichmentResults(enrichmentType, enrichmentTool)) {
-      type_Tool <- paste(enrichmentType, enrichmentTool, sep = "_")
-      sourceSelect <- input[[paste(type_Tool, "barchart_sourceSelect", sep = "_")]]
-      mode <- input[[paste(type_Tool, "barchart_mode", sep = "_")]]
-      
+    if (run$hasResults()) {
+      sourceSelect <- input[[run$getInputId("barchart_sourceSelect")]]
+      mode <- input[[run$getInputId("barchart_mode")]]
+
       if (isSourceNotNull(sourceSelect)) {
         enrichmentFilteredData <- filterAndPrintTable(
-          enrichmentType, enrichmentTool,
-          outputId = paste(type_Tool, "barchart", sep = "_"),
+          run$enrichmentType, run$id,
+          outputId = run$getInputId("barchart"),
           sourceSelect = sourceSelect,
           mode = mode,
-          slider = input[[paste(type_Tool, "barchart_slider", sep = "_")]])
-        constructBarchart(type_Tool, enrichmentFilteredData, mode)
+          slider = input[[run$getInputId("barchart_slider")]])
+        constructBarchart(run$id, enrichmentFilteredData, mode)
       }
     }
   }, error = function(e) {

@@ -1,19 +1,18 @@
-handleDotPlot <- function(enrichmentType, enrichmentTool) {
+handleDotPlot <- function(run) {
   tryCatch({
     renderModal("<h2>Please wait.</h2><br /><p>Rendering Dot Plot.</p>")
-    if (existEnrichmentResults(enrichmentType, enrichmentTool)) {
-      type_Tool <- paste(enrichmentType, enrichmentTool, sep = "_")
-      sourceSelect <- input[[paste(type_Tool, "dotPlot_sourceSelect", sep = "_")]]
+    if (run$hasResults()) {
+      sourceSelect <- input[[run$getInputId("dotPlot_sourceSelect")]]
 
       if (isSourceNotNull(sourceSelect)) {
         enrichmentFilteredData <- filterAndPrintTable(
-          enrichmentType, enrichmentTool,
-          outputId = paste(type_Tool, "dotPlot", sep = "_"),
+          run$enrichmentType, run$id,
+          outputId = run$getInputId("dotPlot"),
           sourceSelect = sourceSelect,
-          mode = input[[paste(type_Tool, "dotPlot_mode", sep = "_")]],
-          slider = input[[paste(type_Tool, "dotPlot_slider", sep = "_")]])
+          mode = input[[run$getInputId("dotPlot_mode")]],
+          slider = input[[run$getInputId("dotPlot_slider")]])
 
-        constructDotPlot(type_Tool, enrichmentFilteredData)
+        constructDotPlot(run$id, enrichmentFilteredData)
       }
     }
   }, error = function(e) {

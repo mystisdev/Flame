@@ -168,7 +168,7 @@ generateEnrichmentResultsPanel <- function() {
     )
   } else { # "literature"
     # Multi-run mode: Dynamic tabsetPanel (like functional enrichment)
-    # Tabs are created dynamically via insertResultTabForLiteratureRun()
+    # Tabs are created dynamically via insertEnrichmentTab()
     return(
       tags$div(
         id = "literatureEnrichmentResultsPanel",

@@ -426,53 +426,6 @@ getCurrentNetworkViewEdgelist <- function(type_Tool, networkId) {
 
 # General plot functions
 
-handleDatasourcePicker <- function(enrichmentType, toolName, componentId) {
-  tryCatch({
-    type_Tool <- paste(enrichmentType, toolName, sep = "_")
-    datasources <- input[[paste(type_Tool, componentId, "sourceSelect", sep = "_")]]
-    maxSliderValue <- calculateMaxSliderValue(enrichmentType, toolName, datasources)
-
-    sliderId <- paste(type_Tool, componentId, "slider", sep = "_")
-    updateShinySliderInput(shinyOutputId = sliderId,
-                           min = 1, maxSliderValue)
-    if (componentId == "network3") {
-      updateShinySliderInput(
-        shinyOutputId = paste(type_Tool, "network3_thresholdSlider", sep = "_"),
-        min = 1, maxSliderValue,
-        value = round(maxSliderValue / 10)
-      )
-    }
-  }, error = function(e) {
-    renderWarning("Could not update slider filter values properly.")
-  })
-}
-
-calculateMaxSliderValue <- function(enrichmentType, toolName, datasources) {
-  enrichmentResult <- getGlobalEnrichmentResult(enrichmentType, toolName)
-  maxSliderValue <- nrow(
-    subset(
-      enrichmentResult,
-      Source %in% datasources
-    )
-  )
-  if (maxSliderValue > MAX_SLIDER_VALUE)
-    maxSliderValue <- MAX_SLIDER_VALUE
-  return(maxSliderValue)
-}
-
-existEnrichmentResults <- function(enrichmentType, enrichmentTool) {
-  enrichmentResult <- getGlobalEnrichmentResult(enrichmentType, enrichmentTool)
-  exist <- FALSE
-  if (nrow(enrichmentResult) > 0){
-    exist <- TRUE
-  } else
-    renderWarning(paste0(
-      "Execute ", enrichmentType, " enrichment analysis 
-      with ", enrichmentTool, " first."
-    ))
-  return(exist)
-}
-
 isSourceNotNull <- function(sourceSelect) {
   isNotNull <- FALSE
   if (!is.null(sourceSelect)){
@@ -482,18 +435,18 @@ isSourceNotNull <- function(sourceSelect) {
   return(isNotNull)
 }
 
-filterAndPrintTable <- function(enrichmentType, enrichmentTool,
+filterAndPrintTable <- function(enrichmentType, runKey,
                                 outputId, sourceSelect, mode, slider,
                                 filter = 'top') {
   enrichmentFilteredData <-
-    filterTopData(enrichmentType, enrichmentTool, sourceSelect, mode, slider)
+    filterTopData(runKey, sourceSelect, mode, slider)
 
   # Convert Source to factor for dropdown filtering (like Results tab)
   enrichmentFilteredData$Source <- as.factor(enrichmentFilteredData$Source)
 
   # Extract type_Tool and plotId from outputId
-  # outputId format: "{type_Tool}_{plotId}" e.g., "Functional_gProfiler_barchart"
-  type_Tool <- paste(enrichmentType, enrichmentTool, sep = "_")
+  # outputId format: "{runKey}_{plotId}" e.g., "functional_gProfiler_1_barchart"
+  type_Tool <- runKey
   plotId <- gsub(paste0(type_Tool, "_"), "", outputId)
 
   # Store as ORIGINAL data (this is called from "Generate" button)
@@ -516,9 +469,8 @@ filterAndPrintTable <- function(enrichmentType, enrichmentTool,
   return(enrichmentFilteredData)
 }
 
-filterTopData <- function(enrichmentType, enrichmentTool,
-                          sourceSelect, mode, slider) {
-  enrichmentResult <- getGlobalEnrichmentResult(enrichmentType, enrichmentTool)
+filterTopData <- function(runKey, sourceSelect, mode, slider) {
+  enrichmentResult <- enrichmentResults[[runKey]]
   filteredData <- subset(
     enrichmentResult,
     Source %in% sourceSelect
@@ -547,7 +499,7 @@ calculatePlotHeight <- function(entriesCount) {
   return(height)
 }
 
-extractFunctionVsFunctionEdgelist <- function(enrichmentType, enrichmentTool,
+extractFunctionVsFunctionEdgelist <- function(runKey,
                                               enrichmentData,
                                               thresholdSlider = NULL,
                                               simplifyForNetwork = FALSE) {
@@ -571,7 +523,7 @@ extractFunctionVsFunctionEdgelist <- function(enrichmentType, enrichmentTool,
                                                  weightColumn,
                                                  thresholdSlider)
   }
-  functionsEdgelist <- appendSourceDatabasesAndIds(enrichmentType, enrichmentTool, functionsEdgelist)
+  functionsEdgelist <- appendSourceDatabasesAndIds(runKey, functionsEdgelist)
   functionsEdgelist <- functionsEdgelist[order(-functionsEdgelist$`Similarity Score %`), ]
   return(functionsEdgelist)
 }
@@ -674,8 +626,8 @@ filterBySliderThreshold <- function(edgelist, weightColumn, thresholdSlider) {
   return(edgelist)
 }
 
-appendSourceDatabasesAndIds <- function(enrichmentType, enrichmentTool, functionsEdgelist) {
-  enrichedNetworkData <- getGlobalEnrichmentResult(enrichmentType, enrichmentTool)
+appendSourceDatabasesAndIds <- function(runKey, functionsEdgelist) {
+  enrichedNetworkData <- enrichmentResults[[runKey]]
   enrichedNetworkData <- enrichedNetworkData[, c(
     "Source", "Term_ID_noLinks", "Function")]
   functionsEdgelist <- merge(functionsEdgelist, enrichedNetworkData,
@@ -894,14 +846,8 @@ getHeatmapCategoryArrays <- function(type_Tool, plotId, enrichmentData) {
 
     } else if (plotId == "heatmap2") {
       # Heatmap2: Function vs Function
-      # Extract type and tool parts
-      parts <- strsplit(type_Tool, "_")[[1]]
-      enrichmentType <- parts[1]
-      enrichmentTool <- paste(parts[2:length(parts)], collapse = "_")
-
-      # Transform to edgelist format
-      heatmapTable <- extractFunctionVsFunctionEdgelist(enrichmentType, enrichmentTool,
-                                                        enrichmentData)
+      # Pass type_Tool directly as runKey (not split into parts)
+      heatmapTable <- extractFunctionVsFunctionEdgelist(type_Tool, enrichmentData)
       if (is.null(heatmapTable) || nrow(heatmapTable) == 0) return(NULL)
 
       # Get draw format setting
@@ -942,7 +888,7 @@ getHeatmapCategoryArrays <- function(type_Tool, plotId, enrichmentData) {
 
 # Derives enrichment type from current sidebar selection
 # Using input$sideBarId instead of currentEnrichmentType global
-# because the global can become stale (only updated by withRunContext),
+# because the global can become stale between runs,
 # while sidebar accurately reflects what the user is currently viewing.
 deriveEnrichmentTypeFromSidebar <- function() {
   sidebarTab <- input$sideBarId
@@ -959,6 +905,7 @@ deriveEnrichmentTypeFromSidebar <- function() {
 
 # Handles plot click events: toggles term selection and updates table
 # Plot is NOT re-rendered to preserve zoom state
+# Updated to use Run object for validation and state management
 handlePlotClick <- function(plotId, plotSource, session = NULL) {
   tryCatch({
     selectedTool <- currentSelectedToolTab
@@ -968,8 +915,13 @@ handlePlotClick <- function(plotId, plotSource, session = NULL) {
     enrichmentType <- deriveEnrichmentTypeFromSidebar()
     if (is.null(enrichmentType)) return()
 
-    type_Tool <- paste(enrichmentType, selectedTool, sep = "_")
-    if (is.null(type_Tool) || type_Tool == "") return()
+    # Get Run object for validation and consistent ID usage
+    fullRunKey <- paste(enrichmentType, selectedTool, sep = "_")
+    run <- activeRuns[[fullRunKey]]
+    if (is.null(run)) return()
+
+    # Use run$id for state management (equivalent to fullRunKey)
+    type_Tool <- run$id
 
     clickData <- event_data("plotly_click", source = plotSource)
     if (is.null(clickData)) return()
@@ -990,10 +942,9 @@ handlePlotClick <- function(plotId, plotSource, session = NULL) {
       cellX <- as.character(clickData$x)
       cellY <- as.character(clickData$y)
 
-      # Axis orientation depends on user setting
-      enrichmentType <- strsplit(type_Tool, "_")[[1]][1]
-      uiTermKeyword <- stringr::str_to_title(UI_TERM_KEYWORD[[enrichmentType]])
-      heatmap1_axis <- input[[paste(type_Tool, "heatmap1_axis", sep = "_")]]
+      # Axis orientation depends on user setting - use run$enrichmentType directly
+      uiTermKeyword <- stringr::str_to_title(UI_TERM_KEYWORD[[run$enrichmentType]])
+      heatmap1_axis <- input[[run$getInputId("heatmap1_axis")]]
 
       if (heatmap1_axis == paste0(uiTermKeyword, "-Genes")) {
         clickedTermId <- cellY
@@ -1068,6 +1019,7 @@ handlePlotZoom <- function(plotId, plotSource) {
 
 # Handle plot selection events (lasso/box) - add to selection (cumulative)
 # Note: Plot is NOT re-rendered to preserve zoom state
+# Updated to use Run object for validation and state management
 handlePlotSelection <- function(plotId, plotSource, session = NULL) {
   tryCatch({
     selectedTool <- currentSelectedToolTab
@@ -1077,8 +1029,13 @@ handlePlotSelection <- function(plotId, plotSource, session = NULL) {
     enrichmentType <- deriveEnrichmentTypeFromSidebar()
     if (is.null(enrichmentType)) return()
 
-    type_Tool <- paste(enrichmentType, selectedTool, sep = "_")
-    if (is.null(type_Tool) || type_Tool == "") return()
+    # Get Run object for validation and consistent ID usage
+    fullRunKey <- paste(enrichmentType, selectedTool, sep = "_")
+    run <- activeRuns[[fullRunKey]]
+    if (is.null(run)) return()
+
+    # Use run$id for state management (equivalent to fullRunKey)
+    type_Tool <- run$id
 
     # Heatmaps don't support lasso well (use click for cells)
     if (plotId %in% c("heatmap1", "heatmap2", "heatmap3")) return()
@@ -1467,15 +1424,8 @@ renderHeatmap1WithData <- function(type_Tool, enrichmentData) {
 renderHeatmap2WithData <- function(type_Tool, enrichmentData) {
   if (is.null(enrichmentData) || nrow(enrichmentData) == 0) return()
 
-  # Extract enrichment type and tool from type_Tool
-  # For multi-run: type_Tool = "enrichmentType_toolName_runNumber"
-  parts <- strsplit(type_Tool, "_")[[1]]
-  enrichmentType <- parts[1]
-  enrichmentTool <- paste(parts[2:length(parts)], collapse = "_")  # e.g., "gProfiler_1"
-
-  # Transform to edgelist format
-  heatmapTable <- extractFunctionVsFunctionEdgelist(enrichmentType, enrichmentTool,
-                                                    enrichmentData)
+  # Pass type_Tool directly as runKey (not split into parts)
+  heatmapTable <- extractFunctionVsFunctionEdgelist(type_Tool, enrichmentData)
   if (is.null(heatmapTable) || nrow(heatmapTable) == 0) return()
 
   # Get UI settings
@@ -1526,9 +1476,10 @@ renderHeatmap3WithData <- function(type_Tool, enrichmentData) {
 
 # Handles table filter changes: updates plot with filtered data
 # DT uses client-side filtering, so we render from filtered row indices
-handleTableFilterChange <- function(enrichmentType, toolName, plotId) {
+# Updated to accept Run object directly
+handleTableFilterChange <- function(run, plotId) {
   tryCatch({
-    type_Tool <- paste(enrichmentType, toolName, sep = "_")
+    type_Tool <- run$id
 
     if (!shouldProcessUpdate(type_Tool, plotId, "table")) return()
 
@@ -1572,9 +1523,10 @@ handleTableFilterChange <- function(enrichmentType, toolName, plotId) {
 # Note: orderForDotPlot is defined in dotplot.R
 
 # Clears all selections and restores original data from Generate button
-handleResetView <- function(enrichmentType, toolName, plotId) {
+# Updated to accept Run object directly
+handleResetView <- function(run, plotId) {
   tryCatch({
-    type_Tool <- paste(enrichmentType, toolName, sep = "_")
+    type_Tool <- run$id
 
     # Clear all selection state
     clearSelection(type_Tool, plotId)

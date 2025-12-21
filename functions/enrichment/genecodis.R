@@ -1,6 +1,7 @@
 # Get organism-specific prefix for GeneCodis datasources
 # Maps taxonomy ID to prefix (e.g., taxid 10090 -> "MMUSCULUS_")
 # Prefix names are arbitrary - they just match DATASOURCES keys
+# Note: This function reads from input global; strategy has its own getVariablePrefix() that takes organism param
 getGeneCodisVariablePrefix <- function() {
   organism_taxid <- ORGANISMS[ORGANISMS$print_name == input[["functional_enrichment_organism"]], ]$taxid
 
@@ -26,125 +27,7 @@ getGeneCodisVariablePrefix <- function() {
   )
 }
 
-runGeneCodis <- function(userInputList, taxid, user_reference = NULL) {
-  # GeneCodis accepts multiple ID formats: gene symbols, Entrez IDs, Ensembl IDs, UniProt IDs
-  # The API automatically recognizes the format, so no conversion is needed
-
-  # Send enrichment job to GeneCodis API
-  jobInfo <- sendGeneCodisRequest(userInputList, taxid, user_reference)
-
-  if (!is.null(jobInfo$job_id)) {
-    # Poll for job completion with adaptive waiting
-    jobReady <- pollGeneCodisJob(jobInfo$job_id, length(userInputList))
-
-    if (jobReady) {
-      # Retrieve results for each annotation category
-      genecodisResult <- retrieveGeneCodisResults(jobInfo$job_id, jobInfo$job_name, jobInfo$annotations)
-
-      if (isGeneCodisResponseValid(genecodisResult)) {
-        # Parse TSV responses into FLAME-compatible format
-        genecodisParsedResult <- parseGeneCodisResult(genecodisResult)
-
-        if (isGeneCodisResultValid(genecodisParsedResult)) {
-          # Filter by user's selected data sources
-          genecodisParsedResult <- filterEnrichmentByDataSources(genecodisParsedResult, currentEnrichmentType, warn_on_empty = TRUE)
-
-          if (nrow(genecodisParsedResult) > 0) {
-            # Store results in global structure after adding -log10Pvalue and enrichment scores
-            enrichmentResults[[currentType_Tool]] <<-
-              transformEnrichmentResultTable(genecodisParsedResult)
-          }
-        }
-      }
-    } else {
-      renderWarning("GeneCodis job timed out. Please try again with a smaller gene list.")
-    }
-  }
-
-  # Always store background size for statistics display
-  enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<-
-    getSimpleBackgroundSize(user_reference)
-}
-
-sendGeneCodisRequest <- function(userInputList, taxid, user_reference = NULL) {
-  url <- "https://genecodis.genyo.es/gc4/analysis"
-
-  # Get selected data sources and map to GeneCodis annotation codes
-  selectedDataSources <- input[[paste0(currentEnrichmentType, "_enrichment_datasources")]]
-  genecodisAnnotations <- mapDataSourcesToGeneCodisDatasets(selectedDataSources)
-
-  # Check if mapping produced empty results
-  if(length(genecodisAnnotations) == 0) {
-    renderWarning("No valid GeneCodis annotations mapped from selected data sources. Check your data source selection.")
-    return(list(job_id = NULL, job_name = NULL, annotations = NULL))
-  }
-
-  # Create unique job name with timestamp
-  jobName <- paste0("FLAME_", format(Sys.time(), "%Y%m%d_%H%M%S"))
-
-  # Build request body
-  body <- list(
-    organism = as.integer(taxid),
-    inputtype = "genes",
-    input = list(input = userInputList),
-    annotations = I(genecodisAnnotations),  # I() prevents auto_unbox from converting single element to scalar
-    stat = "hypergeom",
-    scope = "annotated",
-    coannotation = "no",
-    inputmode = "on",
-    universe = if (is.null(user_reference)) list() else user_reference,
-    email = "",
-    jobName = jobName,
-    algorithm = "fpgrowth",
-    inputSupport = 0,
-    inputNames = list(input1unique = jobName),
-    gc4uid = ""
-  )
-
-  # Encode JSON with auto_unbox to prevent scalars from becoming arrays
-  json_body <- jsonlite::toJSON(body, auto_unbox = TRUE)
-
-  # Send POST request with pre-encoded JSON
-  tryCatch({
-    response <- httr::POST(url,
-                           body = json_body,
-                           encode = "raw",
-                           httr::content_type("application/json"),
-                           httr::timeout(30))
-
-    if (response$status_code == 200) {
-      response_text <- rawToChar(httr::content(response, "raw"))
-
-      # Check for API errors
-      if (grepl("error:", response_text, ignore.case = TRUE)) {
-        renderWarning(paste("GeneCodis API error:", response_text))
-        return(list(job_id = NULL, job_name = NULL, annotations = NULL))
-      }
-
-      # Extract job ID
-      if (grepl("jobID:", response_text)) {
-        job_id <- gsub(".*jobID:\\s*", "", response_text)
-        job_id <- trimws(job_id)
-        return(list(job_id = job_id, job_name = jobName, annotations = genecodisAnnotations))
-      } else {
-        renderWarning(paste("GeneCodis response missing job ID. Response was:", substr(response_text, 1, 200)))
-        return(list(job_id = NULL, job_name = NULL, annotations = NULL))
-      }
-    } else {
-      # Print error response body for debugging
-      error_body <- tryCatch({
-        rawToChar(httr::content(response, "raw"))
-      }, error = function(e) {
-        "Could not read error response"
-      })
-      renderWarning(paste("GeneCodis request failed with status", response$status_code, ":", substr(error_body, 1, 200)))
-      return(list(job_id = NULL, job_name = NULL, annotations = NULL))
-    }
-  }, error = function(e) {
-    renderWarning(paste("Connection to GeneCodis failed:", e$message))
-    return(list(job_id = NULL, job_name = NULL, annotations = NULL))
-  })
-}
+# Helper functions used by GeneCodisStrategy
 
 pollGeneCodisJob <- function(job_id, gene_count, max_timeout = 60) {
   # Adaptive initial wait based on gene list size
@@ -234,7 +117,8 @@ isGeneCodisResponseValid <- function(responseList) {
   return(TRUE)
 }
 
-parseGeneCodisResult <- function(responseList) {
+parseGeneCodisResult <- function(responseList, threshold = NULL) {
+  # Accept threshold parameter instead of reading global input
   # Parse TSV responses from GeneCodis API and combine results
   allResults <- data.frame()
 
@@ -269,8 +153,8 @@ parseGeneCodisResult <- function(responseList) {
       # Map GeneCodis annotation name to FLAME source code
       results$flame_source <- mapGeneCodisToFlameSource(annotation)
 
-      # Apply user's significance filtering
-      threshold <- as.numeric(input$functional_enrichment_threshold)
+      # Apply user's significance filtering using passed parameter
+      threshold <- as.numeric(threshold)
 
       # GeneCodis returns pval_adj (FDR-adjusted p-value)
       if ("pval_adj" %in% colnames(results)) {
@@ -383,3 +267,170 @@ mapGeneCodisToFlameSource <- function(annotation) {
   # Return original if no mapping found
   return(annotation)
 }
+
+
+# =============================================================================
+# GeneCodisStrategy - Tool Strategy Implementation
+# =============================================================================
+
+GeneCodisStrategy <- R6::R6Class("GeneCodisStrategy",
+
+  inherit = ToolStrategy,
+
+  public = list(
+    initialize = function() {
+      super$initialize("GeneCodis")
+    },
+
+    run = function(inputList, organism, backgroundList, params) {
+      # Map datasources to GeneCodis annotations
+      genecodisAnnotations <- mapDataSourcesToGeneCodisDatasets(params$datasources)
+
+      if (length(genecodisAnnotations) == 0) {
+        renderWarning("No valid GeneCodis annotations for selected data sources.")
+        return(NULL)
+      }
+
+      # Send job request
+      jobInfo <- private$sendRequest(inputList, organism, backgroundList, genecodisAnnotations)
+
+      if (is.null(jobInfo$job_id)) {
+        return(NULL)
+      }
+
+      # Poll for completion
+      jobReady <- pollGeneCodisJob(jobInfo$job_id, length(inputList))
+
+      if (!jobReady) {
+        renderWarning("GeneCodis job timed out.")
+        return(NULL)
+      }
+
+      # Retrieve results
+      genecodisResult <- retrieveGeneCodisResults(
+        jobInfo$job_id, jobInfo$job_name, jobInfo$annotations
+      )
+
+      if (!isGeneCodisResponseValid(genecodisResult)) {
+        return(NULL)
+      }
+
+      # Parse results - pass threshold from params
+      result <- parseGeneCodisResult(genecodisResult, params$threshold)
+
+      if (!isGeneCodisResultValid(result)) {
+        return(NULL)
+      }
+
+      # Filter by datasources
+      if (exists("currentEnrichmentType")) {
+        result <- filterEnrichmentByDataSources(result, currentEnrichmentType, warn_on_empty = TRUE)
+      }
+
+      if (nrow(result) == 0) {
+        return(NULL)
+      }
+
+      # Store background size (still using global)
+      if (exists("currentType_Tool")) {
+        enrichmentBackgroundSizes[[toupper(currentType_Tool)]] <<-
+          getSimpleBackgroundSize(backgroundList)
+      }
+
+      return(result)
+    },
+
+    convertIDs = function(geneList, organism, targetNamespace) {
+      # GeneCodis accepts multiple ID formats
+      return(geneList)
+    },
+
+    getValidDatasources = function(organism) {
+      prefix <- private$getVariablePrefix(organism)
+      return(names(DATASOURCES_CODES[[paste0(prefix, "GENECODIS")]]))
+    },
+
+    getDefaultMetric = function(hasBackground) {
+      return("fdr")
+    }
+  ),
+
+  private = list(
+    getVariablePrefix = function(organism) {
+      switch(as.character(organism),
+        "9606" = "",
+        "10090" = "MMUSCULUS_",
+        "10116" = "RNORVEGICUS_",
+        "6239" = "CELEGANS_",
+        "7227" = "DMELANOGASTER_",
+        "7955" = "DRERIO_",
+        "9615" = "CLFAMILIARIS_",
+        "9031" = "GGALLUS_",
+        "9913" = "BTAURUS_",
+        "9823" = "SSCROFA_",
+        "3702" = "ATHALIANA_",
+        "39947" = "OSATIVA_",
+        "559292" = "SCEREVISIAE_",
+        "511145" = "ECOLI_",
+        ""
+      )
+    },
+
+    sendRequest = function(inputList, taxid, backgroundList, annotations) {
+      url <- "https://genecodis.genyo.es/gc4/analysis"
+      jobName <- paste0("FLAME_", format(Sys.time(), "%Y%m%d_%H%M%S"))
+
+      body <- list(
+        organism = as.integer(taxid),
+        inputtype = "genes",
+        input = list(input = inputList),
+        annotations = I(annotations),
+        stat = "hypergeom",
+        scope = "annotated",
+        coannotation = "no",
+        inputmode = "on",
+        universe = if (is.null(backgroundList)) list() else backgroundList,
+        email = "",
+        jobName = jobName,
+        algorithm = "fpgrowth",
+        inputSupport = 0,
+        inputNames = list(input1unique = jobName),
+        gc4uid = ""
+      )
+
+      json_body <- jsonlite::toJSON(body, auto_unbox = TRUE)
+
+      tryCatch({
+        response <- httr::POST(url,
+          body = json_body,
+          encode = "raw",
+          httr::content_type("application/json"),
+          httr::timeout(30)
+        )
+
+        if (response$status_code == 200) {
+          response_text <- rawToChar(httr::content(response, "raw"))
+
+          if (grepl("error:", response_text, ignore.case = TRUE)) {
+            renderWarning(paste("GeneCodis API error:", response_text))
+            return(list(job_id = NULL, job_name = NULL, annotations = NULL))
+          }
+
+          if (grepl("jobID:", response_text)) {
+            job_id <- gsub(".*jobID:\\s*", "", response_text)
+            job_id <- trimws(job_id)
+            return(list(job_id = job_id, job_name = jobName, annotations = annotations))
+          }
+        }
+
+        return(list(job_id = NULL, job_name = NULL, annotations = NULL))
+      }, error = function(e) {
+        renderWarning(paste("Connection to GeneCodis failed:", e$message))
+        return(list(job_id = NULL, job_name = NULL, annotations = NULL))
+      })
+    }
+  )
+)
+
+# Register the strategy
+toolRegistry$register("functional", "GeneCodis", GeneCodisStrategy$new())

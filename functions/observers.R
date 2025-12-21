@@ -229,17 +229,6 @@ registerTableObservers <- function(fullRunKey) {
 # Handler wrappers for run-based operations
 # These delegate to the existing handlers with the fullRunKey
 
-# Higher-order function to set global context and call a handler
-# This eliminates duplication across all the ForRun wrapper functions
-withRunContext <- function(fullRunKey, handler, ...) {
-  runInfo <- parseFullRunKey(fullRunKey)
-  currentEnrichmentType <<- runInfo$enrichmentType
-  currentEnrichmentTool <<- runInfo$toolName
-  currentFullRunKey <<- fullRunKey
-  currentType_Tool <<- fullRunKey
-  handler(runInfo$enrichmentType, runInfo$runId, ...)
-}
-
 handleDatasourcePickerForRun <- function(fullRunKey, componentId) {
   tryCatch({
     datasources <- input[[paste(fullRunKey, componentId, "sourceSelect", sep = "_")]]
@@ -273,89 +262,125 @@ calculateMaxSliderValueForRun <- function(fullRunKey, datasources) {
 }
 
 # Wrapper handlers for plot generation
-# These use withRunContext() to set global context and delegate to existing handlers
-# NOTE: We pass runInfo$runId (e.g., "gProfiler_1") as toolName parameter
-# so handlers construct the correct key (e.g., "functional_gProfiler_1")
+# These pass Run objects directly to handlers
 
 handleEnrichmentNetworkForRun <- function(fullRunKey, networkId) {
-  withRunContext(fullRunKey, handleEnrichmentNetwork, networkId)
+  run <- activeRuns[[fullRunKey]]
+  if (is.null(run)) {
+    warning(paste("handleEnrichmentNetworkForRun: No run found for key:", fullRunKey))
+    return()
+  }
+  handleEnrichmentNetwork(run, networkId)
 }
 
 arenaHandlerForRun <- function(fullRunKey, networkId) {
-  withRunContext(fullRunKey, arenaHandler, networkId)
+  run <- activeRuns[[fullRunKey]]
+  if (is.null(run)) {
+    warning(paste("arenaHandlerForRun: No run found for key:", fullRunKey))
+    return()
+  }
+  arenaHandler(run, networkId)
 }
 
 handleHeatmapForRun <- function(fullRunKey, heatmapId) {
-  withRunContext(fullRunKey, handleHeatmap, heatmapId)
+  run <- activeRuns[[fullRunKey]]
+  if (is.null(run)) {
+    warning(paste("handleHeatmapForRun: No run found for key:", fullRunKey))
+    return()
+  }
+  handleHeatmap(run, heatmapId)
 }
 
 handleBarchartForRun <- function(fullRunKey) {
-  withRunContext(fullRunKey, handleBarchart)
+  run <- activeRuns[[fullRunKey]]
+  if (is.null(run)) {
+    warning(paste("handleBarchartForRun: No run found for key:", fullRunKey))
+    return()
+  }
+  handleBarchart(run)
 }
 
 handleScatterPlotForRun <- function(fullRunKey) {
-  withRunContext(fullRunKey, handleScatterPlot)
+  run <- activeRuns[[fullRunKey]]
+  if (is.null(run)) {
+    warning(paste("handleScatterPlotForRun: No run found for key:", fullRunKey))
+    return()
+  }
+  handleScatterPlot(run)
 }
 
 handleDotPlotForRun <- function(fullRunKey) {
-  withRunContext(fullRunKey, handleDotPlot)
+  run <- activeRuns[[fullRunKey]]
+  if (is.null(run)) {
+    warning(paste("handleDotPlotForRun: No run found for key:", fullRunKey))
+    return()
+  }
+  handleDotPlot(run)
 }
 
 handleManhattanPlotForRun <- function(fullRunKey) {
-  # Manhattan is special - it takes fullRunKey directly, not (type, runId)
-  runInfo <- parseFullRunKey(fullRunKey)
-  currentEnrichmentType <<- runInfo$enrichmentType
-  currentEnrichmentTool <<- runInfo$toolName
-  currentFullRunKey <<- fullRunKey
-  currentType_Tool <<- fullRunKey
-  handleManhattanPlot(fullRunKey)
+  run <- activeRuns[[fullRunKey]]
+  if (is.null(run)) {
+    warning(paste("handleManhattanPlotForRun: No run found for key:", fullRunKey))
+    return()
+  }
+  handleManhattanPlot(run)
 }
 
 handleTableFilterChangeForRun <- function(fullRunKey, plotId) {
-  runInfo <- parseFullRunKey(fullRunKey)
-  handleTableFilterChange(runInfo$enrichmentType, runInfo$runId, plotId)
+  run <- activeRuns[[fullRunKey]]
+  if (is.null(run)) return()
+  handleTableFilterChange(run, plotId)
 }
 
 handleResetViewForRun <- function(fullRunKey, plotId) {
-  runInfo <- parseFullRunKey(fullRunKey)
-  handleResetView(runInfo$enrichmentType, runInfo$runId, plotId)
+  run <- activeRuns[[fullRunKey]]
+  if (is.null(run)) return()
+  handleResetView(run, plotId)
 }
 
 # Network Handler Wrappers for Runs
 
 handleNetworkNodeClickForRun <- function(fullRunKey, networkId) {
-  runInfo <- parseFullRunKey(fullRunKey)
-  handleNetworkNodeClick(runInfo$enrichmentType, runInfo$runId, networkId)
+  run <- activeRuns[[fullRunKey]]
+  if (is.null(run)) return()
+  handleNetworkNodeClick(run, networkId)
 }
 
 handleNetworkEdgeClickForRun <- function(fullRunKey, networkId) {
-  runInfo <- parseFullRunKey(fullRunKey)
-  handleNetworkEdgeClick(runInfo$enrichmentType, runInfo$runId, networkId)
+  run <- activeRuns[[fullRunKey]]
+  if (is.null(run)) return()
+  handleNetworkEdgeClick(run, networkId)
 }
 
 handleNetworkSelectionForRun <- function(fullRunKey, networkId) {
-  runInfo <- parseFullRunKey(fullRunKey)
-  handleNetworkSelection(runInfo$enrichmentType, runInfo$runId, networkId)
+  run <- activeRuns[[fullRunKey]]
+  if (is.null(run)) return()
+  handleNetworkSelection(run, networkId)
 }
 
 handleNetworkDeselectionForRun <- function(fullRunKey, networkId) {
-  runInfo <- parseFullRunKey(fullRunKey)
-  handleNetworkDeselection(runInfo$enrichmentType, runInfo$runId, networkId)
+  run <- activeRuns[[fullRunKey]]
+  if (is.null(run)) return()
+  handleNetworkDeselection(run, networkId)
 }
 
 handleNetworkEnrichmentTableFilterForRun <- function(fullRunKey, networkId) {
-  runInfo <- parseFullRunKey(fullRunKey)
-  handleNetworkEnrichmentTableFilter(runInfo$enrichmentType, runInfo$runId, networkId)
+  run <- activeRuns[[fullRunKey]]
+  if (is.null(run)) return()
+  handleNetworkEnrichmentTableFilter(run, networkId)
 }
 
 handleNetworkEdgelistTableFilterForRun <- function(fullRunKey, networkId) {
-  runInfo <- parseFullRunKey(fullRunKey)
-  handleNetworkEdgelistTableFilter(runInfo$enrichmentType, runInfo$runId, networkId)
+  run <- activeRuns[[fullRunKey]]
+  if (is.null(run)) return()
+  handleNetworkEdgelistTableFilter(run, networkId)
 }
 
 handleNetworkResetViewForRun <- function(fullRunKey, networkId) {
-  runInfo <- parseFullRunKey(fullRunKey)
-  handleNetworkResetView(runInfo$enrichmentType, runInfo$runId, networkId)
+  run <- activeRuns[[fullRunKey]]
+  if (is.null(run)) return()
+  handleNetworkResetView(run, networkId)
 }
 
 # Control Panel Updates for Runs
