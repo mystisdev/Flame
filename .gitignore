@@ -1,5 +1,15 @@
-.Rproj.user
-.Rhistory
-.RData
-.Ruserdata
-www/help_images/.DS_Store
+# Ignore all hidden files/folders
+.*
+
+# But track these
+!.gitignore
+!.Rbuildignore
+
+# macOS resource forks (anywhere in tree)
+**/._*
+
+# Temporary files
+tmp/
+
+# Build artifacts
+*.tar.gz
