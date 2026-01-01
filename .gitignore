@@ -13,3 +13,4 @@ tmp/
 
 # Build artifacts
 *.tar.gz
+.Rproj.user

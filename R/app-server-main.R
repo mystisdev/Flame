@@ -61,6 +61,10 @@ serverMain <- function(input, output, session) {
   # Observer Registry for cleanup management (per-session)
   observerRegistry <- ObserverRegistry$new()
 
+  # AnalyteSet Registry for input list management
+  # Note: This coexists with userInputLists during migration
+  analyteSetRegistry <- AnalyteSetRegistry$new()
+
   # Create an environment to hold session state that functions can access
   sessionEnv <- new.env(parent = emptyenv())
   sessionEnv$userInputLists <- userInputLists
@@ -96,6 +100,7 @@ serverMain <- function(input, output, session) {
   sessionEnv$currentSelectedLiteratureTab <- currentSelectedLiteratureTab
   sessionEnv$outputRegistry <- outputRegistry
   sessionEnv$observerRegistry <- observerRegistry
+  sessionEnv$analyteSetRegistry <- analyteSetRegistry
   sessionEnv$input <- input
   sessionEnv$output <- output
   sessionEnv$session <- session

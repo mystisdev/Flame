@@ -5,6 +5,10 @@ function(input, output, session) {
   pkgRoot <- normalizePath(file.path(getwd(), "..", ".."))
   source(file.path(pkgRoot, "R", "aaa-helpers.R"), local = TRUE)
 
+  # Source R6 infrastructure classes
+  source(file.path(pkgRoot, "R", "infrastructure-config.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "input-analyteset.R"), local = TRUE)
+
   # Source configuration files (letter prefixes ensure correct load order)
   source(file.path(pkgRoot, "R", "config-a-global_settings.R"), local = TRUE)
   source(file.path(pkgRoot, "R", "config-b-global_variables.R"), local = TRUE)
