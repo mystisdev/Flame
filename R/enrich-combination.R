@@ -209,7 +209,7 @@ filterComboTable <- function(filteredCombinationResult) {
 
 executeComboUpsetPlot <- function(filteredCombinationResult) {
   toolTermLists <- extractToolTermLists(filteredCombinationResult)
-  renderUpset("upsetjsCombo", toolTermLists, upsetjs::generateDistinctIntersections)
+  renderUpset("upsetjsCombo", toolTermLists, upsetjs::generateDistinctIntersections, "Distinct Combinations")
 }
 
 extractToolTermLists <- function(filteredCombinationResult) {

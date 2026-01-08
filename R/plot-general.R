@@ -908,12 +908,19 @@ deriveEnrichmentTypeFromSidebar <- function() {
 # Updated to use Run object for validation and state management
 handlePlotClick <- function(plotId, plotSource, session = NULL) {
   tryCatch({
-    selectedTool <- currentSelectedToolTab
-    if (is.null(selectedTool) || selectedTool == "" || selectedTool == "Combination") return()
-
-    # Use sidebar to determine enrichment type (fixes stale global bug)
+    # Derive enrichment type from sidebar - this is the source of truth for which
+    # enrichment section the user is currently viewing
     enrichmentType <- deriveEnrichmentTypeFromSidebar()
     if (is.null(enrichmentType)) return()
+
+    # Read the correct tab panel input based on enrichment type
+    # This ensures we get the tab that's actually visible, not a stale cached value
+    selectedTool <- if (enrichmentType == "functional") {
+      input$toolTabsPanel
+    } else {
+      input$literatureToolTabsPanel
+    }
+    if (is.null(selectedTool) || selectedTool == "" || selectedTool == "Combination") return()
 
     # Get Run object for validation and consistent ID usage
     fullRunKey <- paste(enrichmentType, selectedTool, sep = "_")
@@ -1005,7 +1012,7 @@ handlePlotClick <- function(plotId, plotSource, session = NULL) {
     }
 
   }, error = function(e) {
-    # Silently ignore click errors
+    # Silently handle errors - plot click failures shouldn't disrupt the user
   })
 }
 
@@ -1022,12 +1029,17 @@ handlePlotZoom <- function(plotId, plotSource) {
 # Updated to use Run object for validation and state management
 handlePlotSelection <- function(plotId, plotSource, session = NULL) {
   tryCatch({
-    selectedTool <- currentSelectedToolTab
-    if (is.null(selectedTool) || selectedTool == "" || selectedTool == "Combination") return()
-
-    # Use sidebar to determine enrichment type (fixes stale global bug)
+    # Derive enrichment type from sidebar - source of truth for current view
     enrichmentType <- deriveEnrichmentTypeFromSidebar()
     if (is.null(enrichmentType)) return()
+
+    # Read the correct tab panel input based on enrichment type
+    selectedTool <- if (enrichmentType == "functional") {
+      input$toolTabsPanel
+    } else {
+      input$literatureToolTabsPanel
+    }
+    if (is.null(selectedTool) || selectedTool == "" || selectedTool == "Combination") return()
 
     # Get Run object for validation and consistent ID usage
     fullRunKey <- paste(enrichmentType, selectedTool, sep = "_")

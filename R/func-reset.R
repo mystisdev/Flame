@@ -1,9 +1,5 @@
-resetTextMiningResults <- function() {
-  currentTextminingResult <<- c()
-  output$extracted_text <- renderUI({ HTML("") })
-  output$extracted_terms <- renderDataTable(c())
-  shinyjs::hide("textmining_tagger_results")
-}
+# resetTextMiningResults removed - now handled by
+# TextMiningInputSession$deleteTextmining()
 
 resetCombination <- function() {
   combinationResult <<- data.frame()

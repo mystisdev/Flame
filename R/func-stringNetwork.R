@@ -25,8 +25,8 @@ handleStringSubmitForEnrichment <- function(category) {
     sendSTRINGNetworkForEnrichment(category)
     updateTabItems(session, "sideBarId", selected = sprintf("%s_enrichment", category))
   }, error = function(e) {
-    print(paste("Error: ", e))
-    renderError("Problem with STRING network.")    
+    cat(paste("[STRING] Error:", conditionMessage(e), "\n"))
+    renderWarning(conditionMessage(e))
   })
 }
 
@@ -39,7 +39,7 @@ createSTRINGNetwork <- function() {
   
   printSTRINGParameters(organism, type, edges, score)
   string_taxid <- ORGANISMS[ORGANISMS$print_name == organism, ]$taxid
-  selectedListItems <- userInputLists[[dataset]][[1]]
+  selectedListItems <- analyteListRegistry$get(dataset)$getIds()
   result_ids <- parseInputsForSTRINGRequest(selectedListItems, string_taxid)
   ids_interactive <- result_ids$ids_interactive
   ids_post <- result_ids$ids_post
@@ -269,19 +269,43 @@ createSTRINGInteractiveViewer <- function(ids_interactive, string_taxid,
 
 
 getGenesFromSTRINGNetworkTSV <- function(tsv_str_obj) {
-  df <- read.table(text = tsv_str_obj, header=T)
-  unique_proteins <- unlist(unique(c(
-    unlist(df$preferredName_A),
-    unlist(df$preferredName_B)
-  )))
-  return(paste0(unique_proteins, paste="\n", collapse="\n"))
+  df <- read.table(text = tsv_str_obj, header = TRUE)
+  unique_proteins <- unique(c(
+    as.character(df$preferredName_A),
+    as.character(df$preferredName_B)
+  ))
+  # Filter out NA and empty
+  unique_proteins <- unique_proteins[!is.na(unique_proteins) & unique_proteins != ""]
+  return(unique_proteins)
 }
 
 sendSTRINGNetworkForEnrichment <- function(category) {
   stringGenes <- getGenesFromSTRINGNetworkTSV(STRINGNetworkData$string_tsv)
-  stringList <- buildUserListFromText(paste(
-    stringGenes, sep = "\n", collapse = "\n"
-  ), sprintf("string_%s", category))
-  updateSelectInput(session, sprintf("%s_enrichment_file", category), choices = stringList)
+
+  if (length(stringGenes) == 0) {
+    stop("No genes found in STRING network.")
+  }
+
+  # Generate unique name
+  listName <- sprintf("string_%s", category)
+  existingNames <- analyteListRegistry$getNames()
+  if (listName %in% existingNames) {
+    suffix <- 1
+    while (paste0(listName, "_", suffix) %in% existingNames) {
+      suffix <- suffix + 1
+    }
+    listName <- paste0(listName, "_", suffix)
+  }
+
+  # Create and add analyte list (entity/registry handle validation)
+  analyteList <- UnrankedAnalyteList$new(
+    name = listName,
+    analyteType = AnalyteType$GENE,
+    ids = stringGenes
+  )
+  analyteListRegistry$add(analyteList)
+
+  # Select this list in the enrichment dropdown
+  updateSelectInput(session, sprintf("%s_enrichment_file", category), selected = listName)
 }
 

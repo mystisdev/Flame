@@ -49,7 +49,6 @@ AnalysisRun <- R6::R6Class("AnalysisRun",
 
     # === Storage ===
     save = function() {
-      # Store Run object in activeRuns
       activeRuns[[self$id]] <<- self
     }
   )

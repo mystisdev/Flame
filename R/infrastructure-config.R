@@ -29,6 +29,23 @@ ScoreDirection <- list(
   DESCENDING = "DESCENDING"
 )
 
+#' Module IDs
+#' @description Shiny module namespace IDs - must match between UI and server
+#' Used by: view-input.R (UI functions) and server.R (session constructors)
+#'
+#' Naming convention:
+#'   - INPUT_X matches file input-session-X.R
+#'   - INPUT_MANIPULATION_X matches file input-analytelist-manipulation.R
+ModuleIds <- list(
+  INPUT_LIST = "input_list",
+  INPUT_VOLCANO = "input_volcano",
+  INPUT_REDUCTION = "input_reduction",
+  INPUT_SNPS = "input_snps",
+  INPUT_TEXTMINING = "input_textmining",
+  INPUT_MANIPULATION_MANAGER = "input_manipulation_manager",
+  INPUT_MANIPULATION_SETOPERATIONS = "input_manipulation_setoperations"
+)
+
 #' Paradigm Identifier
 #' @description Types of enrichment analysis
 ParadigmId <- list(
@@ -73,7 +90,7 @@ OutputType <- list(
 #
 # Fields:
 #   name              - Display name for the paradigm
-#   requiredInputClass - R6 class name required (e.g., "RankedAnalyteSet"), NULL for any
+#   requiredInputClass - R6 class name required (e.g., "RankedAnalyteList"), NULL for any
 #   outputs           - Character vector of OutputType values this paradigm supports
 #   requiresBackground - Whether a background gene set is required
 #

@@ -1,10 +1,9 @@
 initializeServerApp <- function() {
-  toggleUpsetTab()
-  session$sendCustomMessage("handler_setListLimit", LISTNAME_NCHAR_LIMIT)
+  # UpSet tab visibility is now managed by AnalyteListSetOperationsSession
   initialiazeOrganismSelectors()
   initializeDatasources()
-  initializeVolcanoPanel()
-  initializeReductionPanel()
+  # Volcano and Reduction panels are dynamically inserted by session classes
+  # via insertTab() when data is loaded - no initialization needed here
   initializeEnrichmentResults()
   initializeArenaEdgelist()
   initializeSTRINGData()
@@ -15,15 +14,7 @@ initializeServerApp <- function() {
   hideEnrichmentResultsPanel()
 }
 
-toggleUpsetTab <- function() {
-  if (length(userInputLists) > 1) {
-    showTab("inputPlots", "UpSet Plot")
-    # Trigger pulse animation on the tab instead of forcing focus
-    session$sendCustomMessage("handler_pulseUpsetTab", list())
-  }
-  else
-    hideTab("inputPlots", "UpSet Plot")
-}
+# toggleUpsetTab() removed - now managed by AnalyteListSetOperationsSession
 
 initialiazeOrganismSelectors <- function() {
   ORGANISMS <- ORGANISMS[order(ORGANISMS$print_name),]
@@ -52,35 +43,8 @@ initializeDatasources <- function() {
   }
 }
 
-initializeVolcanoPanel <- function() {
-  output$volcanoSelectionInfo <- renderText({
-    "Pick the box or lasso from the plot toolbar and then select items. Double-click to reset view."
-  })
-  output$volcanoPlotStatus <- renderText({
-    ""
-  })
-  shinyjs::hide("volcanoSelectionInfo")
-  hideTab("inputPlots", "Volcano Plot")
-  initializeVolcanoMetricsConversionText()
-  shinyjs::hide("volcanoPanel")
-}
-
-initializeVolcanoMetricsConversionText <- function() {
-  updateVolcanoMetricsConversionText(DEFAULT_VOLCANO_LOG10PVALUE_THRESHOLD,
-                                     DEFAULT_VOLCANO_LOG2FC_THRESHOLD)
-}
-
-initializeReductionPanel <- function() {
-  output$reductionSelectionInfo <- renderText({
-    "Pick the box or lasso from the plot toolbar and then select items. Double-click to reset view."
-  })
-  output$reductionPlotStatus <- renderText({
-    ""
-  })
-  shinyjs::hide("reductionSelectionInfo")
-  hideTab("inputPlots", "2D Reduction Plot")
-  shinyjs::hide("reductionPanel")
-}
+# initializeVolcanoPanel() removed - uses insertTab() in VolcanoInputSession
+# initializeReductionPanel() removed - uses insertTab() in ReductionInputSession
 
 initializeEnrichmentResults <- function() {
   # Functional enrichment results are now created dynamically per-run

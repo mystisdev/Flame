@@ -94,8 +94,8 @@ handleEnrichment <- function(enrichmentType) {
       }
     }
   }, error = function(e) {
-    cat(paste("Enrichment analysis error: ", e))
-    renderError(e$message)
+    cat(paste("[Enrichment] Analysis error:", conditionMessage(e), "\n"))
+    renderError("Enrichment analysis error.")
   }, finally = {
     removeModal()
   })

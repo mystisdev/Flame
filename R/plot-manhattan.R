@@ -40,12 +40,17 @@ handleManhattanPlot <- function(run) {
 # Updated to use run object to derive table ID instead of global currentManhattanTableId
 handleManhattanClick <- function(currentTermID) {
   tryCatch({
-    # Derive run context (same pattern as handlePlotClick)
-    selectedTool <- currentSelectedToolTab
-    if (is.null(selectedTool) || selectedTool == "") return()
-
+    # Derive enrichment type from sidebar - source of truth for current view
     enrichmentType <- deriveEnrichmentTypeFromSidebar()
     if (is.null(enrichmentType)) return()
+
+    # Read the correct tab panel input based on enrichment type
+    selectedTool <- if (enrichmentType == "functional") {
+      input$toolTabsPanel
+    } else {
+      input$literatureToolTabsPanel
+    }
+    if (is.null(selectedTool) || selectedTool == "") return()
 
     fullRunKey <- paste(enrichmentType, selectedTool, sep = "_")
     run <- activeRuns[[fullRunKey]]
@@ -67,12 +72,17 @@ handleManhattanClick <- function(currentTermID) {
 # Updated to use run object to derive table ID instead of global currentManhattanTableId
 handleManhattanSelect <- function(currentTermIDs) {
   tryCatch({
-    # Derive run context (same pattern as handlePlotClick)
-    selectedTool <- currentSelectedToolTab
-    if (is.null(selectedTool) || selectedTool == "") return()
-
+    # Derive enrichment type from sidebar - source of truth for current view
     enrichmentType <- deriveEnrichmentTypeFromSidebar()
     if (is.null(enrichmentType)) return()
+
+    # Read the correct tab panel input based on enrichment type
+    selectedTool <- if (enrichmentType == "functional") {
+      input$toolTabsPanel
+    } else {
+      input$literatureToolTabsPanel
+    }
+    if (is.null(selectedTool) || selectedTool == "") return()
 
     fullRunKey <- paste(enrichmentType, selectedTool, sep = "_")
     run <- activeRuns[[fullRunKey]]

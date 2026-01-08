@@ -2,8 +2,8 @@ handleFunctionalEnrichmentOrganismSelection <- function() {
   tryCatch({
     updateAvailableTools()
   }, error = function(e) {
-    cat(paste("Error: ", e))
-    renderError("Unexpected error occured.")
+    cat(paste("[EnrichInputs] Organism selection error:", conditionMessage(e), "\n"))
+    renderError("Unexpected error occurred.")
   })
 }
 
@@ -13,8 +13,8 @@ handleFunctionalEnrichmentToolSelection <- function() {
     updateAvailableNamespaces()
     updateAvailableSignificanceMetrics()
   }, error = function(e) {
-    cat(paste("Error: ", e))
-    renderError("Unexpected error occured.")
+    cat(paste("[EnrichInputs] Tool selection error:", conditionMessage(e), "\n"))
+    renderError("Unexpected error occurred.")
   })
 }
 
@@ -23,8 +23,8 @@ handleBackgroundModeSelection <- function(choice, enrichmentType) {
   tryCatch({
     updateBackgroundMode(choice, enrichmentType)
   }, error = function(e) {
-    cat(paste("Error: ", e))
-    renderError("Unexpected error occured.")
+    cat(paste("[EnrichInputs] Background mode error:", conditionMessage(e), "\n"))
+    renderError("Unexpected error occurred.")
   })
 }
 
@@ -32,7 +32,7 @@ handleBackgroundListUpdate <- function(enrichmentType) {
   tryCatch({
     updateBackgroundListChoices(enrichmentType)
   }, error = function(e) {
-    cat(paste("Error: ", e))
-    renderError("Unexpected error occured.")
+    cat(paste("[EnrichInputs] Background list error:", conditionMessage(e), "\n"))
+    renderError("Unexpected error occurred.")
   })
 }

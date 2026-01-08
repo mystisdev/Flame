@@ -1,32 +1,3 @@
-let LISTNAME_NCHAR_LIMIT = 0;
-
-const setListLimit = (limit) => {
-  LISTNAME_NCHAR_LIMIT = limit;
-  return true;
-};
-
-const shinyRenameLists = (selectedListNames) => {
-  let i;
-  if (typeof(selectedListNames) == "object") {
-    for (i = 0; i < selectedListNames.length; i++) {
-      newListNames[i] = parseNewListName(selectedListNames[i]);
-    }
-  } else
-    newListNames = parseNewListName(selectedListNames);
-  updateRenamedListNames(newListNames);
-  return true;
-};
-
-const parseNewListName = (listName) => {
-  return(
-    prompt(
-      "Rename list ".concat(listName).concat(" (").concat(
-        LISTNAME_NCHAR_LIMIT).concat(" characters max):"),
-      listName
-    )
-  )
-};
-
 const hideSourceTabs = (prefix, retryCount = 0) => {
   const elementId = prefix.concat("_sources_panel");
   const element = document.getElementById(elementId);
@@ -135,8 +106,41 @@ const pulseTab = (tabId, retryCount = 0) => {
   return true;
 };
 
-Shiny.addCustomMessageHandler("handler_setListLimit", setListLimit);
-Shiny.addCustomMessageHandler("handler_renameLists", shinyRenameLists);
+// Rename modal helpers
+const showRenameError = (errorMessage) => {
+  const errorDiv = document.querySelector('.rename-error');
+  if (errorDiv) {
+    errorDiv.textContent = errorMessage;
+    errorDiv.style.display = 'block';
+  }
+  return true;
+};
+
+const updateCharCount = (data) => {
+  const { count, limit, inputId } = data;
+  const element = document.getElementById(inputId);
+  if (!element) return false;
+
+  element.textContent = count + '/' + limit + ' characters';
+
+  element.classList.remove('warning', 'error');
+  if (count > limit) {
+    element.classList.add('error');
+  } else if (count > limit * 0.9) {
+    element.classList.add('warning');
+  }
+
+  // Clear error when typing
+  const errorDiv = document.querySelector('.rename-error');
+  if (errorDiv) {
+    errorDiv.style.display = 'none';
+  }
+
+  return true;
+};
+
+Shiny.addCustomMessageHandler("handler_showRenameError", showRenameError);
+Shiny.addCustomMessageHandler("handler_updateCharCount", updateCharCount);
 Shiny.addCustomMessageHandler("handler_hideSourceTabs", hideSourceTabs);
 Shiny.addCustomMessageHandler("handler_showSourceTab", showSourceTab);
 Shiny.addCustomMessageHandler("handler_browseUrl", browseUrl);

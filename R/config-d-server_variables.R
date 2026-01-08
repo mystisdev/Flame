@@ -1,28 +1,5 @@
 # Input ####
-LISTNAME_NCHAR_LIMIT <- 100
-LIST_LIMIT <- 10
-TEXTMINING_WORD_LIMIT <- 100000
-TEXTMINING_CHAR_LIMIT <- 500000
-GENE_LIST_LIMIT <- 3000
-OBJECT_SIZE_LIMIT <- 1000000 # bytes, 1MB
 STRING_LIMIT <- 500
-RANDOM_GENES_NUMBER <- 200 # currently 674 max # enrichR::genes790 
-GENE_LIST_PREFIX <- "gene_list"
-# Volcano
-VOLCANO_COLORS <- c("default" = "#000000",
-                    "overexpressed" = "#eb6e6c", "underexpressed" = "#64e4ed")
-VOLCANO_PREFIX <- "volcano"
-# 2D Reduction
-REDUCTION_PREFIX <- "reduction"
-REDUCTION_NA_COLOR <- "#4D4D4D"  # Dark grey for NA values
-REDUCTION_COLORSCALE_CONTINUOUS <- list(
-  c(0, "#2166AC"), c(0.5, "#F7F7F7"), c(1, "#B2182B")  # Blue-white-red gradient
-)
-REDUCTION_DEFAULT_SIZE <- 6  # Default marker size in pixels
-REDUCTION_SIZE_RANGE <- c(3, 9)  # Min and max size for scaled markers
-REDUCTION_NA_SIZE <- 1  # Size for NA values (below minimum)
-REDUCTION_CATEGORICAL_THRESHOLD <- 20  # Max unique values to treat as categorical color (used in render.R)
-REDUCTION_MARKER_OPACITY <- 0.7
 
 # Dot Plot ####
 DOTPLOT_SIZE_MIN <- 4
@@ -293,7 +270,6 @@ EDGE_WIDTH_MIN <- 0.1
 EDGE_WIDTH_MAX <- 3
 
 # Interoperability ####
-POST_REQUEST_PATH <- 'tmp/'
 ARENA_API_LINK <- "https://bib.fleming.gr/bib/api/arena3dweb" #"http://127.0.0.1:8080/api/arena3dweb"
 ARENA_LAYER_SPACING_PIXELS <- 300
 ARENA_Y_Z_SAMPLING_LIMIT <- 410

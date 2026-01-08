@@ -7,7 +7,20 @@ function(input, output, session) {
 
   # Source R6 infrastructure classes
   source(file.path(pkgRoot, "R", "infrastructure-config.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "input-analyteset.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "input-analytelist.R"), local = TRUE)
+
+  # Source utility services (used by input sessions)
+  source(file.path(pkgRoot, "R", "utilities-extract.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "utilities-gsnpense.R"), local = TRUE)
+
+  # Source input session classes
+  source(file.path(pkgRoot, "R", "input-session-base.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "input-analytelist-manipulation.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "input-session-list.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "input-session-volcano.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "input-session-reduction.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "input-session-snps.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "input-session-textmining.R"), local = TRUE)
 
   # Source configuration files (letter prefixes ensure correct load order)
   source(file.path(pkgRoot, "R", "config-a-global_settings.R"), local = TRUE)
@@ -29,13 +42,12 @@ function(input, output, session) {
   source(file.path(pkgRoot, "R", "func-observers.R"), local = TRUE)
 
   # Source input functions
-  source(file.path(pkgRoot, "R", "input-main.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "input-upset.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "input-text_mining.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "input-snps.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "input-volcano.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "input-reduction.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "input-api.R"), local = TRUE)
+  # Note: input-main.R replaced by ListInputSession
+  #       input-volcano.R replaced by VolcanoInputSession
+  #       input-reduction.R replaced by ReductionInputSession
+  #       input-snps.R replaced by SNPsInputSession
+  #       input-text_mining.R replaced by TextMiningInputSession
+  #       input-upset.R replaced by AnalyteListSetOperationsSession
   source(file.path(pkgRoot, "R", "input-conversion.R"), local = TRUE)
 
   # Source enrichment functions
@@ -73,9 +85,100 @@ function(input, output, session) {
   # Observer Registry for cleanup management (per-session)
   observerRegistry <- ObserverRegistry$new()
 
-  # API handling
-  observeEvent(session$clientData$url_search, {
-    resolveAPI()
+  # AnalyteList Registry for managing input lists (per-session)
+  # Must be created in reactive context (server function)
+  analyteListRegistry <- AnalyteListRegistry$new()
+
+  # AnalyteList Manager Session - manages sidebar and view panel for ALL lists
+  analyteListManager <- AnalyteListManagerSession$new(
+    ModuleIds$INPUT_MANIPULATION_MANAGER, analyteListRegistry
+  )
+  analyteListManager$server(input, session)
+
+  # List Input Session - manages Upload tab only (creating lists from text/files)
+  listInputSession <- ListInputSession$new(ModuleIds$INPUT_LIST, analyteListRegistry)
+  listInputSession$server(input, session)
+
+  # Volcano Input Session - manages Volcano tab and plot panel
+  volcanoInputSession <- VolcanoInputSession$new(ModuleIds$INPUT_VOLCANO, analyteListRegistry)
+  volcanoInputSession$server(input, session)
+
+  # Reduction Input Session - manages 2D Reduction tab and plot panel
+  reductionInputSession <- ReductionInputSession$new(ModuleIds$INPUT_REDUCTION, analyteListRegistry)
+  reductionInputSession$server(input, session)
+
+  # SNPs Input Session - manages SNPs tab for SNP to gene conversion
+  snpsInputSession <- SNPsInputSession$new(ModuleIds$INPUT_SNPS, analyteListRegistry)
+  snpsInputSession$server(input, session)
+
+  # Text Mining Input Session - manages Text-mining tab for extracting genes from text
+  textMiningInputSession <- TextMiningInputSession$new(ModuleIds$INPUT_TEXTMINING, analyteListRegistry)
+  textMiningInputSession$server(input, session)
+
+  # AnalyteList Operations Session - manages UpSet plot panel for set operations
+  upsetSession <- AnalyteListSetOperationsSession$new(
+    ModuleIds$INPUT_MANIPULATION_SETOPERATIONS,
+    analyteListRegistry,
+    analyteListManager
+  )
+  upsetSession$server(input, session)
+
+  # Clean up all session objects when the Shiny session ends
+  # Order: dependent sessions first, then sessions they depend on
+  session$onSessionEnded(function() {
+    # upsetSession depends on analyteListManager, so clean it up first
+    upsetSession$cleanup()
+    listInputSession$cleanup()
+    volcanoInputSession$cleanup()
+    reductionInputSession$cleanup()
+    snpsInputSession$cleanup()
+    textMiningInputSession$cleanup()
+    analyteListManager$cleanup()
+  })
+
+  # Cross-module reactive updates: update selectors when registry changes
+
+  # Helper to update selectInput while preserving current selection if still valid
+  updateSelectPreserving <- function(inputId, choices) {
+    currentSelection <- input[[inputId]]
+    selected <- if (!is.null(currentSelection) && currentSelection %in% choices) {
+      currentSelection
+    } else {
+      NULL
+    }
+    updateSelectInput(session, inputId, choices = choices, selected = selected)
+  }
+
+  # This replaces the imperative updateListBoxes() function with reactive updates
+  observe({
+    # Get list names reactively - this will re-run when registry changes
+    listNames <- analyteListRegistry$getNamesReactive()
+
+    # BACKWARD COMPATIBILITY: Sync registry to userInputLists for code that
+    # hasn't been migrated yet (enrich-main.R, etc.)
+    # This will be removed once all code is migrated to use the registry directly.
+    userInputLists <<- lapply(analyteListRegistry$getAll(), function(analyteList) {
+      analyteList$toDataFrame()
+    })
+
+    # Update enrichment selectors (preserving current selection if still valid)
+    updateSelectPreserving("functional_enrichment_file", listNames)
+    updateSelectPreserving("functional_enrichment_background_list", listNames)
+    updateSelectPreserving("literature_enrichment_file", listNames)
+    updateSelectPreserving("literature_enrichment_background_list", listNames)
+
+    # Update utility selectors (preserving current selection if still valid)
+    updateSelectPreserving("selectUpset", listNames)
+    updateSelectPreserving("gconvert_select", listNames)
+    updateSelectPreserving("gorth_select", listNames)
+    updateSelectPreserving("literatureSelect", listNames)
+    updateSelectPreserving("STRINGnetworkSelect", listNames)
+
+    # Update background list choices (exclude current input list)
+    updateBackgroundListChoices("functional")
+    updateBackgroundListChoices("literature")
+
+    # UpSet tab visibility is now managed by AnalyteListSetOperationsSession
   })
 
   # Initialize server app
@@ -86,200 +189,23 @@ function(input, output, session) {
     updateTabItems(session, "sideBarId", selected = "file_handler")
   }, ignoreInit = TRUE)
 
-  # INPUT observers
-  observeEvent(input$example, {
-    handleRandomExample()
-  }, ignoreInit = TRUE)
+  # INPUT observers for list management are now handled by ListInputSession
+  # (see listInputSession$server() call above)
 
-  observeEvent(input$input_clear, {
-    handleClearText()
-  }, ignoreInit = TRUE)
+  # Text-mining observers are now handled by TextMiningInputSession
+  # (see textMiningInputSession$server() call above)
 
-  observeEvent(input$text_submit, {
-    handleTextSubmit()
-  }, ignoreInit = TRUE)
+  # UpSet observers are now handled by AnalyteListSetOperationsSession
+  # (see upsetSession$server() call above)
 
-  observeEvent(input$fileUpload, {
-    handleInputFiles()
-  }, ignoreInit = TRUE)
+  # SNPs observers are now handled by SNPsInputSession
+  # (see snpsInputSession$server() call above)
 
-  observeEvent(input$selectAll, {
-    handleSelectAllLists()
-  }, ignoreInit = TRUE)
+  # Volcano observers are now handled by VolcanoInputSession
+  # (see volcanoInputSession$server() call above)
 
-  observeEvent(input$rename, {
-    handlePrepareRenameLists()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$js_listNames, {
-    handleRenameLists()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$remove, {
-    handleRemoveLists()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$selectView, {
-    handleSelectView()
-  }, ignoreInit = TRUE)
-
-  # Text-mining observers
-  observeEvent(input$textmining_addExample, {
-    loadTextMiningExample()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$textmining_clear, {
-    resetTextMiningFields()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$textmining_submit, {
-    handleTextMining()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$textmining_selectAll, {
-    shinyjs::runjs("textmining_selectAll(true);")
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$textmining_selectNone, {
-    shinyjs::runjs("textmining_selectAll(false);")
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$textmining_addList, {
-    addTextMiningToFiles()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$textmining_delete, {
-    deleteTextmining()
-  }, ignoreInit = TRUE)
-
-  # Upset observers
-  observeEvent(input$submitUpset, {
-    handleUpset()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$upsetjsView_hover, {
-    handleUpsetHover()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$upsetjsView_click, {
-    handleUpsetClick()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$upsetClick_ok, {
-    handleUpsetListAccept()
-  }, ignoreInit = TRUE)
-
-  # SNPs observers
-  observeEvent(input$snp_example, {
-    loadVariantExample()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$snp_clear, {
-    resetVariantFields()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$snp_submit, {
-    handleVariantSubmit()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$snp_fileUpload, {
-    handleVariantUpload()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$snp_addList, {
-    addVariantsToFiles()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$snp_delete, {
-    deleteVariants()
-  }, ignoreInit = TRUE)
-
-  # Volcano observers
-  observeEvent(input$volcanoUpload, {
-    handleVolcanoPlot(readVolcanoInput)
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$volcano_addExample, {
-    handleVolcanoPlot(readVolcanoExample)
-  }, ignoreInit = TRUE)
-
-  observeEvent(c(input$volcano_pvalue_slider, input$volcano_fc_slider), {
-    updateVolcanoMetricsConversionText(input$volcano_pvalue_slider,
-                                       input$volcano_fc_slider)
-  }, ignoreInit = TRUE)
-
-  observeEvent(event_data("plotly_selected", source = "Volcano"), {
-    triggeredEvent <- event_data("plotly_selected", source = "Volcano")
-    volcanoSelectedItems <<- triggeredEvent$customdata
-    renderShinyText("volcanoSelected",
-                    paste(volcanoSelectedItems, collapse = ", "))
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$volcano_submit, {
-    handleVolcanoSubmit()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$volcano_ok, {
-    handleVolcanoListAccept()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$volcanoGenerate, {
-    handleVolcanoGenerate()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$volcanoClear, {
-    handleVolcanoClear()
-  }, ignoreInit = TRUE)
-
-  observeEvent(c(
-    input$volcano_gene_col,
-    input$volcano_logfc_col,
-    input$volcano_pvalue_col
-  ), {
-    updateVolcanoDropdownChoices()
-  }, ignoreInit = TRUE)
-
-  # 2D Reduction observers
-  observeEvent(input$reductionUpload, {
-    handleReductionInput(readReductionInput)
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$reduction_addExample, {
-    handleReductionInput(readReductionExample)
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$reductionGenerate, {
-    handleReductionGenerate()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$reductionClear, {
-    handleReductionClear()
-  }, ignoreInit = TRUE)
-
-  observeEvent(event_data("plotly_selected", source = "ReductionPlot"), {
-    triggeredEvent <- event_data("plotly_selected", source = "ReductionPlot")
-    reductionSelectedItems <<- triggeredEvent$customdata
-    renderShinyText("reductionSelected",
-                    paste(reductionSelectedItems, collapse = ", "))
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$reduction_submit, {
-    handleReductionSubmit()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$reduction_ok, {
-    handleReductionListAccept()
-  }, ignoreInit = TRUE)
-
-  observeEvent(c(
-    input$reduction_gene_col,
-    input$reduction_x_axis,
-    input$reduction_y_axis,
-    input$reduction_color,
-    input$reduction_size
-  ), {
-    updateReductionDropdownChoices()
-  }, ignoreInit = TRUE)
+  # 2D Reduction observers are now handled by ReductionInputSession
+  # (see reductionInputSession$server() call above)
 
   # ENRICHMENT observers
   observeEvent(input$functional_enrichment_organism, {
@@ -374,20 +300,6 @@ function(input, output, session) {
     if (isEventFromManhattan(triggeredEvent))
       handleManhattanSelect(triggeredEvent$key)
   }, ignoreInit = TRUE)
-
-  # Plot-Table Synchronization
-  currentSelectedToolTab <<- NULL
-
-  observeEvent(input$toolTabsPanel, {
-    currentSelectedToolTab <<- input$toolTabsPanel
-  }, ignoreInit = FALSE, ignoreNULL = TRUE)
-
-  currentSelectedLiteratureTab <<- NULL
-
-  observeEvent(input$literatureToolTabsPanel, {
-    currentSelectedLiteratureTab <<- input$literatureToolTabsPanel
-    currentSelectedToolTab <<- input$literatureToolTabsPanel
-  }, ignoreInit = FALSE, ignoreNULL = TRUE)
 
   # Plot click observers
   observeEvent(event_data("plotly_click", source = "Barchart", priority = "event"), {

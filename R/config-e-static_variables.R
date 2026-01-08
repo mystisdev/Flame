@@ -1,8 +1,7 @@
 # Input
 userInputLists <- list()
-checkedListNames <- list() # in combination with js_listNames
-volcanoSelectedItems <- c()
-reductionSelectedItems <- c()
+# Note: volcanoSelectedItems and reductionSelectedItems moved to private fields in
+# VolcanoInputSession and ReductionInputSession respectively
 
 # Enrichment
 enrichmentResults <- list()
@@ -22,12 +21,8 @@ STRINGNetworkData <- list()
 
 
 # Current
-currentVariantResults <- data.frame()
-currentTextminingResult <- c()
-currentVolcano <- data.frame()
-volcanoPlotData <- data.frame()  # Prepared data for volcano rendering (standardized column names)
-currentReduction <- data.frame()
-currentUpsetMode <- ""
+# Note: currentVariantResults, currentTextminingResult, currentVolcano, volcanoPlotData,
+# currentReduction, and currentUpsetMode moved to private fields in their respective InputSession classes
 currentConversionResult <- data.frame()
 currentOrthologyResult <- data.frame()
 

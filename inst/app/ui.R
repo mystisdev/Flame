@@ -2,6 +2,7 @@
 
 # Determine package root and source required files
 pkgRoot <- normalizePath(file.path(getwd(), "..", ".."))
+source(file.path(pkgRoot, "R", "infrastructure-config.R"), local = TRUE)
 source(file.path(pkgRoot, "R", "config-b-global_variables.R"), local = TRUE)
 source(file.path(pkgRoot, "R", "config-f-ui_variables.R"), local = TRUE)
 source(file.path(pkgRoot, "R", "func-init.R"), local = TRUE)
@@ -51,7 +52,6 @@ dashboardPage(
     tags$head(tags$link(rel = "stylesheet", type = "text/css", href = "css/Flame.css")),
     tags$head(tags$link(rel = "stylesheet", type = "text/css", href = "css/extract_popups.css")),
     tags$head(tags$script(src = "js/rshiny_handlers.js")),
-    tags$head(tags$script(src = "js/update_rshiny_values.js")),
     tags$head(tags$script(src = "js/extract_popups.js")),
     tags$head(tags$script(src = 'https://string-db.org/javascript/combined_embedded_network_v2.0.2.js')),
     shinyjs::useShinyjs(),

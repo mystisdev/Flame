@@ -1,49 +1,10 @@
-updateUserInputLists <- function(inputDF, listName) {
-  colnames(inputDF) <- listName
-  userInputLists <<- c(userInputLists, list(inputDF))
-  names(userInputLists)[length(userInputLists)] <<- listName
-}
+# =============================================================================
+# UI UPDATE FUNCTIONS
+# =============================================================================
+# Functions for updating Shiny UI elements in response to user actions.
+# =============================================================================
 
-updateListBoxes <- function() {
-  updateCheckboxGroupInput(session, "checkboxLists", choices = names(userInputLists))
-  updateSelectInput(session, "functional_enrichment_file", choices = names(userInputLists))
-  updateSelectInput(session, "functional_enrichment_background_list", choices = names(userInputLists))
-  updateSelectInput(session, "literature_enrichment_file", choices = names(userInputLists))
-  updateSelectInput(session, "literature_enrichment_background_list", choices = names(userInputLists))
-  updateSelectInput(session, "selectView", choices = names(userInputLists))
-  updateSelectInput(session, "selectUpset", choices = names(userInputLists))
-  updateSelectInput(session, "gconvert_select", choices = names(userInputLists))
-  updateSelectInput(session, "gorth_select", choices = names(userInputLists))
-  updateSelectInput(session, "literatureSelect", choices = names(userInputLists))
-  updateSelectInput(session, "STRINGnetworkSelect", choices = names(userInputLists))
-  updateBackgroundListChoices("functional")
-  updateBackgroundListChoices("literature")
-  toggleUpsetTab()
-}
-
-updateVolcanoSliders <- function(maxLog10PValue, maxLogFC) {
-  updateShinySliderInput(
-    shinyOutputId = "volcano_pvalue_slider",
-    minSliderValue = 0, maxSliderValue = ceiling(maxLog10PValue),
-    value = input$volcano_pvalue_slider,
-    step = DEFAULT_VOLCANO_LOG10PVALUE_STEP
-  )
-  updateShinySliderInput(
-    shinyOutputId = "volcano_fc_slider",
-    minSliderValue = 0, maxSliderValue = ceiling(maxLogFC),
-    value = input$volcano_fc_slider,
-    step = DEFAULT_VOLCANO_LOG2FC_STEP
-  )
-}
-
-updateVolcanoMetricsConversionText <- function(log10pvalue, log2fc) {
-  conversionText <- sprintf(
-    "pvalue = %.6f, FC = %.2f",
-    10 ^ -log10pvalue,
-    2 ^ log2fc
-  )
-  renderShinyText("volcanoMetricConversions", conversionText)
-}
+# updateVolcanoMetricsConversionText() removed - now in VolcanoInputSession$updateMetricsText()
 
 updateAvailableTools <- function() {
   inputOrganism <- input$functional_enrichment_organism
@@ -97,16 +58,6 @@ filterDatasourcePrintChoices <- function(choices) {
       filtered_DATASOURCES_PRINT[[i]] <- NULL
   }
   return(filtered_DATASOURCES_PRINT)
-}
-
-addNewDatasourcesOnly <- function(toolCategoryChoices, choices) {
-  if (!identical(toolCategoryChoices[[1]], choices[[names(toolCategoryChoices)]]))
-    for (i in 1:length(toolCategoryChoices[[1]])) {
-      if (!toolCategoryChoices[[1]][[i]] %in% choices[[names(toolCategoryChoices)]])
-        choices[[names(toolCategoryChoices)]] <-
-          c(choices[[names(toolCategoryChoices)]], toolCategoryChoices[[1]][i])
-    }
-  return(choices)
 }
 
 updateAvailableNamespaces <- function() {
@@ -285,6 +236,11 @@ updateBackgroundMode <- function(choice, enrichmentType) {
   updateAvailableSignificanceMetrics()
 }
 
+# TODO: This function uses the old userInputLists global instead of analyteListRegistry.
+#       Fix when refactoring the enrichment page - should use:
+#         background_choices <- analyteListRegistry$getNames()
+#       instead of:
+#         background_choices <- names(userInputLists)
 updateBackgroundListChoices <- function(enrichmentType) {
   # the code below makes sure that the input list is NOT a choice for the background
   # first, we get the user input value
