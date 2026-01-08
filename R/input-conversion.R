@@ -5,7 +5,9 @@
 # Adds gene ID conversion results (from g:Convert or g:Orth) to the input lists.
 #
 # Dependencies:
-# - input-analytelist.R (for AnalyteListRegistry, UnrankedAnalyteList, AnalyteType)
+# - input-analytelist-registry.R (for AnalyteListRegistry)
+# - input-analytelist-unranked.R (for UnrankedAnalyteList)
+# - infrastructure-config.R (for AnalyteType)
 # - analyteListRegistry (global, created in server.R)
 #
 # =============================================================================

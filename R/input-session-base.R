@@ -6,8 +6,9 @@
 # All concrete InputSession classes inherit from this base.
 #
 # Dependencies:
-# - AnalyteListRegistry (from input-analytelist.R)
-# - AnalyteType, UnrankedAnalyteList (from input-analytelist.R)
+# - input-analytelist-registry.R (for AnalyteListRegistry)
+# - input-analytelist-unranked.R (for UnrankedAnalyteList)
+# - infrastructure-config.R (for AnalyteType)
 #
 # =============================================================================
 

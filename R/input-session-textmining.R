@@ -6,8 +6,8 @@
 #
 # Dependencies:
 # - input-session-base.R (for InputSession)
-# - input-analytelist.R (for AnalyteListRegistry)
-# - utilities-extract.R (for extract_entities, extract_annotated_html)
+# - input-analytelist-registry.R (for AnalyteListRegistry)
+# - func-extract.R (for extract_entities, extract_annotated_html)
 # - func-links.R (for attachTextMiningDBLinks)
 #
 # =============================================================================

@@ -1,8 +1,8 @@
 # =============================================================================
-# FLAME Extract Service
+# FLAME Extract Functions
 # =============================================================================
 #
-# Service functions for the EXTRACT API (Jensen Lab tagger).
+# API wrapper functions for the EXTRACT API (Jensen Lab tagger).
 # Used by TextMiningInputSession for extracting gene/protein names from text.
 #
 # API Documentation: https://extract.jensenlab.org/
@@ -51,11 +51,11 @@ extract_entities <- function(text, species) {
       }
       return(result)
     } else {
-      cat("[ExtractService] GetEntities request failed\n")
+      cat("[extract_entities] GetEntities request failed\n")
       return(NULL)
     }
   }, error = function(e) {
-    cat(paste("[ExtractService] extract_entities error:", conditionMessage(e), "\n"))
+    cat(paste("[extract_entities] error:", conditionMessage(e), "\n"))
     return(NULL)
   })
 }
@@ -82,11 +82,11 @@ extract_annotated_html <- function(text, species) {
     if (isPOSTResponseValid(request)) {
       return(rawToChar(httr::content(request, "raw")))
     } else {
-      cat("[ExtractService] GetHTML request failed\n")
+      cat("[extract_annotated_html] GetHTML request failed\n")
       return(NULL)
     }
   }, error = function(e) {
-    cat(paste("[ExtractService] extract_annotated_html error:", conditionMessage(e), "\n"))
+    cat(paste("[extract_annotated_html] error:", conditionMessage(e), "\n"))
     return(NULL)
   })
 }

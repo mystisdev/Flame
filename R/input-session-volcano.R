@@ -11,7 +11,7 @@
 #
 # Dependencies:
 # - input-session-base.R (for InputSession)
-# - input-analytelist.R (for AnalyteListRegistry)
+# - input-analytelist-registry.R (for AnalyteListRegistry)
 #
 # =============================================================================
 

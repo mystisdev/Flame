@@ -7,20 +7,28 @@ function(input, output, session) {
 
   # Source R6 infrastructure classes
   source(file.path(pkgRoot, "R", "infrastructure-config.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "input-analytelist.R"), local = TRUE)
 
-  # Source utility services (used by input sessions)
-  source(file.path(pkgRoot, "R", "utilities-extract.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "utilities-gsnpense.R"), local = TRUE)
+  # Source AnalyteList classes (in dependency order)
+  source(file.path(pkgRoot, "R", "input-analytelist.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "input-analytelist-unranked.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "input-analytelist-ranked.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "input-analytelist-registry.R"), local = TRUE)
+
+  # Source utility functions (used by input sessions)
+  source(file.path(pkgRoot, "R", "func-extract.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "func-gsnpense.R"), local = TRUE)
 
   # Source input session classes
   source(file.path(pkgRoot, "R", "input-session-base.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "input-analytelist-manipulation.R"), local = TRUE)
   source(file.path(pkgRoot, "R", "input-session-list.R"), local = TRUE)
   source(file.path(pkgRoot, "R", "input-session-volcano.R"), local = TRUE)
   source(file.path(pkgRoot, "R", "input-session-reduction.R"), local = TRUE)
   source(file.path(pkgRoot, "R", "input-session-snps.R"), local = TRUE)
   source(file.path(pkgRoot, "R", "input-session-textmining.R"), local = TRUE)
+
+  # Source list management session classes (depends on InputSession)
+  source(file.path(pkgRoot, "R", "listmgmt-session-manager.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "listmgmt-session-setops.R"), local = TRUE)
 
   # Source configuration files (letter prefixes ensure correct load order)
   source(file.path(pkgRoot, "R", "config-a-global_settings.R"), local = TRUE)

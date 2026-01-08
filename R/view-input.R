@@ -33,7 +33,7 @@ generateInputPage <- function() {
 
 # NOTE: UI components are defined in session class files:
 #
-# AnalyteList Manipulation (R/input-analytelist-manipulation.R):
+# List Management (R/listmgmt-session-*.R):
 # - AnalyteListManagerSession: sidebar (analyteListManagerSidebarUI) and view panel (analyteListManagerViewUI)
 # - AnalyteListSetOperationsSession: UpSet plot panel (upsetPlotUI)
 #

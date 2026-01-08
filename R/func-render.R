@@ -68,7 +68,7 @@ renderShinyDataTable <- function(shinyOutputId, outputData,
 # Render UpSet plot for the COMBINATION tab (enrichment results comparison)
 # NOTE: This is NOT for the Input UpSet plot which compares input gene lists.
 #       The Input UpSet is managed by AnalyteListSetOperationsSession in
-#       input-analytelist-manipulation.R with its own inline rendering.
+#       listmgmt-session-setops.R with its own inline rendering.
 # Used by: enrich-combination.R to compare enriched terms across multiple runs
 renderUpset <- function(shinyOutputId, upsetList, upsetModeFunction, modeLabel) {
   output[[shinyOutputId]] <- upsetjs::renderUpsetjs({

@@ -6,8 +6,8 @@
 #
 # Dependencies:
 # - input-session-base.R (for InputSession)
-# - input-analytelist.R (for AnalyteListRegistry)
-# - utilities-gsnpense.R (for gsnpense_convert)
+# - input-analytelist-registry.R (for AnalyteListRegistry)
+# - func-gsnpense.R (for gsnpense_convert)
 # - func-links.R (for attachVariantTableLinks)
 #
 # =============================================================================

@@ -35,7 +35,7 @@ ScoreDirection <- list(
 #'
 #' Naming convention:
 #'   - INPUT_X matches file input-session-X.R
-#'   - INPUT_MANIPULATION_X matches file input-analytelist-manipulation.R
+#'   - INPUT_MANIPULATION_X matches file listmgmt-session-*.R
 ModuleIds <- list(
   INPUT_LIST = "input_list",
   INPUT_VOLCANO = "input_volcano",
