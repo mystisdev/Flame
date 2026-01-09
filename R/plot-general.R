@@ -896,8 +896,6 @@ deriveEnrichmentTypeFromSidebar <- function() {
 
   if (sidebarTab == "functional_enrichment") {
     return("functional")
-  } else if (sidebarTab == "literature_enrichment") {
-    return("literature")
   }
 
   return(NULL)
@@ -913,13 +911,9 @@ handlePlotClick <- function(plotId, plotSource, session = NULL) {
     enrichmentType <- deriveEnrichmentTypeFromSidebar()
     if (is.null(enrichmentType)) return()
 
-    # Read the correct tab panel input based on enrichment type
+    # Read the correct tab panel input
     # This ensures we get the tab that's actually visible, not a stale cached value
-    selectedTool <- if (enrichmentType == "functional") {
-      input$toolTabsPanel
-    } else {
-      input$literatureToolTabsPanel
-    }
+    selectedTool <- input$toolTabsPanel
     if (is.null(selectedTool) || selectedTool == "" || selectedTool == "Combination") return()
 
     # Get Run object for validation and consistent ID usage
@@ -1033,12 +1027,8 @@ handlePlotSelection <- function(plotId, plotSource, session = NULL) {
     enrichmentType <- deriveEnrichmentTypeFromSidebar()
     if (is.null(enrichmentType)) return()
 
-    # Read the correct tab panel input based on enrichment type
-    selectedTool <- if (enrichmentType == "functional") {
-      input$toolTabsPanel
-    } else {
-      input$literatureToolTabsPanel
-    }
+    # Read the correct tab panel input
+    selectedTool <- input$toolTabsPanel
     if (is.null(selectedTool) || selectedTool == "" || selectedTool == "Combination") return()
 
     # Get Run object for validation and consistent ID usage

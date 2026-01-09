@@ -1,6 +1,6 @@
 #' Run the FLAME Shiny Application
 #'
-#' Launches the FLAME (Functional and Literature Analysis of Multi-omics
+#' Launches the FLAME (Functional Analysis of Multi-omics
 #' Enrichment) Shiny application.
 #'
 #' @param launch.browser Logical. If TRUE, opens the app in a browser window.

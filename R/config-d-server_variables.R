@@ -23,7 +23,7 @@ SPECIAL_PREFERRED_NAMESPACE[["amellifera"]] <- "BEEBASE"
 SPECIAL_PREFERRED_NAMESPACE[["dmelanogaster"]] <- "USERINPUT"
 
 # Enrichment ####
-ENRICHMENT_TYPES <- c("functional", "literature")
+ENRICHMENT_TYPES <- c("functional")
 DATASOURCES_PRINT <- list(
   'Gene Ontology' = list(
     "Molecular Function (GO:MF)" = "GO:MF",
@@ -65,6 +65,9 @@ DATASOURCES_PRINT <- list(
   ),
   'Regulatory motifs in DNA' = list(
     "TRANSFAC" = "TF", "CollecTRI TFs" = "CollecTRI", "miRTarBase" = "MIRNA"
+  ),
+  'Literature' = list(
+    "PubMed Publications" = "PUBMED"
   )
 )
 DATASOURCES_DEFAULT_SELECTED <- list("GO:MF", "GO:CC", "GO:BP", "KEGG")

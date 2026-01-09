@@ -44,12 +44,8 @@ handleManhattanClick <- function(currentTermID) {
     enrichmentType <- deriveEnrichmentTypeFromSidebar()
     if (is.null(enrichmentType)) return()
 
-    # Read the correct tab panel input based on enrichment type
-    selectedTool <- if (enrichmentType == "functional") {
-      input$toolTabsPanel
-    } else {
-      input$literatureToolTabsPanel
-    }
+    # Read the correct tab panel input
+    selectedTool <- input$toolTabsPanel
     if (is.null(selectedTool) || selectedTool == "") return()
 
     fullRunKey <- paste(enrichmentType, selectedTool, sep = "_")
@@ -76,12 +72,8 @@ handleManhattanSelect <- function(currentTermIDs) {
     enrichmentType <- deriveEnrichmentTypeFromSidebar()
     if (is.null(enrichmentType)) return()
 
-    # Read the correct tab panel input based on enrichment type
-    selectedTool <- if (enrichmentType == "functional") {
-      input$toolTabsPanel
-    } else {
-      input$literatureToolTabsPanel
-    }
+    # Read the correct tab panel input
+    selectedTool <- input$toolTabsPanel
     if (is.null(selectedTool) || selectedTool == "") return()
 
     fullRunKey <- paste(enrichmentType, selectedTool, sep = "_")

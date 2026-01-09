@@ -1,7 +1,6 @@
 # Enrichment ####
 DEFAULT_TOOL <- "STRING"
 DEFAULT_TOOL_UPPER <- toupper(DEFAULT_TOOL)
-STRING_DATASOURCES_PRINT_LITERATURE <- list("PubMed Publications" = "PUBMED")
 
 # Plots ####
 PLOT_TABNAMES <- c("Barchart", "Dot Plot", "Scatter Plot", "Manhattan", "Heatmap", "Network")

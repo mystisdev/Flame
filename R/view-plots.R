@@ -1,4 +1,4 @@
-# Used for literature enrichment (single-result mode)
+# Generate plots panel
 generatePlotsPanel <- function() {
   tabPanel(
     title = "Plots",

@@ -4,7 +4,7 @@ welcomePage <- fluidRow(
     HTML(
       "<h1><strong>Welcome to <i>Flame</i> (v2.0)</strong></h1>
       <h3><strong>Visualization and interpretation of
-      functional and literature enrichment analysis results from multiple sets</strong></h3>"
+      functional enrichment analysis results from multiple sets</strong></h3>"
     ),
     tags$hr(style = "height:2px; border-color: #ffa600;"),
     HTML(
@@ -16,7 +16,6 @@ welcomePage <- fluidRow(
           <li><b>Combine lists</b> by calculating their unions and intersections with the help of UpSet plots<br />
           <li>Perform <b>functional enrichment</b> analysis on any of the combined lists for more than 14,000 organisms, using six tools (gProfiler, WebGestalt, enrichR, STRING, PANTHER, GeneCodis)<br />
           <li><b>Combine</b> and <b>compare</b> enrichment results from multiple runs<br />
-          <li>Perform <b>literature enrichment</b> analysis on any of the combined lists, using STRING<br />
           <li>Generate <b>protein-protein interaction</b> networks via STRING<br />
           <li><b>Visualize</b> results with the use of networks, heatmaps, bar charts, scatter plots and searchable tables<br />
           <li>Perform <b>network analysis</b> at the gene-function, function-function and gene-gene association levels<br />

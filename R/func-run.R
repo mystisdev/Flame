@@ -24,7 +24,7 @@ AnalysisRun <- R6::R6Class("AnalysisRun",
 
     # === Context (common to all biology) ===
     analysisType = NULL,    # 'ora', 'gsea', 'topology'
-    enrichmentType = NULL,  # 'functional', 'literature' (UI section)
+    enrichmentType = NULL,  # 'functional' (UI section)
     toolName = NULL,
     organism = NULL,
 

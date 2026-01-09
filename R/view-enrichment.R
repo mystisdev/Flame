@@ -13,21 +13,11 @@ generateEnrichmentPage <- function(enrichmentType) {
 }
 
 generateEnrichmentControlPanel <- function() {
-  availableTools <- switch(
-    currentEnrichmentType,
-    "functional" = {
-      datasourceChoices <- NULL
-      datasourceSelected <- NULL
-      metrics <- NULL
-      ENRICHMENT_TOOLS
-    },
-    "literature" = {
-      datasourceChoices <- STRING_DATASOURCES_PRINT_LITERATURE
-      datasourceSelected <- STRING_DATASOURCES_PRINT_LITERATURE
-      metrics <- list("False discovery rate", "P-value")
-      "STRING"
-    }
-  )
+  # Functional enrichment only - tools/datasources selected dynamically
+  datasourceChoices <- NULL
+  datasourceSelected <- NULL
+  metrics <- NULL
+  availableTools <- ENRICHMENT_TOOLS
   
   return(
     tags$div(
@@ -149,38 +139,26 @@ GeneCodis: User Input"
 
 
 generateEnrichmentResultsPanel <- function() {
-  if (currentEnrichmentType == "functional") {
-    return(
-      tags$div(
-        id = "functionalEnrichmentResultsPanel",
-        class = "toolTabs",
-        style = "display: none;",  # Hidden by default, shown when first run is created
-        tabsetPanel(
-          id = "toolTabsPanel",
-          # Only Combination tab is static; run tabs are created dynamically
-          tabPanel(
-            title = "Combination",
-            value = "Combination",
-            generateCombinationPanel()
-          )
+  # Functional enrichment only
+  return(
+    tags$div(
+      id = "functionalEnrichmentResultsPanel",
+      class = "toolTabs",
+      style = "display: none;",  # Hidden by default, shown when first run is created
+      tabsetPanel(
+        id = "toolTabsPanel",
+        # Only Combination tab is static; run tabs are created dynamically
+        tabPanel(
+          title = "Combination",
+          value = "Combination",
+          generateCombinationPanel()
         )
       )
     )
-  } else { # "literature"
-    # Multi-run mode: Dynamic tabsetPanel (like functional enrichment)
-    # Tabs are created dynamically via insertEnrichmentTab()
-    return(
-      tags$div(
-        id = "literatureEnrichmentResultsPanel",
-        class = "toolTabs",
-        style = "display: none;",  # Hidden until first run
-        tabsetPanel(id = "literatureToolTabsPanel")
-      )
-    )
-  }
+  )
 }
 
-# Used for literature enrichment (single-result mode)
+# Generate tool panel content
 generateToolPanel <- function(toolName) {
   if (toolName != "Combination") {
     currentEnrichmentTool <<- toolName
@@ -217,27 +195,14 @@ generateParametersBox <- function() {
 }
 
 generateResultsPanel <- function() {
-  sourcesPanel <- switch(
-    currentEnrichmentType,
-    "functional" = {
-      do.call(
-        tabsetPanel, c(
-          id = paste(currentType_Tool, "sources_panel", sep = "_"),
-          lapply(TAB_NAMES_CODES, function(tabName) {
-            generateEnrichmentTab(tabName)
-          })
-        )
-      )
-    },
-    "literature" = {
-      # For literature enrichment, the tool is always STRING
-      literatureTypeTool <- paste(currentEnrichmentType, "STRING", sep = "_")
-      tabsetPanel(
-        id = paste(literatureTypeTool, "sources_panel", sep = "_"),
-        tabPanel("PUBMED", tags$br(),
-                 DT::dataTableOutput(paste(literatureTypeTool, "table_pubmed", sep = "_")))
-      )
-    }
+  # Functional enrichment only - all datasource tabs
+  sourcesPanel <- do.call(
+    tabsetPanel, c(
+      id = paste(currentType_Tool, "sources_panel", sep = "_"),
+      lapply(TAB_NAMES_CODES, function(tabName) {
+        generateEnrichmentTab(tabName)
+      })
+    )
   )
   
   return(

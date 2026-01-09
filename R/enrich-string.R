@@ -188,7 +188,5 @@ STRINGStrategy <- R6::R6Class("STRINGStrategy",
   )
 )
 
-# Register the strategy for both enrichment types
-# STRING is used in both Functional and Literature enrichment
+# Register the strategy for functional enrichment
 toolRegistry$register("functional", "STRING", STRINGStrategy$new())
-toolRegistry$register("literature", "STRING", STRINGStrategy$new())

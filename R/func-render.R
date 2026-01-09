@@ -246,7 +246,7 @@ renderShinyVisNetwork <- function(networkId, nodes, edges, layout) {
       visGroups(groupname = "WBP", color = DATASOURCE_COLORS["WBP"][[1]], shape = "square") %>%
       visGroups(groupname = "MGI", color = DATASOURCE_COLORS["MGI"][[1]], shape = "square") %>%
       visGroups(groupname = "Gene", color = GENE_NODE_COLOR, shape = "square") %>%
-      visGroups(groupname = "PUBMED", color = LITERATURE_NODE_COLOR, shape = "square") %>%
+      visGroups(groupname = "PUBMED", color = DATASOURCE_COLORS["PUBMED"][[1]], shape = "square") %>%
       visEdges(color = "black") %>%
       visIgraphLayout(layout = layout) %>%
       visInteraction(navigationButtons = T, hover = T, multiselect = T) %>%

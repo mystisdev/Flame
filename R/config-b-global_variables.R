@@ -11,7 +11,8 @@ TAB_NAMES <- list(
   "BTO" = "brenda", "WBBT" = "wbbt", "TF" = "tf", "CollecTRI" = "collectri",
   "MIRNA" = "mirna", "CORUM" = "corum",
   "HPA" = "hpa", "HP" = "hp", "WBP" = "wbp", "MGI" = "mgi",
-  "BioPlanet" = "bioplanet", "PharmGKB" = "pharmgkb", "LINCS" = "lincs"
+  "BioPlanet" = "bioplanet", "PharmGKB" = "pharmgkb", "LINCS" = "lincs",
+  "PUBMED" = "pubmed"
 )
 TAB_NAMES_CODES <- as.character(TAB_NAMES)
 ENRICHMENT_DATASOURCES <- names(TAB_NAMES[TAB_NAMES != "all"])
@@ -35,7 +36,7 @@ NAMESPACES[["STRING"]] <- list("ENSEMBL Protein ID" = "ENSP")
 NAMESPACES[["PANTHER"]] <- list("PANTHER Accession" = "PANTHER_ACC")
 NAMESPACES[["GENECODIS"]] <- list("User Input" = "USERINPUT")
 UI_TERM_KEYWORD <- list(
-  "functional" = "functions", "literature" = "articles"
+  "functional" = "functions"
 )
 
 # Plots ####
@@ -52,7 +53,6 @@ LAYOUT_CHOICES <- list(
 HEATMAP_IDS <- c("heatmap1", "heatmap2", "heatmap3")
 # Colors
 GENE_NODE_COLOR <- "#d1e1d9"
-LITERATURE_NODE_COLOR <- "#cc9f9f"
 DATASOURCE_COLORS <- c(
   "GO:MF" = "#dc3912", "GO:BP" = "#ff9900", "GO:CC" = "#109618",
   "GOSLIM:MF" = "#e85d4a", "GOSLIM:BP" = "#ffb84d", "GOSLIM:CC" = "#4db34d",
@@ -63,5 +63,5 @@ DATASOURCE_COLORS <- c(
   "BTO" = "#f0d871", "WBBT" = "#9cb59c", "TF" = "#5574a6", "CollecTRI" = "#A67C52", "MIRNA" = "#22aa99",
   "CORUM" = "#66aa00", "HPA" = "#6633cc", "HP" = "#990099", "WBP" = "#fffd78", "MGI" = "#fc4503",
   "BioPlanet" = "#9370DB", "PharmGKB" = "#FF6B6B", "LINCS" = "#4ECDC4",
-  "PUBMED" = LITERATURE_NODE_COLOR, "GENE" = GENE_NODE_COLOR
+  "PUBMED" = "#cc9f9f", "GENE" = GENE_NODE_COLOR
 )

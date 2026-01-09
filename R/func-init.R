@@ -9,8 +9,6 @@ initializeServerApp <- function() {
   # Note: STRING network data now initialized by NetworkAnalysisSession
   initializePlotTableState()
   initializeRunCounters()
-  hideConversionBoxes()
-  hideLiteratureVisNetworks()
   hideEnrichmentResultsPanel()
 }
 
@@ -24,8 +22,6 @@ initialiazeOrganismSelectors <- function() {
                        choices = STRING_printNames, selected = selected, server = T)
   updateSelectizeInput(session, 'functional_enrichment_organism',
                        choices = ORGANISMS$print_name, selected = selected, server = T)
-  updateSelectizeInput(session, 'literature_enrichment_organism',
-                       choices = STRING_printNames, selected = selected, server = T)
   # Note: string_network_organism now initialized by NetworkAnalysisSession
   # Note: gconvert and gorth organism selectors now initialized by ConversionSession/OrthologySession
 }
@@ -40,38 +36,16 @@ initializeDatasources <- function() {
 # initializeReductionPanel() removed - uses insertTab() in ReductionInputSession
 
 initializeEnrichmentResults <- function() {
-  # Functional enrichment results are now created dynamically per-run
-  # Only initialize literature enrichment (which stays single-result)
+  # Enrichment results are created dynamically per-run
   enrichmentResults <<- list()
-  newItem <- list(data.frame())
-  names(newItem) <- paste("literature", "STRING", sep = "_")
-  enrichmentResults <<- c(enrichmentResults, newItem)
 }
 
 initializeArenaEdgelist <- function() {
-  # Functional arena edgelists are now created dynamically per-run
-  # Only initialize literature enrichment (which stays single-result)
+  # Arena edgelists are created dynamically per-run
   arenaEdgelist <<- list()
-  for (networkId in NETWORK_IDS) {
-    newItem <- list(data.frame())
-    names(newItem) <- paste("literature", "STRING", networkId, sep = "_")
-    arenaEdgelist <<- c(arenaEdgelist, newItem)
-  }
 }
 
 # initializeSTRINGData() removed - now handled by NetworkAnalysisSession
-
-# Hide only literature conversion boxes (functional ones are in dynamic tabs)
-hideConversionBoxes <- function() {
-  shinyjs::hide("literature_STRING_conversionBoxes")
-}
-
-# Hide only literature vis networks (functional ones are dynamic now)
-hideLiteratureVisNetworks <- function() {
-  lapply(NETWORK_IDS, function(networkId) {
-    shinyjs::hide(paste("literature", "STRING", networkId, sep = "_"))
-  })
-}
 
 # Hide the entire enrichment results panel (shown when first run is created)
 hideEnrichmentResultsPanel <- function() {

@@ -35,7 +35,7 @@ getFullRunKey <- function(enrichmentType, runId) {
 parseFullRunKey <- function(fullRunKey) {
   parts <- strsplit(fullRunKey, "_")[[1]]
   # Format: enrichmentType_toolName_runNumber
-  # - First part is enrichmentType (functional or literature)
+  # - First part is enrichmentType (functional)
   # - Last part is runNumber
   # - Everything in between is toolName
   enrichmentType <- parts[1]
@@ -53,7 +53,7 @@ parseFullRunKey <- function(fullRunKey) {
 # Capture current enrichment parameters from input
 # Resolves "Default" placeholders to tool-specific values for consistent comparison
 # Parameters:
-#   enrichmentType: "functional" or "literature"
+#   enrichmentType: "functional"
 #   toolName: e.g., "gProfiler", "STRING", etc.
 #   organism: organism taxid (e.g., 9606 for human)
 captureRunParameters <- function(enrichmentType, toolName, organism) {

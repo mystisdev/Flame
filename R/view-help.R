@@ -380,7 +380,7 @@ generateHelpFileInputUpsetTab <- function(){
 
 generteHelpEnrichmentAnalysisTabPanel <- function(){
   tabPanel(
-    h5("Functional/Literature Enrichment Analysis"),
+    h5("Functional Enrichment Analysis"),
     tags$br(),
     fluidRow(
       column(
@@ -398,16 +398,6 @@ generteHelpEnrichmentAnalysisTabPanel <- function(){
           title = "Functional Enrichment Results", collapsible = T, collapsed = T,
           solidHeader = T, status = "primary", width = NULL,
           generateHelpEncrichmentResults()
-          
-        )
-      )
-      ,
-      column(
-        12,
-        box(
-          title = "Literature Enrichment", collapsible = T, collapsed = T,
-          solidHeader = T, status = "primary", width = NULL,
-          generateHelpLiteratureEncrichment()
         )
       )
     ))
@@ -685,24 +675,6 @@ generateHelpEncrichmentResults <- function() {
   </div>
   ')
 }
-
-generateHelpLiteratureEncrichment <- function() {
-  HTML('
-    <div class="col-md-12"> 
-      <p style="font-size:18px"; text-align: justify>
-        Flame allows users to retrieve scientific articles
-        that are related to the genes/proteins provided in the input lists.
-        The <b>Literature Enrichment Analysis</b> pipelines is similar to the aforementioned
-        <b>Functional Enrichment Analysis</b>. You can select the parameters for your analysis and your results can be 
-        generated as interactive tables or plots. In Literature Analysis, article IDs are clickable and link to the
-        relevant page in PubMed.
-      </p>
-    </div>
-  ')
-}
-
-
-
 
 generateHelpPlotsTabPanel <- function(){
   tabPanel(h5("Plots"),

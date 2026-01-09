@@ -34,29 +34,6 @@ ENRICHMENT_TYPES_CONFIG <- list(
 
     # Tab Content Generator
     generateTabContent = "generateToolPanelForRun"
-  ),
-
-  literature = list(
-    # Identity
-    id = "literature",
-    label = "Literature Enrichment",
-
-    # UI Configuration
-    tabsetPanelId = "literatureToolTabsPanel",
-    resultsPanelId = "literatureEnrichmentResultsPanel",
-    clearButtonId = "literature_enrichment_all_clear",
-    closeEvent = "closeLiteratureRunTab",
-
-    # Data Configuration - THE FIX: Explicitly define PUBMED
-    datasources = c("PUBMED"),
-    tools = c("STRING"),
-
-    # Logic Flags
-    supportsCombination = FALSE,
-    hasManhattanPlot = FALSE,
-
-    # Tab Content Generator
-    generateTabContent = "generateToolPanelForLiteratureRun"
   )
 
   # FUTURE: Add GSEA without modifying existing code
@@ -86,7 +63,7 @@ ENRICHMENT_TYPES_CONFIG <- list(
 #'
 #' Retrieves the configuration for a specific enrichment type.
 #'
-#' @param type Character string: "functional", "literature", etc.
+#' @param type Character string: "functional", etc.
 #' @return List containing all configuration properties for the type
 #' @examples
 #' config <- getEnrichmentConfig("functional")
@@ -104,18 +81,17 @@ getEnrichmentConfig <- function(type) {
 #' Returns the list of valid datasources for a specific enrichment type.
 #' This is used by plot datasource pickers to show appropriate options.
 #'
-#' @param type Character string: "functional", "literature", etc.
+#' @param type Character string: "functional", etc.
 #' @return Character vector of valid datasource names
 #' @examples
 #' getValidDatasources("functional")  # c("GO:BP", "GO:MF", "KEGG", ...)
-#' getValidDatasources("literature")  # c("PUBMED")
 getValidDatasources <- function(type) {
   return(getEnrichmentConfig(type)$datasources)
 }
 
 #' Check if Enrichment Type Supports Combination
 #'
-#' @param type Character string: "functional", "literature", etc.
+#' @param type Character string: "functional", etc.
 #' @return Logical TRUE if combination tab is supported
 supportsCombination <- function(type) {
   config <- getEnrichmentConfig(type)

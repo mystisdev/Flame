@@ -257,11 +257,6 @@ NetworkAnalysisSession <- R6::R6Class(
           private$handleSubmitForEnrichment(input, parentSession, "functional")
         }, ignoreInit = TRUE)
 
-        # Submit for literature enrichment (dynamic button)
-        private$.observers$submitLiterature <- shiny::observeEvent(input$submit_literature, {
-          private$handleSubmitForEnrichment(input, parentSession, "literature")
-        }, ignoreInit = TRUE)
-
       }) # end moduleServer
     }
   ),
@@ -550,14 +545,8 @@ NetworkAnalysisSession <- R6::R6Class(
           shiny::fluidRow(
             shiny::actionButton(
               inputId = ns("submit_functional"),
-              label = "Functional Enrichment",
-              icon = shiny::icon("table"),
-              style = "md-flat"
-            ),
-            shiny::actionButton(
-              inputId = ns("submit_literature"),
-              label = "Literature Enrichment",
-              icon = shiny::icon("book-open"),
+              label = "Run Enrichment",
+              icon = shiny::icon("paper-plane"),
               style = "md-flat"
             )
           )

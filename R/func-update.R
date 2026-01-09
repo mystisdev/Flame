@@ -156,13 +156,10 @@ updatePlotControlPanelsForTool <- function(enrichmentType, tool) {
 }
 
 updatePlotDataSourcesForTool <- function(enrichmentType, type_Tool) {
-  sources <- switch(
-    enrichmentType,
-    "functional" = ENRICHMENT_DATASOURCES[
-      which(ENRICHMENT_DATASOURCES %in% unique(enrichmentResults[[type_Tool]]$Source))
-    ],
-    "literature" = "PUBMED"
-  )
+  # Get datasources that have results
+  sources <- ENRICHMENT_DATASOURCES[
+    which(ENRICHMENT_DATASOURCES %in% unique(enrichmentResults[[type_Tool]]$Source))
+  ]
   selected <- sources[1]
 
   lapply(ALL_PLOT_IDS, function(plotId) {
@@ -175,12 +172,8 @@ updatePlotDataSourcesForTool <- function(enrichmentType, type_Tool) {
 }
 
 updatePlotSliderInputsForTool <- function(enrichmentType, type_Tool, selectedDataSource) {
-  maxSliderValue <- switch(
-    enrichmentType,
-    "functional" = nrow(enrichmentResults[[type_Tool]][grepl(
-      selectedDataSource, enrichmentResults[[type_Tool]]$Source), ]),
-    "literature" = nrow(enrichmentResults[[type_Tool]])
-  )
+  maxSliderValue <- nrow(enrichmentResults[[type_Tool]][grepl(
+    selectedDataSource, enrichmentResults[[type_Tool]]$Source), ])
   if (maxSliderValue > MAX_SLIDER_VALUE)
     maxSliderValue <- MAX_SLIDER_VALUE
 
@@ -201,9 +194,6 @@ updateBackgroundMode <- function(choice, enrichmentType) {
   if (choice == "genome") {
     shinyjs::hide(paste0(enrichmentType, "_enrichment_background_container"))
     # Genome background: All enrichment tools are available
-    # ENRICHMENT_TOOLS = ["gProfiler", "WebGestalt", "enrichR", "STRING", "PANTHER"]
-    # this is only for enrichmentType = 'functional',
-    # since 'literature' only has STRING anyway
     updatePickerInput(session, "functional_enrichment_tool",
                       choices = ENRICHMENT_TOOLS, selected = DEFAULT_TOOL)
   }
@@ -211,9 +201,6 @@ updateBackgroundMode <- function(choice, enrichmentType) {
     shinyjs::show(paste0(enrichmentType, "_enrichment_background_container"))
     # Custom background: Only tools that support user-provided background lists
     # enrichR is excluded because runEnrichr() does not accept user_reference parameter
-    # Available tools: gProfiler, WebGestalt, STRING, PANTHER (all have user_reference parameter)
-    # this is only for enrichmentType = 'functional',
-    # since 'literature' only has STRING anyway
     updatePickerInput(session, "functional_enrichment_tool",
                       choices = c("gProfiler", "WebGestalt", "STRING", "PANTHER", "GeneCodis"), selected = DEFAULT_TOOL)
   }

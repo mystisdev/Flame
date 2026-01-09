@@ -195,19 +195,15 @@ function(input, output, session) {
     # Update enrichment selectors (preserving current selection if still valid)
     updateSelectPreserving("functional_enrichment_file", listNames)
     updateSelectPreserving("functional_enrichment_background_list", listNames)
-    updateSelectPreserving("literature_enrichment_file", listNames)
-    updateSelectPreserving("literature_enrichment_background_list", listNames)
 
     # Update utility selectors (preserving current selection if still valid)
     updateSelectPreserving("selectUpset", listNames)
     # NOTE: gconvert_select handled by ConversionSession (namespaced as gconvert-select)
     # NOTE: gorth_select handled by OrthologySession (namespaced as gorth-select)
     # NOTE: string_network-select handled by NetworkAnalysisSession (namespaced)
-    updateSelectPreserving("literatureSelect", listNames)
 
     # Update background list choices (exclude current input list)
     updateBackgroundListChoices("functional")
-    updateBackgroundListChoices("literature")
 
     # UpSet tab visibility is now managed by AnalyteListSetOperationsSession
   })
@@ -271,10 +267,6 @@ function(input, output, session) {
     handleMultiClear()
   }, ignoreInit = TRUE)
 
-  observeEvent(input$literature_enrichment_all_clear, {
-    handleLiteratureMultiClear()
-  }, ignoreInit = TRUE)
-
   # Close individual run tab (via X button)
   observeEvent(input$closeRunTab, {
     runId <- input$closeRunTab
@@ -289,21 +281,6 @@ function(input, output, session) {
       shinyjs::hide("functional_enrichment_all_clear")
     }
     prepareCombinationTab()
-  }, ignoreInit = TRUE)
-
-  # Close individual literature run tab
-  observeEvent(input$closeLiteratureRunTab, {
-    runId <- input$closeLiteratureRunTab
-    fullRunKey <- paste("literature", runId, sep = "_")
-    toolName <- parseFullRunKey(fullRunKey)$toolName
-    clearLiteratureRunCompletely(fullRunKey)
-    if (countActiveRunsForTool(toolName) == 0) {
-      resetRunCounterForTool(toolName)
-    }
-    if (getActiveLiteratureRunCount() == 0) {
-      shinyjs::hide("literatureEnrichmentResultsPanel")
-      shinyjs::hide("literature_enrichment_all_clear")
-    }
   }, ignoreInit = TRUE)
 
   # Combination observers

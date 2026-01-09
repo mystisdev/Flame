@@ -6,11 +6,8 @@ handleEnrichment <- function(enrichmentType) {
 
       if (existInputOrganism(enrichmentType)) {
         if (existEnrichmentTool(enrichmentType)) {
-          tools <- switch(
-            enrichmentType,
-            "functional" = input$functional_enrichment_tool,
-            "literature" = "STRING"
-          )
+          # Functional enrichment only - get selected tools
+          tools <- input$functional_enrichment_tool
 
           # Extract values into LOCAL variables (no globals)
           userList <- unlist(userInputLists[names(userInputLists) ==
@@ -130,7 +127,7 @@ existEnrichmentTool <- function(enrichmentType) {
 
 # Returns the significance metric instead of setting global
 # Parameters:
-#   enrichmentType: "functional" or "literature"
+#   enrichmentType: "functional"
 #   toolName: e.g., "gProfiler", "STRING", etc.
 decideToolMetric <- function(enrichmentType, toolName) {
   if (input[[paste0(enrichmentType, "_enrichment_metric")]] == DEFAULT_METRIC_TEXT) {
@@ -143,8 +140,8 @@ decideToolMetric <- function(enrichmentType, toolName) {
     return(input[[paste0(enrichmentType, "_enrichment_metric")]])
 }
 
-# Unified multi-run handler for all enrichment types (config-driven)
-# Uses ENRICHMENT_TYPES_CONFIG to handle differences between functional/literature/future types
+# Unified multi-run handler for enrichment (config-driven)
+# Uses ENRICHMENT_TYPES_CONFIG for configuration
 # Pass Run object directly instead of reading globals
 # isUpdate: TRUE when updating existing tab with new datasources, FALSE for new run
 handleEnrichmentRun <- function(run, isUpdate = FALSE) {
@@ -316,12 +313,8 @@ insertEnrichmentTab <- function(config = NULL, run) {
   runId <- run$runId
   tabTitle <- paste0(run$toolName, " (", run$runNumber, ")")
 
-  # Generate tab content using the appropriate generator from config
-  tabContent <- if (config$generateTabContent == "generateToolPanelForRun") {
-    generateToolPanelForRun("functional", run$toolName, run$uniqueId)
-  } else {
-    generateToolPanelForLiteratureRun(run$toolName, run$uniqueId)
-  }
+  # Generate tab content
+  tabContent <- generateToolPanelForRun("functional", run$toolName, run$uniqueId)
 
   # Create tab title with close button (using config for event name)
   tabTitleHtml <- tags$span(
@@ -345,12 +338,6 @@ insertEnrichmentTab <- function(config = NULL, run) {
     ),
     select = TRUE
   )
-}
-
-# Legacy aliases for backward compatibility (use unified functions above)
-handleEnrichmentWithToolLiteratureMultiRun <- handleEnrichmentRun
-getActiveLiteratureRunCount <- function() {
-  getActiveRunCount("literature")
 }
 
 # Pass enrichmentType parameter instead of reading global
@@ -711,13 +698,8 @@ printResultTables <- function(runKey) {
   # Print all result tables for an enrichment run
   # @param runKey The run key for element IDs and result lookup (required)
   formatResultTable(runKey)
-  # Derive enrichment type from runKey instead of reading global
-  runInfo <- parseFullRunKey(runKey)
-  switch(
-    runInfo$enrichmentType,
-    "functional" = printFunctionalResultTable(runKey),
-    "literature" = printLiteratureResultTable(runKey)
-  )
+  # Functional enrichment only
+  printFunctionalResultTable(runKey)
 }
 
 # Pass Run object directly instead of reading globals
@@ -749,11 +731,8 @@ formatResultTable <- function(runKey) {
       return()
     }
 
-    switch(
-      enrichmentType,
-      "functional" = attachDBLinks(runKey, organism, toolName, namespace),
-      "literature" = attachLinks("PUBMED", "https://pubmed.ncbi.nlm.nih.gov/", gSub = "PMID:", resultKey = runKey)
-    )
+    # Functional enrichment only - attach database links
+    attachDBLinks(runKey, organism, toolName, namespace)
   }
 }
 
@@ -808,14 +787,6 @@ printResultTable <- function(shinyOutputId, tabPosition, datasource,
   }
 }
 
-printLiteratureResultTable <- function(runKey) {
-  # Print literature enrichment result table
-  # @param runKey The run key for element IDs (required)
-  shinyOutputId <- paste(runKey, "table_pubmed", sep = "_")
-  tabPosition <- 0
-  printResultTable(shinyOutputId, tabPosition, "pubmed", runKey)
-}
-
 handleMultiClear <- function() {
   resetCombination()
   # Clear ALL active functional runs
@@ -824,8 +795,7 @@ handleMultiClear <- function() {
       clearRunCompletely(fullRunKey)
     }
   }
-  # Reset counters ONLY for tools with no remaining runs (across both types)
-  # This prevents resetting STRING if literature still has STRING runs
+  # Reset counters for tools with no remaining runs
   for (tool in ENRICHMENT_TOOLS) {
     if (countActiveRunsForTool(tool) == 0) {
       resetRunCounterForTool(tool)
@@ -835,24 +805,6 @@ handleMultiClear <- function() {
   shinyjs::hide("functionalEnrichmentResultsPanel")
   shinyjs::hide("functional_enrichment_all_clear")
   prepareCombinationTab()
-}
-
-# Clear all literature enrichment runs
-handleLiteratureMultiClear <- function() {
-  # Clear ALL active literature runs
-  for (fullRunKey in names(activeRuns)) {
-    if (startsWith(fullRunKey, "literature_")) {
-      clearLiteratureRunCompletely(fullRunKey)
-    }
-  }
-  # Reset STRING counter ONLY if no remaining STRING runs (across both types)
-  # This prevents resetting if functional still has STRING runs
-  if (countActiveRunsForTool("STRING") == 0) {
-    resetRunCounterForTool("STRING")
-  }
-  # Hide the results panel
-  shinyjs::hide("literatureEnrichmentResultsPanel")
-  shinyjs::hide("literature_enrichment_all_clear")
 }
 
 # Unified function to clear a single run completely (data, state, tab)
@@ -894,9 +846,8 @@ clearEnrichmentRun <- function(fullRunKey) {
   unregisterRun(fullRunKey)
 }
 
-# Legacy aliases for backward compatibility
+# Legacy alias for backward compatibility
 clearRunCompletely <- clearEnrichmentRun
-clearLiteratureRunCompletely <- clearEnrichmentRun
 
 # Multi-Run Helper Functions
 
@@ -939,18 +890,10 @@ printParametersMultiRun <- function(run) {
 # Helper functions for hiding/showing source tabs using Shiny's built-in functions
 hideAllSourceTabsForRun <- function(fullRunKey) {
   sourcePanelId <- paste(fullRunKey, "sources_panel", sep = "_")
-
-  # Determine which tabs to hide based on enrichment type
-  runInfo <- parseFullRunKey(fullRunKey)
-  if (runInfo$enrichmentType == "literature") {
-    # Literature enrichment only has PUBMED tab
-    hideTab(inputId = sourcePanelId, target = "PUBMED")
-  } else {
-    # Functional enrichment has multiple datasource tabs
-    lapply(names(TAB_NAMES), function(tabTitle) {
-      hideTab(inputId = sourcePanelId, target = tabTitle)
-    })
-  }
+  # Hide all datasource tabs
+  lapply(names(TAB_NAMES), function(tabTitle) {
+    hideTab(inputId = sourcePanelId, target = tabTitle)
+  })
 }
 
 showSourceTabForRun <- function(fullRunKey, datasource) {

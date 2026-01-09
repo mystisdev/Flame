@@ -92,7 +92,7 @@ ToolStrategy <- R6::R6Class("ToolStrategy",
 # =============================================================================
 #
 # Manages registration and lookup of tool strategies.
-# Organized by enrichment type (functional, literature) and tool name.
+# Organized by enrichment type (functional) and tool name.
 #
 # Structure: strategies[[enrichmentType]][[toolName]] = ToolStrategy instance
 
@@ -104,7 +104,7 @@ ToolRegistry <- R6::R6Class("ToolRegistry",
 
   public = list(
     # Register a strategy for a given type and tool
-    # @param type Enrichment type (e.g., "functional", "literature")
+    # @param type Enrichment type (e.g., "functional")
     # @param toolName Tool name (e.g., "gProfiler", "enrichR")
     # @param strategy ToolStrategy instance
     # @return Self (for chaining)

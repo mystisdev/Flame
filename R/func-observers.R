@@ -422,7 +422,6 @@ updatePlotDataSourcesForRun <- function(fullRunKey) {
   enrichmentType <- runInfo$enrichmentType
 
   # Use config to get valid datasources for this type
-  # This fixes the bug where PUBMED wasn't found for literature enrichment
   validDatasources <- getValidDatasources(enrichmentType)
 
   # Filter against what's actually in results
