@@ -1,6 +1,3 @@
-# Input ####
-STRING_LIMIT <- 500
-
 # Dot Plot ####
 DOTPLOT_SIZE_MIN <- 4
 DOTPLOT_SIZE_MAX <- 25
@@ -269,7 +266,4 @@ MIN_BAR_HEIGHT_PX <- 200
 EDGE_WIDTH_MIN <- 0.1
 EDGE_WIDTH_MAX <- 3
 
-# Interoperability ####
-ARENA_API_LINK <- "https://bib.fleming.gr/bib/api/arena3dweb" #"http://127.0.0.1:8080/api/arena3dweb"
-ARENA_LAYER_SPACING_PIXELS <- 300
-ARENA_Y_Z_SAMPLING_LIMIT <- 410
+# Arena3D constants moved to R/func-arena.R

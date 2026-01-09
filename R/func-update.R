@@ -194,24 +194,8 @@ updatePlotSliderInputsForTool <- function(enrichmentType, type_Tool, selectedDat
     minSliderValue = 1, maxSliderValue)
 }
 
-updateAvailableStringNamespaces <- function() {
-  if (input$string_network_organism != "") {
-    if (!is.na(
-      ORGANISMS[ORGANISMS$print_name == input$string_network_organism, ]$short_name
-    )) {
-      shinyjs::enable("STRING_namespace")
-      updateSelectInput(session, "STRING_namespace",
-                        choices = NAMESPACES[["STRING"]],
-                        selected = "ENSP")
-    } else {
-      shinyjs::disable("STRING_namespace")
-      updateSelectInput(session, "STRING_namespace",
-                        choices = c("User Input" = "USERINPUT"),
-                        selected = "USERINPUT")
-    }
-  }
-}
-
+# updateAvailableStringNamespaces() removed - STRING_namespace selector doesn't exist,
+# network analysis now handled by NetworkAnalysisSession
 
 updateBackgroundMode <- function(choice, enrichmentType) {
   if (choice == "genome") {

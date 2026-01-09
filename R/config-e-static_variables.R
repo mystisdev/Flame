@@ -16,15 +16,12 @@ activeRuns <- list()        # Metadata for each active run (key: fullRunKey)
 runCounters <- list()       # Display numbers per tool (can reset on Clear All)
 uniqueIdCounters <- list()  # Unique ID numbers per tool (NEVER reset - prevents Shiny caching bugs)
 
-# STRING Network
-STRINGNetworkData <- list()
-
+# Note: STRINGNetworkData moved to private field in NetworkAnalysisSession
 
 # Current
 # Note: currentVariantResults, currentTextminingResult, currentVolcano, volcanoPlotData,
-# currentReduction, and currentUpsetMode moved to private fields in their respective InputSession classes
-currentConversionResult <- data.frame()
-currentOrthologyResult <- data.frame()
+# currentReduction, currentUpsetMode, currentConversionResult, and currentOrthologyResult
+# moved to private fields in their respective session classes
 
 # === UI Panel State ===
 # Set by generateToolPanel() for UI generation and used as default parameter values

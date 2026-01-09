@@ -15,7 +15,7 @@
 # - upsetjs package
 #
 # Note: Module ID is defined in infrastructure-config.R (ModuleIds):
-# - ModuleIds$INPUT_MANIPULATION_SETOPERATIONS
+# - ModuleIds$LISTMGMT_SETOPS
 #
 # =============================================================================
 
@@ -93,10 +93,10 @@ upsetPlotUI <- function(id) {
 #' # In server.R
 #' registry <- AnalyteListRegistry$new()
 #' manager <- AnalyteListManagerSession$new(
-#'   ModuleIds$INPUT_MANIPULATION_MANAGER, registry
+#'   ModuleIds$LISTMGMT_MANAGER, registry
 #' )
 #' upsetSession <- AnalyteListSetOperationsSession$new(
-#'   ModuleIds$INPUT_MANIPULATION_SETOPERATIONS, registry, manager
+#'   ModuleIds$LISTMGMT_SETOPS, registry, manager
 #' )
 #' upsetSession$server(input, session)
 #' }

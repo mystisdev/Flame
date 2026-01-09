@@ -10,7 +10,7 @@
 # - func-general.R (for renderModal, removeModal, renderWarning, renderError)
 #
 # Note: Module ID is defined in infrastructure-config.R (ModuleIds):
-# - ModuleIds$INPUT_MANIPULATION_MANAGER
+# - ModuleIds$LISTMGMT_MANAGER
 #
 # =============================================================================
 
@@ -82,7 +82,7 @@ analyteListManagerViewUI <- function(id) {
 #' # In server.R
 #' registry <- AnalyteListRegistry$new()
 #' manager <- AnalyteListManagerSession$new(
-#'   ModuleIds$INPUT_MANIPULATION_MANAGER, registry
+#'   ModuleIds$LISTMGMT_MANAGER, registry
 #' )
 #' manager$server(input, session)
 #' }

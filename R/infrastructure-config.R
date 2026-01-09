@@ -31,19 +31,26 @@ ScoreDirection <- list(
 
 #' Module IDs
 #' @description Shiny module namespace IDs - must match between UI and server
-#' Used by: view-input.R (UI functions) and server.R (session constructors)
+#' Used by: ui.R, view-input.R (UI) and server.R (session constructors)
 #'
 #' Naming convention:
 #'   - INPUT_X matches file input-session-X.R
-#'   - INPUT_MANIPULATION_X matches file listmgmt-session-*.R
+#'   - LISTMGMT_X matches file listmgmt-session-*.R
+#'   - UTILITIES_X matches file utilities-session-*.R
 ModuleIds <- list(
+  # Input sessions (input-session-*.R)
   INPUT_LIST = "input_list",
   INPUT_VOLCANO = "input_volcano",
   INPUT_REDUCTION = "input_reduction",
   INPUT_SNPS = "input_snps",
   INPUT_TEXTMINING = "input_textmining",
-  INPUT_MANIPULATION_MANAGER = "input_manipulation_manager",
-  INPUT_MANIPULATION_SETOPERATIONS = "input_manipulation_setoperations"
+  # List management sessions (listmgmt-session-*.R)
+  LISTMGMT_MANAGER = "listmgmt_manager",
+  LISTMGMT_SETOPS = "listmgmt_setops",
+  # Utility sessions (utilities-session-*.R)
+  UTILITIES_CONVERSION = "gconvert",
+  UTILITIES_ORTHOLOGY = "gorth",
+  UTILITIES_NETWORK = "string_network"
 )
 
 #' Paradigm Identifier

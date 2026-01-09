@@ -279,7 +279,30 @@ arenaHandlerForRun <- function(fullRunKey, networkId) {
     warning(paste("arenaHandlerForRun: No run found for key:", fullRunKey))
     return()
   }
-  arenaHandler(run, networkId)
+
+  arenaKey <- run$getInputId(networkId)
+  edgelist <- arenaEdgelist[[arenaKey]]
+
+  if (is.null(edgelist) || nrow(edgelist) == 0) {
+    renderWarning("Make sure a visible network exists.")
+    return()
+  }
+
+  tryCatch({
+    renderModal("<h2>Please wait.</h2><p>Building network for Arena3Dweb</p>")
+    result <- arena_export(edgelist)
+
+    if (result$success) {
+      session$sendCustomMessage("handler_browseUrl", result$url)
+    } else {
+      renderWarning(result$error)
+    }
+  }, error = function(e) {
+    cat("[arenaHandlerForRun] Error:", conditionMessage(e), "\n")
+    renderWarning("Cannot open Arena3Dweb network at this time. Try again in a while.")
+  }, finally = {
+    removeModal()
+  })
 }
 
 handleHeatmapForRun <- function(fullRunKey, heatmapId) {

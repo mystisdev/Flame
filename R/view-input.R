@@ -7,7 +7,7 @@ generateInputPage <- function() {
     tags$br(),
     fluidRow(
       class = "inputControlRow",
-      analyteListManagerSidebarUI(ModuleIds$INPUT_MANIPULATION_MANAGER),
+      analyteListManagerSidebarUI(ModuleIds$LISTMGMT_MANAGER),
       column(
         8,
         tabsetPanel(
@@ -23,8 +23,8 @@ generateInputPage <- function() {
     tags$h3("View and Filter Options"),
     tabsetPanel(
       id = "inputPlots",
-      analyteListManagerViewUI(ModuleIds$INPUT_MANIPULATION_MANAGER),
-      upsetPlotUI(ModuleIds$INPUT_MANIPULATION_SETOPERATIONS)
+      analyteListManagerViewUI(ModuleIds$LISTMGMT_MANAGER),
+      upsetPlotUI(ModuleIds$LISTMGMT_SETOPS)
       # Volcano and Reduction plot tabs are inserted dynamically by their session classes
       # when data is loaded (using insertTab), not pre-created here
     )

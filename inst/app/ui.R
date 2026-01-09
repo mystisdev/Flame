@@ -10,8 +10,9 @@ source(file.path(pkgRoot, "R", "view-welcome.R"), local = TRUE)
 source(file.path(pkgRoot, "R", "view-input.R"), local = TRUE)
 source(file.path(pkgRoot, "R", "view-enrichment.R"), local = TRUE)
 source(file.path(pkgRoot, "R", "view-plots.R"), local = TRUE)
-source(file.path(pkgRoot, "R", "view-network.R"), local = TRUE)
-source(file.path(pkgRoot, "R", "view-conversion.R"), local = TRUE)
+source(file.path(pkgRoot, "R", "utilities-session-conversion.R"), local = TRUE)
+source(file.path(pkgRoot, "R", "utilities-session-orthology.R"), local = TRUE)
+source(file.path(pkgRoot, "R", "utilities-session-network.R"), local = TRUE)
 source(file.path(pkgRoot, "R", "view-help.R"), local = TRUE)
 source(file.path(pkgRoot, "R", "view-about.R"), local = TRUE)
 source(file.path(pkgRoot, "R", "view-footer.R"), local = TRUE)
@@ -38,11 +39,11 @@ dashboardPage(
       tags$hr(),
       menuItem("Literature Enrichment", tabName = "literature_enrichment", icon = icon("book")),
       tags$hr(),
-      menuItem("Network Analysis", tabName = "string_network", icon=icon("diagram-project")),
+      menuItem("Network Analysis", tabName = ModuleIds$UTILITIES_NETWORK, icon=icon("diagram-project")),
       tags$hr(),
       menuItem("Conversion", tabName = "Conversion", icon = icon("right-left"),
-               menuSubItem("Gene ID Conversion", tabName = "gconvert", icon = icon("angles-right")),
-               menuSubItem("Orthology Search", tabName = "gorth", icon = icon("angles-right"))),
+               menuSubItem("Gene ID Conversion", tabName = ModuleIds$UTILITIES_CONVERSION, icon = icon("angles-right")),
+               menuSubItem("Orthology Search", tabName = ModuleIds$UTILITIES_ORTHOLOGY, icon = icon("angles-right"))),
       tags$hr(),
       menuItem("Help", tabName = "help", icon = icon("question")),
       menuItem("About", tabName = "about", icon = icon("info"))
@@ -60,9 +61,9 @@ dashboardPage(
       tabItem("file_handler", generateInputPage()),
       tabItem("functional_enrichment", generateEnrichmentPage("functional")),
       tabItem("literature_enrichment", generateEnrichmentPage("literature")),
-      tabItem("string_network", generateStringNetworkPage()),
-      tabItem("gconvert", generateConvertDiv("gconvert")),
-      tabItem("gorth", generateConvertDiv("gorth")),
+      tabItem(ModuleIds$UTILITIES_NETWORK, networkAnalysisUI(ModuleIds$UTILITIES_NETWORK)),
+      tabItem(ModuleIds$UTILITIES_CONVERSION, conversionUI(ModuleIds$UTILITIES_CONVERSION)),
+      tabItem(ModuleIds$UTILITIES_ORTHOLOGY, orthologyUI(ModuleIds$UTILITIES_ORTHOLOGY)),
       tabItem("help", generateHelpPage()),
       tabItem("about", aboutPage)
     ),

@@ -17,6 +17,9 @@ function(input, output, session) {
   # Source utility functions (used by input sessions)
   source(file.path(pkgRoot, "R", "func-extract.R"), local = TRUE)
   source(file.path(pkgRoot, "R", "func-gsnpense.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "func-gconvert.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "func-gorth.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "func-string-network.R"), local = TRUE)
 
   # Source input session classes
   source(file.path(pkgRoot, "R", "input-session-base.R"), local = TRUE)
@@ -29,6 +32,11 @@ function(input, output, session) {
   # Source list management session classes (depends on InputSession)
   source(file.path(pkgRoot, "R", "listmgmt-session-manager.R"), local = TRUE)
   source(file.path(pkgRoot, "R", "listmgmt-session-setops.R"), local = TRUE)
+
+  # Source utilities session classes
+  source(file.path(pkgRoot, "R", "utilities-session-conversion.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "utilities-session-orthology.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "utilities-session-network.R"), local = TRUE)
 
   # Source configuration files (letter prefixes ensure correct load order)
   source(file.path(pkgRoot, "R", "config-a-global_settings.R"), local = TRUE)
@@ -56,7 +64,7 @@ function(input, output, session) {
   #       input-snps.R replaced by SNPsInputSession
   #       input-text_mining.R replaced by TextMiningInputSession
   #       input-upset.R replaced by AnalyteListSetOperationsSession
-  source(file.path(pkgRoot, "R", "input-conversion.R"), local = TRUE)
+  #       input-conversion.R replaced by ConversionSession/OrthologySession
 
   # Source enrichment functions
   source(file.path(pkgRoot, "R", "enrich-inputs_panel.R"), local = TRUE)
@@ -79,11 +87,11 @@ function(input, output, session) {
   source(file.path(pkgRoot, "R", "plot-scatter.R"), local = TRUE)
   source(file.path(pkgRoot, "R", "plot-dotplot.R"), local = TRUE)
   source(file.path(pkgRoot, "R", "plot-manhattan.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "plot-arena3d.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "func-arena.R"), local = TRUE)
 
   # Source remaining functions
-  source(file.path(pkgRoot, "R", "func-stringNetwork.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "func-conversion.R"), local = TRUE)
+  # Note: func-stringNetwork.R replaced by NetworkAnalysisSession
+  # Note: func-conversion.R replaced by ConversionSession/OrthologySession
   source(file.path(pkgRoot, "R", "func-tabGeneration.R"), local = TRUE)
   source(file.path(pkgRoot, "R", "func-registry.R"), local = TRUE)
 
@@ -99,7 +107,7 @@ function(input, output, session) {
 
   # AnalyteList Manager Session - manages sidebar and view panel for ALL lists
   analyteListManager <- AnalyteListManagerSession$new(
-    ModuleIds$INPUT_MANIPULATION_MANAGER, analyteListRegistry
+    ModuleIds$LISTMGMT_MANAGER, analyteListRegistry
   )
   analyteListManager$server(input, session)
 
@@ -125,11 +133,23 @@ function(input, output, session) {
 
   # AnalyteList Operations Session - manages UpSet plot panel for set operations
   upsetSession <- AnalyteListSetOperationsSession$new(
-    ModuleIds$INPUT_MANIPULATION_SETOPERATIONS,
+    ModuleIds$LISTMGMT_SETOPS,
     analyteListRegistry,
     analyteListManager
   )
   upsetSession$server(input, session)
+
+  # Conversion Session - manages Gene ID Conversion tab (g:Convert)
+  conversionSession <- ConversionSession$new(ModuleIds$UTILITIES_CONVERSION, analyteListRegistry)
+  conversionSession$server(input, session)
+
+  # Orthology Session - manages Orthology Search tab (g:Orth)
+  orthologySession <- OrthologySession$new(ModuleIds$UTILITIES_ORTHOLOGY, analyteListRegistry)
+  orthologySession$server(input, session)
+
+  # Network Analysis Session - manages STRING Network tab
+  networkSession <- NetworkAnalysisSession$new(ModuleIds$UTILITIES_NETWORK, analyteListRegistry)
+  networkSession$server(input, session)
 
   # Clean up all session objects when the Shiny session ends
   # Order: dependent sessions first, then sessions they depend on
@@ -141,6 +161,9 @@ function(input, output, session) {
     reductionInputSession$cleanup()
     snpsInputSession$cleanup()
     textMiningInputSession$cleanup()
+    conversionSession$cleanup()
+    orthologySession$cleanup()
+    networkSession$cleanup()
     analyteListManager$cleanup()
   })
 
@@ -177,10 +200,10 @@ function(input, output, session) {
 
     # Update utility selectors (preserving current selection if still valid)
     updateSelectPreserving("selectUpset", listNames)
-    updateSelectPreserving("gconvert_select", listNames)
-    updateSelectPreserving("gorth_select", listNames)
+    # NOTE: gconvert_select handled by ConversionSession (namespaced as gconvert-select)
+    # NOTE: gorth_select handled by OrthologySession (namespaced as gorth-select)
+    # NOTE: string_network-select handled by NetworkAnalysisSession (namespaced)
     updateSelectPreserving("literatureSelect", listNames)
-    updateSelectPreserving("STRINGnetworkSelect", listNames)
 
     # Update background list choices (exclude current input list)
     updateBackgroundListChoices("functional")
@@ -385,43 +408,7 @@ function(input, output, session) {
     handlePlotSelection("heatmap3", "Heatmap3", session = session)
   }, ignoreInit = TRUE, ignoreNULL = TRUE)
 
-  # STRING observers
-  observeEvent(input$string_network_organism, {
-    handleStringOrganismSelection()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$runStringNetwork, {
-    handleStringNetwork()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$string_submit_functional, {
-    handleStringSubmitForEnrichment("functional")
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$string_submit_literature, {
-    handleStringSubmitForEnrichment("literature")
-  }, ignoreInit = TRUE)
-
-  # CONVERSION observers
-  observeEvent(input$gconvert_button, {
-    handle_gconvert()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$gorth_organism, {
-    handle_gorthOrganism()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$gorth_button, {
-    handle_gorth()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$gconvert_addList, {
-    dType <- input$gconvert_dType
-    addConversionResultToInput("gconvert", dType)
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$gorth_addList, {
-    dType <- input$gorth_dType
-    addConversionResultToInput("gorth", dType)
-  }, ignoreInit = TRUE)
+  # NOTE: STRING observers replaced by NetworkAnalysisSession (utilities-session-network.R)
+  # NOTE: Conversion observers replaced by ConversionSession (utilities-session-conversion.R)
+  # NOTE: Orthology observers replaced by OrthologySession (utilities-session-orthology.R)
 }

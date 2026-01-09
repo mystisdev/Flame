@@ -6,7 +6,7 @@ initializeServerApp <- function() {
   # via insertTab() when data is loaded - no initialization needed here
   initializeEnrichmentResults()
   initializeArenaEdgelist()
-  initializeSTRINGData()
+  # Note: STRING network data now initialized by NetworkAnalysisSession
   initializePlotTableState()
   initializeRunCounters()
   hideConversionBoxes()
@@ -19,7 +19,6 @@ initializeServerApp <- function() {
 initialiazeOrganismSelectors <- function() {
   ORGANISMS <- ORGANISMS[order(ORGANISMS$print_name),]
   selected <- "Homo sapiens (Human) [NCBI Tax. ID: 9606]"
-  gProfiler_printNames <- ORGANISMS[!is.na(ORGANISMS$short_name), ]$print_name
   STRING_printNames <- ORGANISMS[ORGANISMS$taxid %in% TOOL_ORGANISMS$STRING, ]$print_name
   updateSelectizeInput(session, 'textmining_organism',
                        choices = STRING_printNames, selected = selected, server = T)
@@ -27,14 +26,8 @@ initialiazeOrganismSelectors <- function() {
                        choices = ORGANISMS$print_name, selected = selected, server = T)
   updateSelectizeInput(session, 'literature_enrichment_organism',
                        choices = STRING_printNames, selected = selected, server = T)
-  updateSelectizeInput(session, 'string_network_organism',
-                       choices = STRING_printNames, selected = selected, server = T)
-  updateSelectizeInput(session, 'gconvert_organism',
-                       choices = gProfiler_printNames, selected = selected, server = T)
-  updateSelectizeInput(session, 'gorth_organism',
-                       choices = gProfiler_printNames, selected = selected, server = T)
-  updateSelectizeInput(session, 'gorth_target', choices = gProfiler_printNames[gProfiler_printNames != selected],
-                       selected = "Mus musculus (Mouse) [NCBI Tax. ID: 10090]", server = T)
+  # Note: string_network_organism now initialized by NetworkAnalysisSession
+  # Note: gconvert and gorth organism selectors now initialized by ConversionSession/OrthologySession
 }
 
 initializeDatasources <- function() {
@@ -66,9 +59,7 @@ initializeArenaEdgelist <- function() {
   }
 }
 
-initializeSTRINGData <- function() {
-  STRINGNetworkData <<- list()
-}
+# initializeSTRINGData() removed - now handled by NetworkAnalysisSession
 
 # Hide only literature conversion boxes (functional ones are in dynamic tabs)
 hideConversionBoxes <- function() {

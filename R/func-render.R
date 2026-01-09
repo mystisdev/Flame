@@ -322,7 +322,7 @@ renderHeatmap <- function(type_Tool, shinyOutputId, heatmapTable, color,
           categoryarray = yCategories
         )
       ) %>%
-      config(doubleClick = doubleClickBehavior)
+      plotly::config(doubleClick = doubleClickBehavior)
   })
 }
 

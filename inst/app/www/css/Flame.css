@@ -274,7 +274,7 @@ label:has(> [id$="-selectAll"]), label:has(> #selectAll) {
   font-weight: bold;
 }
 
-[id$="_submit"], [id$="_addList"], #rename, [id$="-rename"] {
+[id$="_submit"], [id$="_addList"], [id$="-addList"], #rename, [id$="-rename"] {
   color: #fff;
   background-color: #158794;
 }
@@ -345,7 +345,8 @@ label:has(> [id$="-selectAll"]), label:has(> #selectAll) {
   margin: 0;
 }
 
-#string_viewer {
+/* STRING Network viewer - namespaced ID from NetworkAnalysisSession */
+#string_network-viewer {
   background-color: white;
 }
 
@@ -426,4 +427,9 @@ label:has(> [id$="-selectAll"]), label:has(> #selectAll) {
   margin-top: 10px;
   font-size: 13px;
   color: #e74c3c;
+}
+
+/* pickerInput subtext - smaller text for disabled option info */
+.bootstrap-select .dropdown-menu .text small.text-muted {
+  font-size: 0.6em;
 }
