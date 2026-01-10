@@ -1,20 +1,3 @@
-# Get organism-specific prefix for EnrichR database codes
-# Used by UI update functions to get correct datasource options
-getEnrichrVariablePrefix <- function() {
-  return(
-    switch(
-      ORGANISMS[ORGANISMS$print_name ==
-                  input[["functional_enrichment_organism"]], ]$short_name,
-      "mmusculus" = "MOUSE_",
-      "dmelanogaster" = "FLY_",
-      "celegans" = "WORM_",
-      "scerevisiae" = "YEAST_",
-      "drerio" = "FISH_",
-      "btaurus" = "OX_"
-    )
-  )
-}
-
 # Configuration-driven term parsing patterns
 # Each pattern defines how to extract term names and IDs from enrichR results
 ENRICHR_TERM_PATTERNS <- list(

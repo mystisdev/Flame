@@ -117,16 +117,16 @@ MAX_KEGG_HIGHLIGHTED_GENES <- 10
 attachKEGGLinks <- function(resultKey, organism = NULL, toolName = NULL, namespace = NULL) {
   # Accept organism, toolName, and namespace parameters instead of reading globals
 
-  # Derive missing parameters from Run object (no global fallback)
+  # Derive missing parameters from session in registry (no global fallback)
   if (is.null(organism) || is.null(toolName) || is.null(namespace)) {
-    run <- activeRuns[[resultKey]]
+    run <- enrichmentSessionRegistry$get(resultKey)
     if (!is.null(run)) {
       if (is.null(organism)) organism <- run$organism
       if (is.null(toolName)) toolName <- run$toolName
-      if (is.null(namespace)) namespace <- run$parameters$namespace
+      if (is.null(namespace)) namespace <- run$getParameters()$namespace
     } else {
-      # Run object required - cannot proceed without context
-      warning("attachKEGGLinks: Run object not found for ", resultKey)
+      # Session required - cannot proceed without context
+      warning("attachKEGGLinks: Session not found for ", resultKey)
       return()
     }
   }

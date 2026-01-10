@@ -10,6 +10,11 @@
 # All observers are registered with observerRegistry for cleanup
 # when tabs are closed. All observers per run MUST be destroyed to prevent
 # memory leaks and race conditions from orphaned observers.
+#
+# Data Access (Part 2 Refactoring):
+# - Sessions are retrieved from enrichmentSessionRegistry (not activeRuns)
+# - Results are accessed via session$getResults() (not enrichmentResults global)
+# - Arena edgelists accessed via session$getArenaEdgelist() (not arenaEdgelist global)
 
 # Register all observers for a new functional enrichment run
 registerObserversForRun <- function(fullRunKey) {
@@ -251,7 +256,12 @@ handleDatasourcePickerForRun <- function(fullRunKey, componentId) {
 }
 
 calculateMaxSliderValueForRun <- function(fullRunKey, datasources) {
-  enrichmentResult <- enrichmentResults[[fullRunKey]]
+  # Get session from registry instead of global enrichmentResults
+
+  session <- enrichmentSessionRegistry$get(fullRunKey)
+  if (is.null(session)) return(10)
+
+  enrichmentResult <- session$getResults()
   if (is.null(enrichmentResult)) return(10)
 
   maxSliderValue <- nrow(subset(enrichmentResult, Source %in% datasources))
@@ -262,26 +272,26 @@ calculateMaxSliderValueForRun <- function(fullRunKey, datasources) {
 }
 
 # Wrapper handlers for plot generation
-# These pass Run objects directly to handlers
+# These get sessions from enrichmentSessionRegistry and pass to handlers
 
 handleEnrichmentNetworkForRun <- function(fullRunKey, networkId) {
-  run <- activeRuns[[fullRunKey]]
-  if (is.null(run)) {
-    warning(paste("handleEnrichmentNetworkForRun: No run found for key:", fullRunKey))
+  session <- enrichmentSessionRegistry$get(fullRunKey)
+  if (is.null(session)) {
+    warning(paste("handleEnrichmentNetworkForRun: No session found for key:", fullRunKey))
     return()
   }
-  handleEnrichmentNetwork(run, networkId)
+  handleEnrichmentNetwork(session, networkId)
 }
 
 arenaHandlerForRun <- function(fullRunKey, networkId) {
-  run <- activeRuns[[fullRunKey]]
-  if (is.null(run)) {
-    warning(paste("arenaHandlerForRun: No run found for key:", fullRunKey))
+  enrichSession <- enrichmentSessionRegistry$get(fullRunKey)
+  if (is.null(enrichSession)) {
+    warning(paste("arenaHandlerForRun: No session found for key:", fullRunKey))
     return()
   }
 
-  arenaKey <- run$getInputId(networkId)
-  edgelist <- arenaEdgelist[[arenaKey]]
+  # Get edgelist from session instead of global
+  edgelist <- enrichSession$getArenaEdgelist(networkId)
 
   if (is.null(edgelist) || nrow(edgelist) == 0) {
     renderWarning("Make sure a visible network exists.")
@@ -306,107 +316,107 @@ arenaHandlerForRun <- function(fullRunKey, networkId) {
 }
 
 handleHeatmapForRun <- function(fullRunKey, heatmapId) {
-  run <- activeRuns[[fullRunKey]]
-  if (is.null(run)) {
-    warning(paste("handleHeatmapForRun: No run found for key:", fullRunKey))
+  session <- enrichmentSessionRegistry$get(fullRunKey)
+  if (is.null(session)) {
+    warning(paste("handleHeatmapForRun: No session found for key:", fullRunKey))
     return()
   }
-  handleHeatmap(run, heatmapId)
+  handleHeatmap(session, heatmapId)
 }
 
 handleBarchartForRun <- function(fullRunKey) {
-  run <- activeRuns[[fullRunKey]]
-  if (is.null(run)) {
-    warning(paste("handleBarchartForRun: No run found for key:", fullRunKey))
+  session <- enrichmentSessionRegistry$get(fullRunKey)
+  if (is.null(session)) {
+    warning(paste("handleBarchartForRun: No session found for key:", fullRunKey))
     return()
   }
-  handleBarchart(run)
+  handleBarchart(session)
 }
 
 handleScatterPlotForRun <- function(fullRunKey) {
-  run <- activeRuns[[fullRunKey]]
-  if (is.null(run)) {
-    warning(paste("handleScatterPlotForRun: No run found for key:", fullRunKey))
+  session <- enrichmentSessionRegistry$get(fullRunKey)
+  if (is.null(session)) {
+    warning(paste("handleScatterPlotForRun: No session found for key:", fullRunKey))
     return()
   }
-  handleScatterPlot(run)
+  handleScatterPlot(session)
 }
 
 handleDotPlotForRun <- function(fullRunKey) {
-  run <- activeRuns[[fullRunKey]]
-  if (is.null(run)) {
-    warning(paste("handleDotPlotForRun: No run found for key:", fullRunKey))
+  session <- enrichmentSessionRegistry$get(fullRunKey)
+  if (is.null(session)) {
+    warning(paste("handleDotPlotForRun: No session found for key:", fullRunKey))
     return()
   }
-  handleDotPlot(run)
+  handleDotPlot(session)
 }
 
 handleManhattanPlotForRun <- function(fullRunKey) {
-  run <- activeRuns[[fullRunKey]]
-  if (is.null(run)) {
-    warning(paste("handleManhattanPlotForRun: No run found for key:", fullRunKey))
+  session <- enrichmentSessionRegistry$get(fullRunKey)
+  if (is.null(session)) {
+    warning(paste("handleManhattanPlotForRun: No session found for key:", fullRunKey))
     return()
   }
-  handleManhattanPlot(run)
+  handleManhattanPlot(session)
 }
 
 handleTableFilterChangeForRun <- function(fullRunKey, plotId) {
-  run <- activeRuns[[fullRunKey]]
-  if (is.null(run)) return()
-  handleTableFilterChange(run, plotId)
+  session <- enrichmentSessionRegistry$get(fullRunKey)
+  if (is.null(session)) return()
+  handleTableFilterChange(session, plotId)
 }
 
 handleResetViewForRun <- function(fullRunKey, plotId) {
-  run <- activeRuns[[fullRunKey]]
-  if (is.null(run)) return()
-  handleResetView(run, plotId)
+  session <- enrichmentSessionRegistry$get(fullRunKey)
+  if (is.null(session)) return()
+  handleResetView(session, plotId)
 }
 
-# Network Handler Wrappers for Runs
+# Network Handler Wrappers for Sessions
 
 handleNetworkNodeClickForRun <- function(fullRunKey, networkId) {
-  run <- activeRuns[[fullRunKey]]
-  if (is.null(run)) return()
-  handleNetworkNodeClick(run, networkId)
+  session <- enrichmentSessionRegistry$get(fullRunKey)
+  if (is.null(session)) return()
+  handleNetworkNodeClick(session, networkId)
 }
 
 handleNetworkEdgeClickForRun <- function(fullRunKey, networkId) {
-  run <- activeRuns[[fullRunKey]]
-  if (is.null(run)) return()
-  handleNetworkEdgeClick(run, networkId)
+  session <- enrichmentSessionRegistry$get(fullRunKey)
+  if (is.null(session)) return()
+  handleNetworkEdgeClick(session, networkId)
 }
 
 handleNetworkSelectionForRun <- function(fullRunKey, networkId) {
-  run <- activeRuns[[fullRunKey]]
-  if (is.null(run)) return()
-  handleNetworkSelection(run, networkId)
+  session <- enrichmentSessionRegistry$get(fullRunKey)
+  if (is.null(session)) return()
+  handleNetworkSelection(session, networkId)
 }
 
 handleNetworkDeselectionForRun <- function(fullRunKey, networkId) {
-  run <- activeRuns[[fullRunKey]]
-  if (is.null(run)) return()
-  handleNetworkDeselection(run, networkId)
+  session <- enrichmentSessionRegistry$get(fullRunKey)
+  if (is.null(session)) return()
+  handleNetworkDeselection(session, networkId)
 }
 
 handleNetworkEnrichmentTableFilterForRun <- function(fullRunKey, networkId) {
-  run <- activeRuns[[fullRunKey]]
-  if (is.null(run)) return()
-  handleNetworkEnrichmentTableFilter(run, networkId)
+  session <- enrichmentSessionRegistry$get(fullRunKey)
+  if (is.null(session)) return()
+  handleNetworkEnrichmentTableFilter(session, networkId)
 }
 
 handleNetworkEdgelistTableFilterForRun <- function(fullRunKey, networkId) {
-  run <- activeRuns[[fullRunKey]]
-  if (is.null(run)) return()
-  handleNetworkEdgelistTableFilter(run, networkId)
+  session <- enrichmentSessionRegistry$get(fullRunKey)
+  if (is.null(session)) return()
+  handleNetworkEdgelistTableFilter(session, networkId)
 }
 
 handleNetworkResetViewForRun <- function(fullRunKey, networkId) {
-  run <- activeRuns[[fullRunKey]]
-  if (is.null(run)) return()
-  handleNetworkResetView(run, networkId)
+  session <- enrichmentSessionRegistry$get(fullRunKey)
+  if (is.null(session)) return()
+  handleNetworkResetView(session, networkId)
 }
 
-# Control Panel Updates for Runs
+# Control Panel Updates for Sessions
 
 updatePlotControlPanelsForRun <- function(fullRunKey) {
   selectedDataSource <- updatePlotDataSourcesForRun(fullRunKey)
@@ -414,7 +424,11 @@ updatePlotControlPanelsForRun <- function(fullRunKey) {
 }
 
 updatePlotDataSourcesForRun <- function(fullRunKey) {
-  result <- enrichmentResults[[fullRunKey]]
+  # Get session from registry instead of global enrichmentResults
+  enrichSession <- enrichmentSessionRegistry$get(fullRunKey)
+  if (is.null(enrichSession)) return(NULL)
+
+  result <- enrichSession$getResults()
   if (is.null(result) || nrow(result) == 0) return(NULL)
 
   # Extract enrichment type from run key to get valid datasources
@@ -442,7 +456,11 @@ updatePlotDataSourcesForRun <- function(fullRunKey) {
 }
 
 updatePlotSliderInputsForRun <- function(fullRunKey, selectedDataSource) {
-  result <- enrichmentResults[[fullRunKey]]
+  # Get session from registry instead of global enrichmentResults
+  enrichSession <- enrichmentSessionRegistry$get(fullRunKey)
+  if (is.null(enrichSession)) return()
+
+  result <- enrichSession$getResults()
   if (is.null(result) || nrow(result) == 0 || is.null(selectedDataSource)) return()
 
   maxSliderValue <- nrow(result[grepl(selectedDataSource, result$Source), ])

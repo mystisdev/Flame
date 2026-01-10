@@ -49,7 +49,7 @@ handleManhattanClick <- function(currentTermID) {
     if (is.null(selectedTool) || selectedTool == "") return()
 
     fullRunKey <- paste(enrichmentType, selectedTool, sep = "_")
-    run <- activeRuns[[fullRunKey]]
+    run <- enrichmentSessionRegistry$get(fullRunKey)
     if (is.null(run)) return()
 
     currentTermID <- mapGProfilerIDs(currentTermID)
@@ -77,7 +77,7 @@ handleManhattanSelect <- function(currentTermIDs) {
     if (is.null(selectedTool) || selectedTool == "") return()
 
     fullRunKey <- paste(enrichmentType, selectedTool, sep = "_")
-    run <- activeRuns[[fullRunKey]]
+    run <- enrichmentSessionRegistry$get(fullRunKey)
     if (is.null(run)) return()
 
     currentTermIDs <- mapGProfilerIDs(currentTermIDs)

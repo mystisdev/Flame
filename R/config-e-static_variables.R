@@ -12,7 +12,8 @@ combinationResult <- data.frame()
 enrichmentBackgroundSizes <- list()
 
 # Multi-run tracking (for functional enrichment)
-activeRuns <- list()        # Metadata for each active run (key: fullRunKey)
+# DEPRECATED: activeRuns replaced by enrichmentSessionRegistry in Part 2 refactoring
+activeRuns <- list()        # No longer used - kept for legacy code compatibility
 runCounters <- list()       # Display numbers per tool (can reset on Clear All)
 uniqueIdCounters <- list()  # Unique ID numbers per tool (NEVER reset - prevents Shiny caching bugs)
 

@@ -435,11 +435,12 @@ isSourceNotNull <- function(sourceSelect) {
   return(isNotNull)
 }
 
-filterAndPrintTable <- function(enrichmentType, runKey,
-                                outputId, sourceSelect, mode, slider,
+filterAndPrintTable <- function(session, outputId, sourceSelect, mode, slider,
                                 filter = 'top') {
+  # session is now an EnrichmentSession object
+  runKey <- session$id
   enrichmentFilteredData <-
-    filterTopData(runKey, sourceSelect, mode, slider)
+    filterTopData(session, sourceSelect, mode, slider)
 
   # Convert Source to factor for dropdown filtering (like Results tab)
   enrichmentFilteredData$Source <- as.factor(enrichmentFilteredData$Source)
@@ -469,8 +470,10 @@ filterAndPrintTable <- function(enrichmentType, runKey,
   return(enrichmentFilteredData)
 }
 
-filterTopData <- function(runKey, sourceSelect, mode, slider) {
-  enrichmentResult <- enrichmentResults[[runKey]]
+filterTopData <- function(session, sourceSelect, mode, slider) {
+  # Get results from session (not global enrichmentResults)
+  enrichmentResult <- session$getResults()
+  if (is.null(enrichmentResult)) return(NULL)
   filteredData <- subset(
     enrichmentResult,
     Source %in% sourceSelect
@@ -499,10 +502,11 @@ calculatePlotHeight <- function(entriesCount) {
   return(height)
 }
 
-extractFunctionVsFunctionEdgelist <- function(runKey,
+extractFunctionVsFunctionEdgelist <- function(session,
                                               enrichmentData,
                                               thresholdSlider = NULL,
                                               simplifyForNetwork = FALSE) {
+  # session is now an EnrichmentSession object
   functionsEdgelist <- enrichmentData[, c("Term_ID_noLinks", "Positive Hits")]
   totalGenesEdgelist <- calculateEdgeTotalGenes(functionsEdgelist)
   commonGenesEdgelist <- calculateEdgeCommonGenes(functionsEdgelist)
@@ -523,7 +527,7 @@ extractFunctionVsFunctionEdgelist <- function(runKey,
                                                  weightColumn,
                                                  thresholdSlider)
   }
-  functionsEdgelist <- appendSourceDatabasesAndIds(runKey, functionsEdgelist)
+  functionsEdgelist <- appendSourceDatabasesAndIds(session, functionsEdgelist)
   functionsEdgelist <- functionsEdgelist[order(-functionsEdgelist$`Similarity Score %`), ]
   return(functionsEdgelist)
 }
@@ -626,8 +630,9 @@ filterBySliderThreshold <- function(edgelist, weightColumn, thresholdSlider) {
   return(edgelist)
 }
 
-appendSourceDatabasesAndIds <- function(runKey, functionsEdgelist) {
-  enrichedNetworkData <- enrichmentResults[[runKey]]
+appendSourceDatabasesAndIds <- function(session, functionsEdgelist) {
+  # Get results from session (not global enrichmentResults)
+  enrichedNetworkData <- session$getResults()
   enrichedNetworkData <- enrichedNetworkData[, c(
     "Source", "Term_ID_noLinks", "Function")]
   functionsEdgelist <- merge(functionsEdgelist, enrichedNetworkData,
@@ -846,8 +851,10 @@ getHeatmapCategoryArrays <- function(type_Tool, plotId, enrichmentData) {
 
     } else if (plotId == "heatmap2") {
       # Heatmap2: Function vs Function
-      # Pass type_Tool directly as runKey (not split into parts)
-      heatmapTable <- extractFunctionVsFunctionEdgelist(type_Tool, enrichmentData)
+      # Get session from registry (type_Tool is the full run key)
+      session <- enrichmentSessionRegistry$get(type_Tool)
+      if (is.null(session)) return(NULL)
+      heatmapTable <- extractFunctionVsFunctionEdgelist(session, enrichmentData)
       if (is.null(heatmapTable) || nrow(heatmapTable) == 0) return(NULL)
 
       # Get draw format setting
@@ -916,9 +923,9 @@ handlePlotClick <- function(plotId, plotSource, session = NULL) {
     selectedTool <- input$toolTabsPanel
     if (is.null(selectedTool) || selectedTool == "" || selectedTool == "Combination") return()
 
-    # Get Run object for validation and consistent ID usage
+    # Get session from registry for validation and consistent ID usage
     fullRunKey <- paste(enrichmentType, selectedTool, sep = "_")
-    run <- activeRuns[[fullRunKey]]
+    run <- enrichmentSessionRegistry$get(fullRunKey)
     if (is.null(run)) return()
 
     # Use run$id for state management (equivalent to fullRunKey)
@@ -1031,9 +1038,9 @@ handlePlotSelection <- function(plotId, plotSource, session = NULL) {
     selectedTool <- input$toolTabsPanel
     if (is.null(selectedTool) || selectedTool == "" || selectedTool == "Combination") return()
 
-    # Get Run object for validation and consistent ID usage
+    # Get session from registry for validation and consistent ID usage
     fullRunKey <- paste(enrichmentType, selectedTool, sep = "_")
-    run <- activeRuns[[fullRunKey]]
+    run <- enrichmentSessionRegistry$get(fullRunKey)
     if (is.null(run)) return()
 
     # Use run$id for state management (equivalent to fullRunKey)
@@ -1426,8 +1433,10 @@ renderHeatmap1WithData <- function(type_Tool, enrichmentData) {
 renderHeatmap2WithData <- function(type_Tool, enrichmentData) {
   if (is.null(enrichmentData) || nrow(enrichmentData) == 0) return()
 
-  # Pass type_Tool directly as runKey (not split into parts)
-  heatmapTable <- extractFunctionVsFunctionEdgelist(type_Tool, enrichmentData)
+  # Get session from registry (type_Tool is the full run key)
+  session <- enrichmentSessionRegistry$get(type_Tool)
+  if (is.null(session)) return()
+  heatmapTable <- extractFunctionVsFunctionEdgelist(session, enrichmentData)
   if (is.null(heatmapTable) || nrow(heatmapTable) == 0) return()
 
   # Get UI settings

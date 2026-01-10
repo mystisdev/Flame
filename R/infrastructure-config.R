@@ -50,7 +50,9 @@ ModuleIds <- list(
   # Utility sessions (utilities-session-*.R)
   UTILITIES_CONVERSION = "gconvert",
   UTILITIES_ORTHOLOGY = "gorth",
-  UTILITIES_NETWORK = "string_network"
+  UTILITIES_NETWORK = "string_network",
+  # Enrichment sessions (enrich-*.R)
+  ENRICH_FORM = "enrich_form"
 )
 
 #' Paradigm Identifier

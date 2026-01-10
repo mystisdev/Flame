@@ -31,7 +31,8 @@ prepareCombinationTab <- function() {
       value <- maxRank - 1
     updateSliderInput(session, "combo_rank_slider",
                       value = value, max = maxRank)
-    shinyjs::show("functional_enrichment_all_clear")
+    # Show clear all button using namespaced ID (enrich_form module)
+    shinyjs::show(paste0(ModuleIds$ENRICH_FORM, "-enrichment_all_clear"))
   } else {
     # Hide Combination tab when fewer than 2 runs have results
     hideTab(inputId = "toolTabsPanel", target = "Combination")
@@ -39,16 +40,21 @@ prepareCombinationTab <- function() {
 }
 
 existTwoToolResults <- function() {
-  exist <- F
-  functionalEnrichmentResults <- enrichmentResults[grep("^functional", names(enrichmentResults))]
-  if (length(functionalEnrichmentResults[lengths(functionalEnrichmentResults) > 0]) > 1) {
-    exist <- T
-  }
-  return(exist)
+  # Check if at least 2 sessions in registry have results
+  sessions <- enrichmentSessionRegistry$getAll()
+  sessionsWithResults <- Filter(function(s) s$hasResults(), sessions)
+  return(length(sessionsWithResults) >= 2)
 }
 
 createGlobalComboTable <- function() {
-  functionalEnrichmentResults <- enrichmentResults[grep("^functional", names(enrichmentResults))]
+  # Get results from sessions in registry instead of global enrichmentResults
+  sessions <- enrichmentSessionRegistry$getAll()
+  sessionsWithResults <- Filter(function(s) s$hasResults(), sessions)
+
+  # Build named list of results keyed by session ID
+  functionalEnrichmentResults <- lapply(sessionsWithResults, function(s) s$getResults())
+  names(functionalEnrichmentResults) <- names(sessionsWithResults)
+
   combinationResult <<- dplyr::bind_rows(functionalEnrichmentResults, .id = "Tool")
 
   # Keep Positive Hits for intersection/union calculation before dropping
@@ -57,15 +63,15 @@ createGlobalComboTable <- function() {
                                               "Positive Hits")]
   # Convert fullRunKey to display name matching tab title
   # fullRunKey format: "functional_toolName_uniqueId" (e.g., "functional_gProfiler_5")
-  # Tab title format: "toolName (runNumber)" (e.g., "gProfiler (1)")
-  # Look up runNumber from activeRuns to match the tab title
+  # Tab title format: "toolName (displayNumber)" (e.g., "gProfiler (1)")
+  # Look up displayNumber from session registry to match the tab title
   combinationResult$Tool <<- sapply(combinationResult$Tool, function(fullRunKey) {
-    runInfo <- activeRuns[[fullRunKey]]
-    if (!is.null(runInfo)) {
-      # Use display number (runNumber) to match tab title
-      paste0(runInfo$toolName, " (", runInfo$runNumber, ")")
+    enrichSession <- enrichmentSessionRegistry$get(fullRunKey)
+    if (!is.null(enrichSession)) {
+      # Use display number to match tab title
+      paste0(enrichSession$toolName, " (", enrichSession$displayNumber, ")")
     } else {
-      # Fallback: parse from key if run not found (shouldn't happen)
+      # Fallback: parse from key if session not found (shouldn't happen)
       parts <- strsplit(fullRunKey, "_")[[1]]
       paste(parts[-1], collapse = "_")
     }
@@ -291,8 +297,13 @@ areComboInputsNotEmpty <- function() {
 }
 
 parseComboVisNetwork <- function() {
-  functionalEnrichmentResults <- enrichmentResults[grep("^functional",
-                                                        names(enrichmentResults))]
+  # Get results from sessions in registry instead of global enrichmentResults
+  sessions <- enrichmentSessionRegistry$getAll()
+  sessionsWithResults <- Filter(function(s) s$hasResults(), sessions)
+
+  functionalEnrichmentResults <- lapply(sessionsWithResults, function(s) s$getResults())
+  names(functionalEnrichmentResults) <- names(sessionsWithResults)
+
   comboResult_forNetwork <- dplyr::bind_rows(functionalEnrichmentResults,
                                               .id = "Tool")
   comboResult_forNetwork <- comboResult_forNetwork[, c("Source", "Function",
@@ -303,9 +314,9 @@ parseComboVisNetwork <- function() {
 
   # Convert fullRunKey to display name matching tab title and tool picker
   comboResult_forNetwork$Tool <- sapply(comboResult_forNetwork$Tool, function(fullRunKey) {
-    runInfo <- activeRuns[[fullRunKey]]
-    if (!is.null(runInfo)) {
-      paste0(runInfo$toolName, " (", runInfo$runNumber, ")")
+    enrichSession <- enrichmentSessionRegistry$get(fullRunKey)
+    if (!is.null(enrichSession)) {
+      paste0(enrichSession$toolName, " (", enrichSession$displayNumber, ")")
     } else {
       parts <- strsplit(fullRunKey, "_")[[1]]
       paste(parts[-1], collapse = "_")

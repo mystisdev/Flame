@@ -21,7 +21,9 @@ ENRICHMENT_TYPES_CONFIG <- list(
     # UI Configuration
     tabsetPanelId = "toolTabsPanel",
     resultsPanelId = "functionalEnrichmentResultsPanel",
-    clearButtonId = "functional_enrichment_all_clear",
+    # NOTE: clearButtonId uses namespaced ID format: {moduleId}-{inputId}
+    # The EnrichmentFormSession uses ModuleIds$ENRICH_FORM = "enrich_form"
+    clearButtonId = "enrich_form-enrichment_all_clear",
     closeEvent = "closeRunTab",
 
     # Data Configuration

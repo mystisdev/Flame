@@ -7,7 +7,7 @@ handleBarchart <- function(run) {
 
       if (isSourceNotNull(sourceSelect)) {
         enrichmentFilteredData <- filterAndPrintTable(
-          run$enrichmentType, run$id,
+          run,
           outputId = run$getInputId("barchart"),
           sourceSelect = sourceSelect,
           mode = mode,

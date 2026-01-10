@@ -8,7 +8,7 @@ initializeServerApp <- function() {
   initializeArenaEdgelist()
   # Note: STRING network data now initialized by NetworkAnalysisSession
   initializePlotTableState()
-  initializeRunCounters()
+  # initializeRunCounters() removed - now handled by enrichmentSessionRegistry
   hideEnrichmentResultsPanel()
 }
 
@@ -20,8 +20,7 @@ initialiazeOrganismSelectors <- function() {
   STRING_printNames <- ORGANISMS[ORGANISMS$taxid %in% TOOL_ORGANISMS$STRING, ]$print_name
   updateSelectizeInput(session, 'textmining_organism',
                        choices = STRING_printNames, selected = selected, server = T)
-  updateSelectizeInput(session, 'functional_enrichment_organism',
-                       choices = ORGANISMS$print_name, selected = selected, server = T)
+  # Note: functional_enrichment_organism now initialized by EnrichmentFormSession
   # Note: string_network_organism now initialized by NetworkAnalysisSession
   # Note: gconvert and gorth organism selectors now initialized by ConversionSession/OrthologySession
 }

@@ -1,32 +1,3 @@
-# Get organism-specific prefix for GeneCodis datasources
-# Maps taxonomy ID to prefix (e.g., taxid 10090 -> "MMUSCULUS_")
-# Prefix names are arbitrary - they just match DATASOURCES keys
-# Note: This function reads from input global; strategy has its own getVariablePrefix() that takes organism param
-getGeneCodisVariablePrefix <- function() {
-  organism_taxid <- ORGANISMS[ORGANISMS$print_name == input[["functional_enrichment_organism"]], ]$taxid
-
-  return(
-    switch(
-      as.character(organism_taxid),
-      "9606" = "",  # Homo sapiens (human) - no prefix
-      "10090" = "MMUSCULUS_",  # Mus musculus (mouse)
-      "10116" = "RNORVEGICUS_",  # Rattus norvegicus (rat)
-      "6239" = "CELEGANS_",  # Caenorhabditis elegans (worm)
-      "7227" = "DMELANOGASTER_",  # Drosophila melanogaster (fly)
-      "7955" = "DRERIO_",  # Danio rerio (zebrafish)
-      "9615" = "CLFAMILIARIS_",  # Canis lupus familiaris (dog)
-      "9031" = "GGALLUS_",  # Gallus gallus (chicken)
-      "9913" = "BTAURUS_",  # Bos taurus (cow)
-      "9823" = "SSCROFA_",  # Sus scrofa (pig) - taxid 9823
-      "3702" = "ATHALIANA_",  # Arabidopsis thaliana - taxid 3702
-      "39947" = "OSATIVA_",  # Oryza sativa Japonica Group - taxid 39947
-      "559292" = "SCEREVISIAE_",  # Saccharomyces cerevisiae S288C - taxid 559292
-      "511145" = "ECOLI_",  # Escherichia coli str. K-12 substr. MG1655 - taxid 511145
-      ""  # Default - organism not supported by GeneCodis
-    )
-  )
-}
-
 # Helper functions used by GeneCodisStrategy
 
 pollGeneCodisJob <- function(job_id, gene_count, max_timeout = 60) {
@@ -216,9 +187,27 @@ isGeneCodisResultValid <- function(parsedResult) {
 }
 
 # Helper function: Map FLAME data source codes to GeneCodis annotation names
-mapDataSourcesToGeneCodisDatasets <- function(selectedDataSources) {
-  # Get organism-specific datasources for GeneCodis
-  prefix <- getGeneCodisVariablePrefix()
+# @param selectedDataSources Character vector of datasource codes
+# @param organism Organism taxid (numeric or character)
+mapDataSourcesToGeneCodisDatasets <- function(selectedDataSources, organism) {
+  # Get organism-specific prefix using same logic as GeneCodisStrategy
+  prefix <- switch(as.character(organism),
+    "9606" = "",
+    "10090" = "MMUSCULUS_",
+    "10116" = "RNORVEGICUS_",
+    "6239" = "CELEGANS_",
+    "7227" = "DMELANOGASTER_",
+    "7955" = "DRERIO_",
+    "9615" = "CLFAMILIARIS_",
+    "9031" = "GGALLUS_",
+    "9913" = "BTAURUS_",
+    "9823" = "SSCROFA_",
+    "3702" = "ATHALIANA_",
+    "39947" = "OSATIVA_",
+    "559292" = "SCEREVISIAE_",
+    "511145" = "ECOLI_",
+    ""
+  )
   organismDataSources <- DATASOURCES[[paste0(prefix, "GENECODIS")]]
 
   # Filter selected datasources to only those GeneCodis supports for this organism
@@ -284,7 +273,7 @@ GeneCodisStrategy <- R6::R6Class("GeneCodisStrategy",
 
     run = function(inputList, organism, backgroundList, params) {
       # Map datasources to GeneCodis annotations
-      genecodisAnnotations <- mapDataSourcesToGeneCodisDatasets(params$datasources)
+      genecodisAnnotations <- mapDataSourcesToGeneCodisDatasets(params$datasources, organism)
 
       if (length(genecodisAnnotations) == 0) {
         renderWarning("No valid GeneCodis annotations for selected data sources.")

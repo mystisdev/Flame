@@ -53,7 +53,7 @@ function(input, output, session) {
   source(file.path(pkgRoot, "R", "func-update.R"), local = TRUE)
   source(file.path(pkgRoot, "R", "func-reset.R"), local = TRUE)
   source(file.path(pkgRoot, "R", "func-runs.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "func-run.R"), local = TRUE)
+  # Note: func-run.R deleted in Part 2 refactoring (replaced by enrich-session-ora.R)
   source(file.path(pkgRoot, "R", "core-tool_registry.R"), local = TRUE)
   source(file.path(pkgRoot, "R", "func-observers.R"), local = TRUE)
 
@@ -65,6 +65,12 @@ function(input, output, session) {
   #       input-text_mining.R replaced by TextMiningInputSession
   #       input-upset.R replaced by AnalyteListSetOperationsSession
   #       input-conversion.R replaced by ConversionSession/OrthologySession
+
+  # Source enrichment session classes (in dependency order)
+  source(file.path(pkgRoot, "R", "enrich-session-registry.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "enrich-session-base.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "enrich-session-ora.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "enrich-form.R"), local = TRUE)
 
   # Source enrichment functions
   source(file.path(pkgRoot, "R", "enrich-inputs_panel.R"), local = TRUE)
@@ -104,6 +110,10 @@ function(input, output, session) {
   # AnalyteList Registry for managing input lists (per-session)
   # Must be created in reactive context (server function)
   analyteListRegistry <- AnalyteListRegistry$new()
+
+  # Enrichment Session Registry for managing enrichment runs (per-session)
+  # Must be created in reactive context (server function)
+  enrichmentSessionRegistry <- EnrichmentSessionRegistry$new()
 
   # AnalyteList Manager Session - manages sidebar and view panel for ALL lists
   analyteListManager <- AnalyteListManagerSession$new(
@@ -151,6 +161,14 @@ function(input, output, session) {
   networkSession <- NetworkAnalysisSession$new(ModuleIds$UTILITIES_NETWORK, analyteListRegistry)
   networkSession$server(input, session)
 
+  # Enrichment Form Session - manages enrichment form and creates run sessions
+  enrichmentFormSession <- EnrichmentFormSession$new(
+    ModuleIds$ENRICH_FORM,
+    enrichmentSessionRegistry,
+    analyteListRegistry
+  )
+  enrichmentFormSession$server(input, output, session)
+
   # Clean up all session objects when the Shiny session ends
   # Order: dependent sessions first, then sessions they depend on
   session$onSessionEnded(function() {
@@ -164,6 +182,7 @@ function(input, output, session) {
     conversionSession$cleanup()
     orthologySession$cleanup()
     networkSession$cleanup()
+    enrichmentFormSession$cleanup()
     analyteListManager$cleanup()
   })
 
@@ -186,24 +205,20 @@ function(input, output, session) {
     listNames <- analyteListRegistry$getNamesReactive()
 
     # BACKWARD COMPATIBILITY: Sync registry to userInputLists for code that
-    # hasn't been migrated yet (enrich-main.R, etc.)
+    # hasn't been migrated yet (plot handlers, etc.)
     # This will be removed once all code is migrated to use the registry directly.
     userInputLists <<- lapply(analyteListRegistry$getAll(), function(analyteList) {
       analyteList$toDataFrame()
     })
 
-    # Update enrichment selectors (preserving current selection if still valid)
-    updateSelectPreserving("functional_enrichment_file", listNames)
-    updateSelectPreserving("functional_enrichment_background_list", listNames)
+    # Update enrichment form selectors (now handled by EnrichmentFormSession)
+    enrichmentFormSession$updateFileChoices(listNames)
 
     # Update utility selectors (preserving current selection if still valid)
     updateSelectPreserving("selectUpset", listNames)
     # NOTE: gconvert_select handled by ConversionSession (namespaced as gconvert-select)
     # NOTE: gorth_select handled by OrthologySession (namespaced as gorth-select)
     # NOTE: string_network-select handled by NetworkAnalysisSession (namespaced)
-
-    # Update background list choices (exclude current input list)
-    updateBackgroundListChoices("functional")
 
     # UpSet tab visibility is now managed by AnalyteListSetOperationsSession
   })
@@ -234,51 +249,27 @@ function(input, output, session) {
   # 2D Reduction observers are now handled by ReductionInputSession
   # (see reductionInputSession$server() call above)
 
-  # ENRICHMENT observers
-  observeEvent(input$functional_enrichment_organism, {
-    handleFunctionalEnrichmentOrganismSelection()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$functional_enrichment_tool, {
-    handleFunctionalEnrichmentToolSelection()
-  }, ignoreInit = TRUE, ignoreNULL = FALSE)
-
-  lapply(ENRICHMENT_TYPES, function(enrichmentType) {
-    observeEvent(input[[paste0(enrichmentType, "_enrichment_file")]], {
-      handleBackgroundListUpdate(enrichmentType)
-    }, ignoreInit = TRUE)
-  })
-
-  lapply(ENRICHMENT_TYPES, function(enrichmentType) {
-    observeEvent(input[[paste0(enrichmentType, "_enrichment_background_choice")]], {
-      choice <- input[[paste0(enrichmentType, "_enrichment_background_choice")]]
-      handleBackgroundModeSelection(choice, enrichmentType)
-    }, ignoreInit = TRUE)
-  })
-
-  lapply(ENRICHMENT_TYPES, function(enrichmentType) {
-    observeEvent(input[[paste0(enrichmentType, "_enrichment_run")]], {
-      handleBackgroundListUpdate(input[[paste0(enrichmentType, "_enrichment_file")]])
-      handleEnrichment(enrichmentType)
-    }, ignoreInit = TRUE)
-  })
-
-  observeEvent(input$functional_enrichment_all_clear, {
-    handleMultiClear()
-  }, ignoreInit = TRUE)
+  # ENRICHMENT observers are now handled by EnrichmentFormSession
+  # (see enrichmentFormSession$server() call above)
+  # This includes: organism cascade, tool cascade, file change, background mode,
+  # submit button, and clear all button.
 
   # Close individual run tab (via X button)
+  # NOTE: This remains here because it's triggered by the tab close button,
+  # not by the form. The clear all button is handled by EnrichmentFormSession.
   observeEvent(input$closeRunTab, {
     runId <- input$closeRunTab
     fullRunKey <- paste("functional", runId, sep = "_")
     toolName <- parseFullRunKey(fullRunKey)$toolName
-    clearRunCompletely(fullRunKey)
-    if (countActiveRunsForTool(toolName) == 0) {
-      resetRunCounterForTool(toolName)
+    clearEnrichmentRun(fullRunKey)
+    # Use registry for counting
+    if (enrichmentSessionRegistry$countByTool(toolName) == 0) {
+      enrichmentSessionRegistry$resetDisplayCounter(toolName)
     }
-    if (getActiveFunctionalRunCount() == 0) {
+    if (enrichmentSessionRegistry$count() == 0) {
       shinyjs::hide("functionalEnrichmentResultsPanel")
-      shinyjs::hide("functional_enrichment_all_clear")
+      # Hide the clear all button using the namespaced ID
+      shinyjs::hide(paste0(ModuleIds$ENRICH_FORM, "-enrichment_all_clear"))
     }
     prepareCombinationTab()
   }, ignoreInit = TRUE)

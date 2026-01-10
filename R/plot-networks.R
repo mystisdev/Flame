@@ -23,7 +23,7 @@ handleFunctionVsGeneNetwork <- function(run) {
 
   if (isSourceNotNull(source)) {
     enrichmentFilteredData <- filterAndPrintTable(
-      run$enrichmentType, run$id,
+      run,
       outputId = run$getInputId("network1"),
       sourceSelect = source,
       mode = input[[run$getInputId("network1_mode")]],
@@ -31,7 +31,7 @@ handleFunctionVsGeneNetwork <- function(run) {
 
     networkEdgelist <- separateRows(enrichmentFilteredData)
     networkEdgelist <- keepEdgelistColumns(networkEdgelist)
-    arenaEdgelist[[run$getInputId("network1")]] <<- networkEdgelist
+    run$setArenaEdgelist("network1", networkEdgelist)
     renderShinyDataTable(
       shinyOutputId = run$getInputId("network1_edgelist"),
       networkEdgelist,
@@ -151,7 +151,7 @@ handleFunctionVsFunctionNetwork <- function(run) {
 
   if (isSourceNotNull(source)) {
     enrichmentFilteredData <- filterAndPrintTable(
-      run$enrichmentType, run$id,
+      run,
       outputId = run$getInputId("network2"),
       sourceSelect = source,
       mode = input[[run$getInputId("network2_mode")]],
@@ -159,12 +159,12 @@ handleFunctionVsFunctionNetwork <- function(run) {
 
     networkEdgelist <-
       extractFunctionVsFunctionEdgelist(
-        run$id, enrichmentFilteredData,
+        run, enrichmentFilteredData,
         input[[run$getInputId("network2_thresholdSlider")]],
         simplifyForNetwork = TRUE
       )
     if (existEnoughEdges(run$id, "network2", networkEdgelist)) {
-      arenaEdgelist[[run$getInputId("network2")]] <<- networkEdgelist
+      run$setArenaEdgelist("network2", networkEdgelist)
       renderShinyDataTable(
         shinyOutputId = run$getInputId("network2_edgelist"),
         networkEdgelist,
@@ -213,7 +213,7 @@ handleGeneVsGeneNetwork <- function(run) {
 
   if (isSourceNotNull(source)) {
     enrichmentFilteredData <- filterAndPrintTable(
-      run$enrichmentType, run$id,
+      run,
       outputId = run$getInputId("network3"),
       sourceSelect = source,
       mode = input[[run$getInputId("network3_mode")]],
@@ -226,7 +226,7 @@ handleGeneVsGeneNetwork <- function(run) {
         simplifyForNetwork = TRUE
       )
     if (existEnoughEdges(run$id, "network3", networkEdgelist)) {
-      arenaEdgelist[[run$getInputId("network3")]] <<- networkEdgelist
+      run$setArenaEdgelist("network3", networkEdgelist)
       renderShinyDataTable(
         shinyOutputId = run$getInputId("network3_edgelist"),
         networkEdgelist,

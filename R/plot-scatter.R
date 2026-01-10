@@ -6,7 +6,7 @@ handleScatterPlot <- function(run) {
 
       if (isSourceNotNull(sourceSelect)) {
         enrichmentFilteredData <- filterAndPrintTable(
-          run$enrichmentType, run$id,
+          run,
           outputId = run$getInputId("scatterPlot"),
           sourceSelect = sourceSelect,
           mode = input[[run$getInputId("scatterPlot_mode")]],

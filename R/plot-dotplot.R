@@ -6,7 +6,7 @@ handleDotPlot <- function(run) {
 
       if (isSourceNotNull(sourceSelect)) {
         enrichmentFilteredData <- filterAndPrintTable(
-          run$enrichmentType, run$id,
+          run,
           outputId = run$getInputId("dotPlot"),
           sourceSelect = sourceSelect,
           mode = input[[run$getInputId("dotPlot_mode")]],

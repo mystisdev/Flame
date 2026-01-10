@@ -23,7 +23,7 @@ handleFunctionVsGeneHeatmap <- function(run) {
 
   if (isSourceNotNull(source)) {
     enrichmentFilteredData <- filterAndPrintTable(
-      run$enrichmentType, run$id,
+      run,
       outputId = run$getInputId("heatmap1"),
       sourceSelect = source,
       mode = input[[run$getInputId("heatmap1_mode")]],
@@ -65,20 +65,21 @@ handleFunctionVsFunctionHeatmap <- function(run) {
 
   if (isSourceNotNull(source)) {
     enrichmentFilteredData <- filterAndPrintTable(
-      run$enrichmentType, run$id,
+      run,
       outputId = run$getInputId("heatmap2"),
       sourceSelect = source,
       mode = input[[run$getInputId("heatmap2_mode")]],
       slider = input[[run$getInputId("heatmap2_slider")]])
 
-    constructFunctionsVsFunctionHeatmap(run$id, enrichmentFilteredData)
+    constructFunctionsVsFunctionHeatmap(run, enrichmentFilteredData)
   }
 }
 
-# Updated to accept runKey (full key like "functional_gProfiler_1")
-constructFunctionsVsFunctionHeatmap <- function(type_Tool, enrichmentFilteredData) {
-  heatmapTable <- extractFunctionVsFunctionEdgelist(type_Tool, enrichmentFilteredData)
-  
+# Updated to accept session object instead of runKey
+constructFunctionsVsFunctionHeatmap <- function(session, enrichmentFilteredData) {
+  type_Tool <- session$id
+  heatmapTable <- extractFunctionVsFunctionEdgelist(session, enrichmentFilteredData)
+
   drawFormatColumun <- switch(
     input[[paste(type_Tool, "heatmap2_drawFormat", sep = "_")]],
     "Term_ID" = "Id",
@@ -103,7 +104,7 @@ handleGeneVsGeneHeatmap <- function(run) {
 
   if (isSourceNotNull(source)) {
     enrichmentFilteredData <- filterAndPrintTable(
-      run$enrichmentType, run$id,
+      run,
       outputId = run$getInputId("heatmap3"),
       sourceSelect = source,
       mode = input[[run$getInputId("heatmap3_mode")]],
