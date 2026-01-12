@@ -8,7 +8,7 @@
 # =============================================================================
 
 # --- Constants ---
-ARENA_API_URL <- "https://bib.fleming.gr/bib/api/arena3dweb"
+ARENA_API_URL <- "https://pavlopoulos-lab-services.org/bib/api/arena3dweb"
 ARENA_LAYER_SPACING <- 300
 ARENA_COORDINATE_RANGE <- 410
 
