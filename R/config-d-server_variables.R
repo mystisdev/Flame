@@ -1,9 +1,3 @@
-# Dot Plot ####
-DOTPLOT_SIZE_MIN <- 4
-DOTPLOT_SIZE_MAX <- 25
-DOTPLOT_ENTRY_HEIGHT_PX <- 22
-DOTPLOT_COLORSCALE <- "Viridis"  # Built-in Plotly scale
-
 # Organisms ####
 # Use helper function for path resolution (works in dev and installed package)
 ORGANISMS <- tryCatch(
@@ -203,6 +197,14 @@ DATASOURCES_CODES[["OX_ENRICHR"]] <- list(
   "HP" = "Human_Phenotype_Ontology",
   "MGI" = "MGI_Mammalian_Phenotype_Level_4_2019"
 )
+
+# Compute DATASOURCES from DATASOURCES_CODES for tools not already defined
+for (datasourceName in names(DATASOURCES_CODES)) {
+  if (is.null(DATASOURCES[[datasourceName]])) {
+    DATASOURCES[[datasourceName]] <- names(DATASOURCES_CODES[[datasourceName]])
+  }
+}
+
 NAMESPACES[["GPROFILER"]] <- c("User Input" = "USERINPUT", NAMESPACES[["CORE"]])
 NAMESPACES[["WEBGESTALT"]] <- list(
   "Entrez Gene Accession" = "ENTREZGENE_ACC",
@@ -260,13 +262,5 @@ ENRICHMENT_DF_COLNAMES <- c(
   "Query size", "Intersection Size", "Positive Hits"
 )
 
-# Plots ####
-ALL_PLOT_IDS <- c(NETWORK_IDS, HEATMAP_IDS, "barchart", "scatterPlot", "dotPlot")
-DEFAULT_SLIDER_VALUE <- 50
-MAX_SLIDER_VALUE <- 200
-SINGLE_BAR_HEIGHT_PX <- 18
-MIN_BAR_HEIGHT_PX <- 200
-EDGE_WIDTH_MIN <- 0.1
-EDGE_WIDTH_MAX <- 3
-
 # Arena3D constants moved to R/func-arena.R
+# Plot constants moved to respective OutputSession classes (R/output-session-*.R)

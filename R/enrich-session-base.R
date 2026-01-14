@@ -5,14 +5,14 @@
 # Abstract base class for all enrichment session types (ORA, GSEA, etc.).
 # Provides common functionality for:
 # - Results storage and access
-# - Tab UI generation and insertion
 # - Observer lifecycle management
 # - Cleanup
 #
 # Subclasses must implement:
 # - execute(): Run the enrichment and store results
-# - ui(): Generate the tab UI content
+# - ui(): Generate the tab UI (session owns its UI)
 # - server(): Set up observers using moduleServer()
+# - cleanup(output): Clean up observers and clear outputs
 #
 # Dependencies:
 # - enrich-session-registry.R (for EnrichmentSessionRegistry)
@@ -28,7 +28,7 @@
 #' @section Lifecycle:
 #' 1. Create: session <- ORAEnrichmentSession$new(...)
 #' 2. Execute: session$execute()
-#' 3. Insert UI: session$insertUI(parentSession)
+#' 3. Insert tab: EnrichmentController$insertTab() handles UI generation
 #' 4. Start server: session$server(input, output, session)
 #' 5. Cleanup: session$cleanup()
 #'
@@ -94,8 +94,12 @@ EnrichmentSession <- R6::R6Class(
       stop("Subclass must implement execute()")
     },
 
-    #' Generate tab UI content (abstract)
-    #' @return Shiny UI elements
+    #' Generate the tab UI (abstract)
+    #'
+    #' Subclasses implement their own UI generation and track output IDs
+    #' for cleanup. Called by EnrichmentController$insertTab().
+    #'
+    #' @return Shiny UI tagList
     ui = function() {
       stop("Subclass must implement ui()")
     },
@@ -108,21 +112,18 @@ EnrichmentSession <- R6::R6Class(
       stop("Subclass must implement server()")
     },
 
-    # === Concrete Methods ===
-
-    #' Insert the tab UI into the results panel
-    #' @param parentSession Shiny session for insertTab
-    insertUI = function(parentSession) {
-      shiny::insertTab(
-        inputId = "toolTabsPanel",
-        tab = shiny::tabPanel(
-          title = paste0(self$toolName, " ", self$displayNumber),
-          value = self$runId,
-          self$ui()
-        ),
-        session = parentSession
-      )
+    #' Render results tables (abstract)
+    #'
+    #' Each enrichment paradigm (ORA, GSEA, etc.) implements its own version.
+    #' ORA renders tables with P-value, Positive Hits columns.
+    #' GSEA will render tables with NES, Leading Edge columns.
+    #'
+    #' @param output Shiny output object to render tables into
+    renderResultsTables = function(output) {
+      stop("Subclass must implement renderResultsTables()")
     },
+
+    # === Concrete Methods ===
 
     #' Check if results exist
     #' @return Logical
@@ -140,12 +141,6 @@ EnrichmentSession <- R6::R6Class(
     #' @return Integer or NULL
     getBackgroundSize = function() {
       private$.backgroundSize
-    },
-
-    #' Get the raw API response (for Manhattan plot)
-    #' @return API response object or NULL
-    getRawApiResponse = function() {
-      private$.rawApiResponse
     },
 
     #' Get the conversion table
@@ -211,7 +206,6 @@ EnrichmentSession <- R6::R6Class(
     #' Does NOT destroy observers or remove UI - just clears data
     clearResults = function() {
       private$.results <- NULL
-      private$.rawApiResponse <- NULL
       private$.conversionTable <- NULL
       private$.backgroundConversionTable <- NULL
       private$.arenaEdgelists <- list()
@@ -229,7 +223,6 @@ EnrichmentSession <- R6::R6Class(
 
       # Clear results
       private$.results <- NULL
-      private$.rawApiResponse <- NULL
       private$.conversionTable <- NULL
       private$.arenaEdgelists <- list()
     },
@@ -256,9 +249,6 @@ EnrichmentSession <- R6::R6Class(
 
     # Background size
     .backgroundSize = NULL,
-
-    # Raw API response (for tools like gProfiler that need it for Manhattan)
-    .rawApiResponse = NULL,
 
     # Conversion table (gene ID mappings)
     .conversionTable = NULL,

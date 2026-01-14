@@ -195,8 +195,7 @@ PANTHERStrategy <- R6::R6Class("PANTHERStrategy",
       # Return structured result (no global writes)
       return(list(
         result = result,
-        backgroundSize = getSimpleBackgroundSize(backgroundList),
-        rawResult = NULL
+        backgroundSize = getSimpleBackgroundSize(backgroundList)
       ))
     },
 

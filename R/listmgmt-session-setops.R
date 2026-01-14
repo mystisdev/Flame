@@ -11,7 +11,7 @@
 # - input-analytelist-unranked.R (for UnrankedAnalyteList)
 # - infrastructure-config.R (for AnalyteType)
 # - listmgmt-session-manager.R (for AnalyteListManagerSession)
-# - func-general.R (for renderModal, removeModal, renderWarning, renderError)
+# - aaa-utilities.R (for renderModal, renderWarning, renderError)
 # - upsetjs package
 #
 # Note: Module ID is defined in infrastructure-config.R (ModuleIds):

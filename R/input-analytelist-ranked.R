@@ -88,8 +88,12 @@ RankedAnalyteList <- R6::R6Class(
       private$.ranks
     },
 
-    #' Convert to data frame with ID, score, and rank columns
-    #' @return Data frame
+    #' Convert to data frame for display and export
+    #'
+    #' Used by AnalyteListManagerSession to render list contents in a DataTable
+    #' and enable export to CSV/Excel/PDF.
+    #'
+    #' @return Data frame with ID, score, and rank columns
     toDataFrame = function() {
       data.frame(
         id = self$getIds(),

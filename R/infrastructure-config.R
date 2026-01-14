@@ -89,8 +89,7 @@ OutputType <- list(
   HEATMAP_GENE_GENE = "Heatmap_GeneGene",
   NETWORK_TERM_GENE = "Network_TermGene",
   NETWORK_TERM_TERM = "Network_TermTerm",
-  NETWORK_GENE_GENE = "Network_GeneGene",
-  MANHATTAN = "Manhattan"
+  NETWORK_GENE_GENE = "Network_GeneGene"
 )
 
 # =============================================================================
@@ -119,8 +118,7 @@ PARADIGMS[[ParadigmId$ORA]] <- list(
     OutputType$HEATMAP_GENE_GENE,
     OutputType$NETWORK_TERM_GENE,
     OutputType$NETWORK_TERM_TERM,
-    OutputType$NETWORK_GENE_GENE,
-    OutputType$MANHATTAN
+    OutputType$NETWORK_GENE_GENE
   ),
   requiresBackground = FALSE
 )
@@ -167,7 +165,6 @@ PARADIGMS[[ParadigmId$TOPOLOGY]] <- list(
 #   defaultMetricBackground - Default metric when using custom background
 #
 #   supportsBackground    - Whether tool supports custom background gene sets
-#   hasManhattanPlot      - Whether tool provides Manhattan plot data
 #
 #   organisms             - Reserved for organism list (loaded separately from RDS files)
 #
@@ -216,7 +213,6 @@ TOOLS[[ToolId$GPROFILER]] <- list(
   defaultMetricGenome = "fdr",
   defaultMetricBackground = "bonferroni",
   supportsBackground = TRUE,
-  hasManhattanPlot = TRUE,
 
   organisms = NULL
 )
@@ -257,7 +253,6 @@ TOOLS[[ToolId$STRING]] <- list(
   defaultMetricGenome = "fdr",
   defaultMetricBackground = "p_value",
   supportsBackground = TRUE,
-  hasManhattanPlot = FALSE,
 
   organisms = NULL
 )
@@ -362,7 +357,6 @@ TOOLS[[ToolId$ENRICHR]] <- list(
   defaultMetricGenome = "adjusted_pvalue",
   defaultMetricBackground = NULL,
   supportsBackground = FALSE,
-  hasManhattanPlot = FALSE,
 
   organisms = NULL
 )
@@ -412,7 +406,6 @@ TOOLS[[ToolId$WEBGESTALT]] <- list(
   defaultMetricGenome = "BH",
   defaultMetricBackground = "top",
   supportsBackground = TRUE,
-  hasManhattanPlot = FALSE,
 
   organisms = NULL
 )
@@ -451,7 +444,6 @@ TOOLS[[ToolId$PANTHER]] <- list(
   defaultMetricGenome = "FDR",
   defaultMetricBackground = "NONE",
   supportsBackground = TRUE,
-  hasManhattanPlot = FALSE,
 
   organisms = NULL
 )
@@ -509,7 +501,6 @@ TOOLS[[ToolId$GENECODIS]] <- list(
   defaultMetricGenome = "fdr",
   defaultMetricBackground = "fdr",
   supportsBackground = TRUE,
-  hasManhattanPlot = FALSE,
 
   organisms = NULL
 )

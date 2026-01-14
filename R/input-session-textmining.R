@@ -8,7 +8,6 @@
 # - input-session-base.R (for InputSession)
 # - input-analytelist-registry.R (for AnalyteListRegistry)
 # - func-extract.R (for extract_entities, extract_annotated_html)
-# - func-links.R (for attachTextMiningDBLinks)
 #
 # =============================================================================
 
@@ -296,10 +295,34 @@ TextMiningInputSession <- R6::R6Class(
 
     # Format extracted terms for display in the results DataTable
     prepareExtractedTermsForPrint = function(extracted_terms) {
-      extracted_terms <- attachTextMiningDBLinks(extracted_terms)
+      extracted_terms <- private$attachTextMiningDBLinks(extracted_terms)
       extracted_terms <- subset(extracted_terms, select = c(Name, Type, ID))
       names(extracted_terms) <- c("Gene Name", "Species (TaxID)", "ID")
       return(extracted_terms)
+    },
+
+    # Attach database links to text mining results (Ensembl and miRNA)
+    attachTextMiningDBLinks = function(df) {
+      df$ID_noLINKS <- df$ID
+      df$ID[grep("^ENS", df$ID_noLINKS)] <-
+        paste0(
+          "<a href='",
+          sprintf('https://www.ensembl.org/id/%s',
+                  df$ID_noLINKS[grep("^ENS", df$ID_noLINKS)]),
+          "' target = '_blank'>",
+          df$ID_noLINKS[grep("^ENS", df$ID_noLINKS)],
+          "</a>"
+        )
+      df$ID[grep("^hsa-", df$ID_noLINKS)] <-
+        paste0(
+          "<a href='",
+          sprintf('https://www.mirbase.org/textsearch.shtml?q=%s',
+                  df$ID_noLINKS[grep("^hsa-", df$ID_noLINKS)]),
+          "' target = '_blank'>",
+          df$ID_noLINKS[grep("^hsa-", df$ID_noLINKS)],
+          "</a>"
+        )
+      return(df)
     },
 
     printExtractResults = function(enriched_text, extracted_terms, output) {

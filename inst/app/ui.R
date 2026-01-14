@@ -4,12 +4,13 @@
 pkgRoot <- normalizePath(file.path(getwd(), "..", ".."))
 source(file.path(pkgRoot, "R", "infrastructure-config.R"), local = TRUE)
 source(file.path(pkgRoot, "R", "config-b-global_variables.R"), local = TRUE)
-source(file.path(pkgRoot, "R", "config-f-ui_variables.R"), local = TRUE)
-source(file.path(pkgRoot, "R", "func-init.R"), local = TRUE)
+source(file.path(pkgRoot, "R", "config-c-enrichment_types.R"), local = TRUE)
+# config-f DELETED - constants moved to their owning classes
+# func-init.R DELETED - initializeDatasources() moved to config-d, hide calls inlined in server.R
 source(file.path(pkgRoot, "R", "view-welcome.R"), local = TRUE)
 source(file.path(pkgRoot, "R", "view-input.R"), local = TRUE)
 source(file.path(pkgRoot, "R", "view-enrichment.R"), local = TRUE)
-source(file.path(pkgRoot, "R", "view-plots.R"), local = TRUE)
+# view-plots.R DELETED - all functions were dead code (replaced by OutputSession classes)
 source(file.path(pkgRoot, "R", "utilities-session-conversion.R"), local = TRUE)
 source(file.path(pkgRoot, "R", "utilities-session-orthology.R"), local = TRUE)
 source(file.path(pkgRoot, "R", "utilities-session-network.R"), local = TRUE)

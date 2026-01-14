@@ -720,15 +720,6 @@ generateHelpPlotsTabPanel <- function(){
              column(
                12,
                box(
-                 title = "Manhattan", collapsible = T, collapsed = T,
-                 solidHeader = T, status = "primary", width = NULL,
-                 generateHelpPlotsManhattan()
-               )
-             ),
-             
-             column(
-               12,
-               box(
                  title = "Combination UpSet", collapsible = T, collapsed = T,
                  solidHeader = T, status = "primary", width = NULL,
                  generateHelpPlotsUpset()
@@ -743,8 +734,8 @@ generateHelpPlotsNetwork <- function() {
   HTML('
   <div>
     <p>
-      The Plots tab contains various visualizations options including networks, 
-      heatmaps, barcharts, scatter plots and a Manhattan plot (for the gProfiler pipeline only).
+      The Plots tab contains various visualizations options including networks,
+      heatmaps, barcharts and scatter plots.
       The first Tab offers three different network visualizations: <b> (a) Functions Vs Genes </b>,
           <b>(b) Functions Vs Functions</b> and <b>(c)Genes Vs Genes</b>.
           
@@ -980,31 +971,6 @@ generateHelpPlotsScatter <-function(){
         </div>
         </div>
                    ')}
-
-generateHelpPlotsManhattan <- function(){HTML('
-      <div>
-      <div class = "wholeRow">
-        <div class = "helpImage_div">
-           <img src = "help_images/manPlot.png"
-           style = "width: 1200px; border: 1px solid black;"/> 
-        </div>
-      </div>
-       <div class = "wholeRow">
-       <p>
-       A Manhattan plot (available only for gProfiler).
-
-Functional terms are organized according to their chromosomal sequence along the x-axis and colored by their data source.
-The Y-axis implies the significance (-log10Pvalue).
-Hovering over a data point generates a popup window with key information about the functional term such as its id, name and pvalue.
-By selecting a set of points using a lasso or a rectangle, the Manhattan plot will be redrawn showing information about the selected items only.
-Upon selection, the corresponding table will be automatically updated.
-Export options are also supported and the table is also downloadable.
-The plot is fully interactive and one can zoom in and isolate an area of interest.
-        </p>
-        </div>
-        </div>
-                   ')
-}
 
 generateHelpPlotsUpset <- function(){HTML('
       <div>

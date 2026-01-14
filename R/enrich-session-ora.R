@@ -6,20 +6,19 @@
 # Each instance represents one ORA enrichment run and owns ALL its data.
 #
 # Lifecycle:
-# 1. Created by EnrichmentFormSession on submit
+# 1. Created by EnrichmentController on submit
 # 2. execute() runs full enrichment flow:
 #    - Gene conversion
 #    - Strategy execution via toolRegistry
 #    - Result transformation
 #    - DB link attachment
-# 3. insertUI() adds tab to results panel
+# 3. EnrichmentController$insertTab() adds tab to results panel
 # 4. server() sets up observers for plots/tables
 # 5. cleanup() destroys observers when tab closes
 #
 # Data Ownership (Option B - no globals):
 # - Results stored in private$.results (NOT enrichmentResults global)
 # - Background size in private$.backgroundSize
-# - Raw API response in private$.rawApiResponse
 # - Arena edgelists in private$.arenaEdgelists
 #
 # Dependencies:
@@ -141,8 +140,6 @@ ORAEnrichmentSession <- R6::R6Class(
         return(invisible(self))
       }
 
-      # Store raw API response (needed for Manhattan plot)
-      private$.rawApiResponse <- strategyResult$rawResult
       private$.backgroundSize <- strategyResult$backgroundSize
 
       # Step 3: Transform results
@@ -161,10 +158,6 @@ ORAEnrichmentSession <- R6::R6Class(
 
       # Step 6: Store final results
       private$.results <- results
-
-      # TEMPORARY: Also write to global for backwards compatibility with plot code
-      # TODO: Remove this when plot code migrates to OutputSessions (Part 3)
-      enrichmentResults[[self$id]] <<- results
 
       invisible(self)
     },
@@ -216,9 +209,6 @@ ORAEnrichmentSession <- R6::R6Class(
       # Update stored results
       private$.results <- results
 
-      # TEMPORARY: Sync with global for backwards compatibility
-      enrichmentResults[[self$id]] <<- results
-
       # Return original input IDs for no-hit calculation
       return(conversionTable$input)
     },
@@ -231,31 +221,121 @@ ORAEnrichmentSession <- R6::R6Class(
       return(conversionTable$target)
     },
 
-    #' Generate the tab UI content
+    #' Generate the complete tab UI for this session
     #'
-    #' Creates the UI for the enrichment results tab.
-    #' For Part 2, this delegates to existing generateToolPanelContent().
+    #' Creates the entire tab content including Results panel (datasource tabs,
+    #' conversion boxes) and Plots panel (containers for OutputSessions).
+    #' Tracks all output IDs in private$.outputIds for cleanup.
     #'
-    #' @return Shiny UI elements
+    #' @return Shiny UI tagList
     ui = function() {
-      # For Part 2, delegate to existing tab generation
-      # This will be replaced with proper UI in Part 3 (OutputSessions)
-      ns <- shiny::NS(self$id)
+      runKey <- self$id
 
-      # Generate tab content using existing function
-      # NOTE: This is temporary - will be refactored in Part 3
-      generateToolPanelContent(
-        fullRunKey = self$id,
-        runId = self$runId,
-        toolName = self$toolName,
-        uniqueId = self$uniqueId
+      # Initialize output ID tracking
+      private$.outputIds <- list(
+        tables = character(),
+        text = character(),
+        conversion = character()
       )
+
+      # Wrapper div stays as anchor for content replacement
+      shiny::tags$div(
+        id = paste0(runKey, "_content_wrapper"),
+        shiny::tags$div(
+          id = paste0(runKey, "_content"),
+          shiny::tags$br(),
+          private$generateParametersBox(),
+          shiny::tabsetPanel(
+            private$generateResultsPanel(),
+            private$generatePlotsPanel()
+          )
+        )
+      )
+    },
+
+    #' Clear all Shiny outputs owned by this session
+    #'
+    #' Clears result tables, text outputs, and conversion tables.
+    #' Called by cleanup() and when datasources change.
+    #'
+    #' @param output Shiny output object
+    clearOutputs = function(output) {
+      # Clear result tables
+      for (tableId in private$.outputIds$tables) {
+        tryCatch({
+          output[[tableId]] <- DT::renderDataTable(NULL)
+        }, error = function(e) NULL)
+      }
+
+      # Clear text outputs
+      for (textId in private$.outputIds$text) {
+        tryCatch({
+          output[[textId]] <- shiny::renderText("")
+        }, error = function(e) NULL)
+      }
+
+      # Clear conversion tables
+      for (convId in private$.outputIds$conversion) {
+        tryCatch({
+          output[[convId]] <- DT::renderDataTable(NULL)
+        }, error = function(e) NULL)
+      }
+
+      invisible(self)
+    },
+
+    #' Update content when datasources change
+    #'
+    #' Replaces the entire tab content with new UI reflecting new datasources.
+    #' Used when user re-runs enrichment with same parameters except datasources.
+    #'
+    #' @param newParams List. New parameters including updated datasources.
+    #' @param output Shiny output object.
+    #' @param parentSession Shiny session object.
+    updateContent = function(newParams, output, parentSession) {
+      # 1. Clear old outputs
+      self$clearOutputs(output)
+
+      # 2. Reset output ID tracking (old IDs are invalid after content removal)
+      private$.outputIds <- list(
+        tables = character(),
+        text = character(),
+        conversion = character()
+      )
+
+      # 3. Update parameters (datasources changed)
+      self$updateParameters(newParams)
+
+      # 4. Remove old content
+      shiny::removeUI(
+        selector = paste0("#", self$id, "_content"),
+        session = parentSession
+      )
+
+      # 5. Generate and insert new content
+      newContent <- shiny::tags$div(
+        id = paste0(self$id, "_content"),
+        shiny::tags$br(),
+        private$generateParametersBox(),
+        shiny::tabsetPanel(
+          private$generateResultsPanel(),
+          private$generatePlotsPanel()
+        )
+      )
+
+      shiny::insertUI(
+        selector = paste0("#", self$id, "_content_wrapper"),
+        where = "afterBegin",
+        ui = newContent,
+        session = parentSession
+      )
+
+      invisible(self)
     },
 
     #' Set up server logic
     #'
     #' Registers observers for plot generation, table rendering, etc.
-    #' For Part 2, this delegates to existing observer registration.
     #'
     #' @param input Shiny input object
     #' @param output Shiny output object
@@ -275,7 +355,7 @@ ORAEnrichmentSession <- R6::R6Class(
         private$.observers$close <- shiny::observeEvent(
           input[[paste0("close_", self$runId)]],
           {
-            # Trigger cleanup - will be called by EnrichmentFormSession
+            # Trigger cleanup - will be called by EnrichmentController
             # For now, just log
             message(sprintf("Close requested for session: %s", self$id))
           },
@@ -284,10 +364,400 @@ ORAEnrichmentSession <- R6::R6Class(
       })
     },
 
+    #' Render results tables for ORA paradigm
+    #'
+    #' Renders the "All" table and per-datasource tables for ORA enrichment.
+    #' ORA-specific: uses P-value, Enrichment Score, Positive Hits columns.
+    #'
+    #' @param output Shiny output object to render tables into
+    renderResultsTables = function(output) {
+      results <- private$.results
+      runKey <- self$id
+
+      if (is.null(results) || nrow(results) == 0) {
+        return(invisible(self))
+      }
+
+      # Helper function to render a single results table
+      renderSingleTable <- function(shinyOutputId, data, datasource) {
+        if (nrow(data) == 0) return()
+
+        # Format Positive Hits with spaces after commas
+        data$`Positive Hits` <- gsub(",", ", ", data$`Positive Hits`)
+
+        # Show the source tab (use session's own method)
+        self$showSourceTab(datasource)
+
+        # ORA-specific table parameters
+        caption <- "Enrichment Results"
+        fileName <- paste(runKey, datasource, sep = "_")
+        mode <- "Positive Hits"
+        hiddenColumns <- c(10, 11)  # Positive Hits detail, Term_ID_noLinks
+        expandableColumn <- 10
+
+        # Convert Source to factor for dropdown filtering
+        data$Source <- as.factor(data$Source)
+
+        # Render using internal method (encapsulated from func-render.R)
+        private$renderResultsTableInternal(
+          output = output,
+          shinyOutputId = shinyOutputId,
+          data = data,
+          caption = caption,
+          fileName = fileName,
+          mode = mode,
+          hiddenColumns = hiddenColumns,
+          expandableColumn = expandableColumn,
+          filter = 'top'
+        )
+      }
+
+      # Render "All" table
+      shinyOutputId <- paste(runKey, "table_all", sep = "_")
+      renderSingleTable(shinyOutputId, results, "all")
+
+      # Render per-datasource tables
+      params <- private$.parameters
+      datasources <- params$datasources
+      lapply(datasources, function(datasource) {
+        partialId <- as.character(TAB_NAMES[datasource])
+        shinyOutputId <- paste(runKey, "table", partialId, sep = "_")
+        pattern <- paste0("^", datasource, "$")
+        matches <- grepl(pattern, results$Source)
+        filteredResults <- results[matches, ]
+
+        if (nrow(filteredResults) > 0) {
+          renderSingleTable(shinyOutputId, filteredResults, datasource)
+        }
+      })
+
+      invisible(self)
+    },
+
+    #' Create output sessions for plots
+    #'
+    #' Creates OutputSessions for each plot type.
+    #' Uses proper Shiny module pattern - each OutputSession owns its UI and server.
+    #' Call this after the tab is inserted (the container div exists).
+    #' Only called for NEW sessions - for datasources-differ, use refreshOutputSessions().
+    createOutputSessions = function() {
+      # Helper to insert UI into container
+      insertIntoContainer <- function(containerId, sessionUI) {
+        shiny::insertUI(
+          selector = paste0("#", containerId),
+          where = "afterBegin",
+          ui = sessionUI,
+          immediate = TRUE
+        )
+      }
+
+      # Create BarchartOutputSession
+      private$.outputSessions$barchart <- BarchartOutputSession$new(
+        runKey = self$id,
+        enrichSession = self
+      )
+      insertIntoContainer(paste(self$id, "barchart_container", sep = "_"),
+                          private$.outputSessions$barchart$ui())
+      private$.outputSessions$barchart$server()
+
+      # Create ScatterOutputSession
+      private$.outputSessions$scatter <- ScatterOutputSession$new(
+        runKey = self$id,
+        enrichSession = self
+      )
+      insertIntoContainer(paste(self$id, "scatterPlot_container", sep = "_"),
+                          private$.outputSessions$scatter$ui())
+      private$.outputSessions$scatter$server()
+
+      # Create DotPlotOutputSession
+      private$.outputSessions$dotplot <- DotPlotOutputSession$new(
+        runKey = self$id,
+        enrichSession = self
+      )
+      insertIntoContainer(paste(self$id, "dotPlot_container", sep = "_"),
+                          private$.outputSessions$dotplot$ui())
+      private$.outputSessions$dotplot$server()
+
+      # Create Heatmap1OutputSession (Function vs Gene)
+      private$.outputSessions$heatmap1 <- Heatmap1OutputSession$new(
+        runKey = self$id,
+        enrichSession = self
+      )
+      insertIntoContainer(paste(self$id, "heatmap1_container", sep = "_"),
+                          private$.outputSessions$heatmap1$ui())
+      private$.outputSessions$heatmap1$server()
+
+      # Create Heatmap2OutputSession (Function vs Function)
+      private$.outputSessions$heatmap2 <- Heatmap2OutputSession$new(
+        runKey = self$id,
+        enrichSession = self
+      )
+      insertIntoContainer(paste(self$id, "heatmap2_container", sep = "_"),
+                          private$.outputSessions$heatmap2$ui())
+      private$.outputSessions$heatmap2$server()
+
+      # Create Heatmap3OutputSession (Gene vs Gene)
+      private$.outputSessions$heatmap3 <- Heatmap3OutputSession$new(
+        runKey = self$id,
+        enrichSession = self
+      )
+      insertIntoContainer(paste(self$id, "heatmap3_container", sep = "_"),
+                          private$.outputSessions$heatmap3$ui())
+      private$.outputSessions$heatmap3$server()
+
+      # Create Network1OutputSession (Function vs Gene)
+      private$.outputSessions$network1 <- Network1OutputSession$new(
+        runKey = self$id,
+        enrichSession = self
+      )
+      insertIntoContainer(paste(self$id, "network1_container", sep = "_"),
+                          private$.outputSessions$network1$ui())
+      private$.outputSessions$network1$server()
+
+      # Create Network2OutputSession (Function vs Function)
+      private$.outputSessions$network2 <- Network2OutputSession$new(
+        runKey = self$id,
+        enrichSession = self
+      )
+      insertIntoContainer(paste(self$id, "network2_container", sep = "_"),
+                          private$.outputSessions$network2$ui())
+      private$.outputSessions$network2$server()
+
+      # Create Network3OutputSession (Gene vs Gene)
+      private$.outputSessions$network3 <- Network3OutputSession$new(
+        runKey = self$id,
+        enrichSession = self
+      )
+      insertIntoContainer(paste(self$id, "network3_container", sep = "_"),
+                          private$.outputSessions$network3$ui())
+      private$.outputSessions$network3$server()
+    },
+
+    #' Get an output session by type
+    #'
+    #' @param type Character. Output type ("barchart", "scatter", etc.)
+    #' @return OutputSession object or NULL
+    getOutputSession = function(type) {
+      private$.outputSessions[[type]]
+    },
+
+    #' Destroy all output sessions
+    #'
+    #' Cleans up output sessions without destroying the enrichment session itself.
+    #' Used when datasources change - we destroy output sessions, re-execute,
+    #' then recreate output sessions with fresh state.
+    destroyOutputSessions = function() {
+      for (session in private$.outputSessions) {
+        if (!is.null(session)) {
+          tryCatch(session$cleanup(), error = function(e) NULL)
+        }
+      }
+      private$.outputSessions <- list()
+    },
+
+    #' Refresh all output sessions (keep alive, clear state)
+    #'
+    #' Used when datasources change. Unlike destroyOutputSessions(), this keeps
+    #' the sessions alive with their moduleServer bindings intact. It just clears
+    #' their state and rendered outputs, then updates their controls for new data.
+    refreshOutputSessions = function() {
+      for (session in private$.outputSessions) {
+        if (!is.null(session)) {
+          tryCatch({
+            session$clearForRefresh()
+            session$updateControls()
+          }, error = function(e) {
+            cat("[refreshOutputSessions] Error:", conditionMessage(e), "\n")
+          })
+        }
+      }
+    },
+
+    #' Clean up all resources
+    #'
+    #' Destroys output sessions first, clears our outputs, then observers and state.
+    #'
+    #' @param output Shiny output object (optional, for clearing outputs)
+    cleanup = function(output = NULL) {
+      # 1. Clean up OutputSessions (plots) FIRST
+      for (session in private$.outputSessions) {
+        if (!is.null(session)) {
+          tryCatch(session$cleanup(), error = function(e) NULL)
+        }
+      }
+      private$.outputSessions <- list()
+
+      # 2. Clear our own outputs (tables, text) if output provided
+      if (!is.null(output)) {
+        self$clearOutputs(output)
+      }
+
+      # 3. Call parent cleanup (observers, results, arenaEdgelists)
+      super$cleanup()
+    },
+
     #' Check if this session has a background list
     #' @return Logical
     hasBackground = function() {
       !is.null(self$background)
+    },
+
+    # =========================================================================
+    # DISPLAY METHODS (Session owns its display)
+    # =========================================================================
+
+    #' Print run parameters to the UI
+    #'
+    #' Renders the parameters block showing run configuration.
+    #' Session owns its parameters and knows how to display them.
+    #'
+    #' @param listName Character. Name of the input gene list.
+    printParameters = function(listName) {
+      bgSize <- self$getBackgroundSize()
+      bgSizeDisplay <- if (is.null(bgSize)) "Genome-wide (tool default)" else bgSize
+      params <- private$.parameters
+
+      # Get background mode from params (stored during capture)
+      bgMode <- if (!is.null(params$backgroundMode)) params$backgroundMode else "genome"
+
+      # Get datasources from session results
+      results <- private$.results
+      datasourcesDisplay <- if (!is.null(results) && nrow(results) > 0) {
+        paste(unique(results$Source), collapse = ", ")
+      } else {
+        paste(params$datasources, collapse = ", ")
+      }
+
+      parametersOutput <- paste0(
+        "Run: ", self$toolName, " (", self$displayNumber, ")",
+        "\nFile: ", listName,
+        "\nOrganism: ", ORGANISMS[ORGANISMS$taxid == self$organism, ]$print_name,
+        "\nBackground: ", bgMode,
+        "\nBackground size (no. of genes): ", bgSizeDisplay,
+        "\nDatasources: ", datasourcesDisplay,
+        "\nNamespace: ", params$namespace,
+        "\nSignificance metric: ", params$metric,
+        "\nSignificance threshold: ", params$threshold
+      )
+      renderShinyText(paste(self$id, "enrichment_parameters", sep = "_"),
+                      parametersOutput)
+    },
+
+    #' Print no-hit genes to the UI
+    #'
+    #' Finds and displays genes from checkList that were not found
+    #' in any enriched term's Positive Hits.
+    #'
+    #' @param checkList Character vector. Gene IDs to check against results.
+    printNoHitGenes = function(checkList) {
+      results <- private$.results
+      if (is.null(results) || nrow(results) == 0) {
+        private$renderNoHitGenesInternal(checkList)
+        return(invisible(self))
+      }
+
+      # Collect all genes from Positive Hits column
+      allHitGenes <- paste(results$`Positive Hits`, collapse = ",")
+      allHitGenes <- strsplit(allHitGenes, ",")[[1]]
+      allHitGenes <- unique(allHitGenes)
+
+      # Find genes not in any term
+      noHitGenes <- checkList[!checkList %in% allHitGenes]
+      private$renderNoHitGenesInternal(noHitGenes)
+      invisible(self)
+    },
+
+    #' Print unconverted genes to the UI
+    #'
+    #' Displays genes that failed namespace conversion for both
+    #' input list and optional background list.
+    printUnconvertedGenes = function() {
+      convTable <- private$.conversionTable
+      bgConvTable <- private$.backgroundConversionTable
+      origInputs <- private$.input$getIds()
+      origBackground <- if (!is.null(self$background)) self$background$getIds() else NULL
+
+      # Report unconverted input genes
+      inputOutputId <- paste(self$id, "notConverted_input", sep = "_")
+      unconvertedInputs <- origInputs[!origInputs %in% convTable$input]
+      private$renderGeneReportInternal(
+        outputId = inputOutputId,
+        genes = unconvertedInputs,
+        messageTemplate = "%d input item(s) could not be converted to the target namespace:\n%s"
+      )
+
+      # Report unconverted background genes (if provided)
+      refOutputId <- paste(self$id, "notConverted_reference", sep = "_")
+      refDivId <- paste(self$id, "notConverted_reference_div", sep = "_")
+
+      if (!is.null(bgConvTable) && !is.null(origBackground)) {
+        unconvertedBackground <- origBackground[!origBackground %in% bgConvTable$input]
+        private$renderGeneReportInternal(
+          outputId = refOutputId,
+          genes = unconvertedBackground,
+          messageTemplate = "%d reference background item(s) could not be converted to the target namespace:\n%s"
+        )
+        shinyjs::show(refDivId)
+      } else {
+        shinyjs::hide(refDivId)
+      }
+      invisible(self)
+    },
+
+    #' Print conversion tables to the UI
+    #'
+    #' Renders the gene conversion tables for input list and
+    #' optional background list.
+    printConversionTables = function() {
+      inputConversionTable <- private$.conversionTable
+      backgroundConversionTable <- private$.backgroundConversionTable
+
+      # Render input list conversion table
+      shinyOutputId <- paste(self$id, "conversionTable_input", sep = "_")
+      fileName <- paste(self$id, "conversion_table", sep = "_")
+      inputTableCopy <- inputConversionTable
+      colnames(inputTableCopy) <- c("Input", "Target", "Name")
+      renderShinyDataTable(shinyOutputId, inputTableCopy, fileName = fileName)
+
+      # Handle reference background conversion table
+      genomeDivId <- paste(self$id, "conversionTable_genome_div", sep = "_")
+      refDivId <- paste(self$id, "conversionTable_reference_div", sep = "_")
+
+      if (is.null(backgroundConversionTable)) {
+        shinyjs::show(genomeDivId)
+        shinyjs::hide(refDivId)
+      } else {
+        shinyjs::hide(genomeDivId)
+        shinyOutputId <- paste(self$id, "conversionTable_reference", sep = "_")
+        fileName <- paste(self$id, "conversion_table_reference", sep = "_")
+        bgTableCopy <- backgroundConversionTable
+        colnames(bgTableCopy) <- c("Input", "Target", "Name")
+        renderShinyDataTable(shinyOutputId, bgTableCopy, fileName = fileName)
+        shinyjs::show(refDivId)
+      }
+      invisible(self)
+    },
+
+    #' Show a specific datasource tab for this run
+    #'
+    #' @param datasource Character. Datasource code or "all"
+    #' @param parentSession Shiny session for tab operations
+    showSourceTab = function(datasource, parentSession = NULL) {
+      sourcePanelId <- paste(self$id, "sources_panel", sep = "_")
+      sess <- if (!is.null(parentSession)) {
+        parentSession
+      } else {
+        shiny::getDefaultReactiveDomain()
+      }
+      tabTitle <- if (datasource == "all") {
+        "ALL"
+      } else if (datasource == "pubmed") {
+        "PUBMED"
+      } else {
+        datasource
+      }
+      showTab(inputId = sourcePanelId, target = tabTitle, session = sess)
+      invisible(self)
     },
 
     #' Print summary
@@ -311,8 +781,252 @@ ORAEnrichmentSession <- R6::R6Class(
     # Module session reference
     .moduleSession = NULL,
 
+    # Parent Shiny session (for UI operations from output sessions)
+    .parentSession = NULL,
+
+    # Output sessions (BarchartOutputSession, etc.)
+    .outputSessions = list(),
+
     # Background conversion table (separate from input conversion table)
     .backgroundConversionTable = NULL,
+
+    # Output IDs for cleanup tracking
+    .outputIds = list(
+      tables = character(),
+      text = character(),
+      conversion = character()
+    ),
+
+    # =========================================================================
+    # UI GENERATION HELPERS
+    # =========================================================================
+
+    #' Generate the Parameters box
+    generateParametersBox = function() {
+      outputId <- paste(self$id, "enrichment_parameters", sep = "_")
+      private$.outputIds$text <- c(private$.outputIds$text, outputId)
+
+      shinydashboard::box(
+        title = "Parameters",
+        width = NULL,
+        status = "primary",
+        solidHeader = TRUE,
+        collapsible = TRUE,
+        collapsed = TRUE,
+        shiny::verbatimTextOutput(outputId = outputId)
+      )
+    },
+
+    #' Generate the Results panel with datasource tabs
+    generateResultsPanel = function() {
+      runKey <- self$id
+
+      # Get selected datasources from parameters
+      selectedDatasources <- self$getParameters()$datasources
+
+      # Build list of tab codes to create: "all" + selected datasources
+      # TAB_NAMES maps display names (e.g., "GO:MF") to codes (e.g., "gomf")
+      tabCodesToCreate <- c("all")
+      for (ds in selectedDatasources) {
+        if (ds %in% names(TAB_NAMES)) {
+          tabCodesToCreate <- c(tabCodesToCreate, TAB_NAMES[[ds]])
+        }
+      }
+
+      # Generate only the tabs we need
+      sourcesPanel <- do.call(
+        shiny::tabsetPanel, c(
+          id = paste(runKey, "sources_panel", sep = "_"),
+          lapply(tabCodesToCreate, function(tabName) {
+            private$generateDatasourceTab(tabName)
+          })
+        )
+      )
+
+      # Track text output IDs
+      genesNotFoundId <- paste(runKey, "genesNotFound", sep = "_")
+      notConvertedInputId <- paste(runKey, "notConverted_input", sep = "_")
+      notConvertedRefId <- paste(runKey, "notConverted_reference", sep = "_")
+      private$.outputIds$text <- c(private$.outputIds$text,
+                                    genesNotFoundId, notConvertedInputId, notConvertedRefId)
+
+      # Track conversion table IDs
+      convInputId <- paste(runKey, "conversionTable_input", sep = "_")
+      convRefId <- paste(runKey, "conversionTable_reference", sep = "_")
+      private$.outputIds$conversion <- c(private$.outputIds$conversion,
+                                          convInputId, convRefId)
+
+      shiny::tabPanel(
+        title = "Results",
+        icon = shiny::icon("table"),
+        shiny::tags$div(
+          id = paste(runKey, "resultsDiv", sep = "_"),
+          class = "enrichmentResultsDiv",
+          shiny::tags$br(),
+          sourcesPanel
+        ),
+        shiny::tags$br(),
+        shiny::tags$div(
+          id = paste(runKey, "conversionBoxes", sep = "_"),
+          style = "display: none;",
+          shinydashboard::box(
+            title = "Conversion Table",
+            width = NULL,
+            status = "primary",
+            solidHeader = TRUE,
+            collapsible = TRUE,
+            collapsed = TRUE,
+            shiny::tabsetPanel(
+              shiny::tabPanel("Input List",
+                              DT::dataTableOutput(convInputId)),
+              shiny::tabPanel("Reference Background",
+                              shiny::div(id = paste(runKey, "conversionTable_genome_div", sep = "_"),
+                                         shiny::h3("No custom background was submitted by the user, the entire selected genome was used instead.")),
+                              shiny::div(id = paste(runKey, "conversionTable_reference_div", sep = "_"),
+                                         style = "display:none",
+                                         DT::dataTableOutput(convRefId)))
+            )
+          ),
+          shinydashboard::box(
+            title = "Unconverted Inputs",
+            class = "conversionBox",
+            width = NULL,
+            status = "primary",
+            solidHeader = TRUE,
+            collapsible = TRUE,
+            collapsed = TRUE,
+            shiny::verbatimTextOutput(notConvertedInputId),
+            shiny::tags$hr(),
+            shiny::div(id = paste(runKey, "notConverted_reference_div", sep = "_"),
+                       style = "display:none",
+                       shiny::verbatimTextOutput(notConvertedRefId))
+          )
+        ),
+        shinydashboard::box(
+          title = "No-hit Inputs",
+          class = "conversionBox",
+          width = NULL,
+          status = "primary",
+          solidHeader = TRUE,
+          collapsible = TRUE,
+          collapsed = TRUE,
+          shiny::verbatimTextOutput(genesNotFoundId)
+        )
+      )
+    },
+
+    #' Generate a single datasource tab
+    generateDatasourceTab = function(tabName) {
+      tableId <- paste(self$id, "table", tabName, sep = "_")
+      private$.outputIds$tables <- c(private$.outputIds$tables, tableId)
+
+      shiny::tabPanel(
+        title = names(TAB_NAMES[TAB_NAMES == tabName]),
+        shiny::tags$br(),
+        DT::dataTableOutput(tableId)
+      )
+    },
+
+    #' Generate the Plots panel with OutputSession containers
+    #'
+    #' Creates tabs for: Barchart, Dot Plot, Scatter Plot, Heatmap (3 sub-tabs),
+    #' Network (3 sub-tabs). No external config - method is source of truth.
+    generatePlotsPanel = function() {
+      runKey <- self$id
+      uiTermKeyword <- stringr::str_to_title(
+        UI_TERM_KEYWORD[[self$enrichmentType]]
+      )
+
+      shiny::tabPanel(
+        title = "Plots",
+        icon = shiny::icon("chart-bar"),
+        shiny::tabsetPanel(
+          # Barchart tab
+          shiny::tabPanel(
+            title = "Barchart",
+            shiny::tags$br(),
+            shiny::tags$div(
+              id = paste(runKey, "barchart_container", sep = "_"),
+              class = "output-session-container"
+            )
+          ),
+          # Dot Plot tab
+          shiny::tabPanel(
+            title = "Dot Plot",
+            shiny::tags$br(),
+            shiny::tags$div(
+              id = paste(runKey, "dotPlot_container", sep = "_"),
+              class = "output-session-container"
+            )
+          ),
+          # Scatter Plot tab
+          shiny::tabPanel(
+            title = "Scatter Plot",
+            shiny::tags$br(),
+            shiny::tags$div(
+              id = paste(runKey, "scatterPlot_container", sep = "_"),
+              class = "output-session-container"
+            )
+          ),
+          # Heatmap tab with 3 sub-tabs
+          shiny::tabPanel(
+            title = "Heatmap",
+            shiny::tags$br(),
+            shiny::tabsetPanel(
+              shiny::tabPanel(
+                title = paste0(uiTermKeyword, " Vs Genes"),
+                shiny::tags$div(
+                  id = paste(runKey, "heatmap1_container", sep = "_"),
+                  class = "output-session-container"
+                )
+              ),
+              shiny::tabPanel(
+                title = paste0(uiTermKeyword, " Vs ", uiTermKeyword),
+                shiny::tags$div(
+                  id = paste(runKey, "heatmap2_container", sep = "_"),
+                  class = "output-session-container"
+                )
+              ),
+              shiny::tabPanel(
+                title = "Genes Vs Genes",
+                shiny::tags$div(
+                  id = paste(runKey, "heatmap3_container", sep = "_"),
+                  class = "output-session-container"
+                )
+              )
+            )
+          ),
+          # Network tab with 3 sub-tabs
+          shiny::tabPanel(
+            title = "Network",
+            shiny::tags$br(),
+            shiny::tabsetPanel(
+              shiny::tabPanel(
+                title = paste0(uiTermKeyword, " Vs Genes"),
+                shiny::tags$div(
+                  id = paste(runKey, "network1_container", sep = "_"),
+                  class = "output-session-container"
+                )
+              ),
+              shiny::tabPanel(
+                title = paste0(uiTermKeyword, " Vs ", uiTermKeyword),
+                shiny::tags$div(
+                  id = paste(runKey, "network2_container", sep = "_"),
+                  class = "output-session-container"
+                )
+              ),
+              shiny::tabPanel(
+                title = "Genes Vs Genes",
+                shiny::tags$div(
+                  id = paste(runKey, "network3_container", sep = "_"),
+                  class = "output-session-container"
+                )
+              )
+            )
+          )
+        )
+      )
+    },
 
     #' Convert gene IDs to tool-specific format
     #'
@@ -322,7 +1036,7 @@ ORAEnrichmentSession <- R6::R6Class(
     convertGeneIds = function(geneList, namespace) {
       # Determine default namespace if not specified
       if (is.null(namespace) || namespace == "Default namespace") {
-        namespace <- private$getDefaultTargetNamespace()
+        namespace <- getDefaultTargetNamespace(self$toolName, self$organism)
       }
 
       conversionTable <- tryCatch({
@@ -365,25 +1079,8 @@ ORAEnrichmentSession <- R6::R6Class(
       conversionTable
     },
 
-    #' Get default target namespace for this tool
-    getDefaultTargetNamespace = function() {
-      shortName <- ORGANISMS[ORGANISMS$taxid == self$organism, ]$short_name
-      switch(
-        self$toolName,
-        "STRING" = "ENSP",
-        "gProfiler" = "USERINPUT",
-        "WebGestalt" = "ENTREZGENE_ACC",
-        "PANTHER" = "PANTHER_ACC",
-        "GeneCodis" = "USERINPUT",
-        "enrichR" = {
-          if (shortName == "scerevisiae" || shortName == "dmelanogaster")
-            "USERINPUT"
-          else
-            "ENTREZGENE"
-        },
-        "USERINPUT"  # Default fallback
-      )
-    },
+    # getDefaultTargetNamespace REMOVED - use global function from enrich-main.R
+    # Called as: getDefaultTargetNamespace(self$toolName, self$organism)
 
     #' STRING-specific gene conversion via STRING API
     stringConvert = function(geneList) {
@@ -556,6 +1253,115 @@ ORAEnrichmentSession <- R6::R6Class(
         )
       }
       df
+    },
+
+    # -------------------------------------------------------------------------
+    # Display Helpers (encapsulated from enrich-main.R)
+    # -------------------------------------------------------------------------
+
+    #' Render gene report text
+    #'
+    #' Helper for displaying gene lists with counts.
+    #'
+    #' @param outputId Shiny output ID
+    #' @param genes Character vector of genes
+    #' @param messageTemplate sprintf template with %d and %s placeholders
+    renderGeneReportInternal = function(outputId, genes, messageTemplate) {
+      count <- length(genes)
+      if (count > 0) {
+        geneList <- paste(genes, collapse = ", ")
+        message <- sprintf(messageTemplate, count, geneList)
+        renderShinyText(outputId, message)
+      } else {
+        renderShinyText(outputId, "-")
+      }
+    },
+
+    #' Render no-hit genes display
+    #'
+    #' Displays genes not found in any enriched term.
+    #'
+    #' @param noHitGenes Character vector of genes
+    renderNoHitGenesInternal = function(noHitGenes) {
+      shinyOutputId <- paste(self$id, "genesNotFound", sep = "_")
+      private$renderGeneReportInternal(
+        outputId = shinyOutputId,
+        genes = noHitGenes,
+        messageTemplate = "%d input item(s) not found in any result term:\n%s"
+      )
+    },
+
+    # -------------------------------------------------------------------------
+    # Results Table Rendering (encapsulated from func-render.R)
+    # -------------------------------------------------------------------------
+
+    #' Render enrichment results table with expandable rows
+    #'
+    #' Renders a DT table with expandable rows for ORA results.
+    #' Encapsulated from func-render.R:renderEnrichmentTable().
+    #'
+    #' @param output Shiny output object
+    #' @param shinyOutputId Output ID to render to
+    #' @param data Data frame to render
+    #' @param caption Table caption
+    #' @param fileName Base filename for exports
+    #' @param mode Label for expandable content (e.g., "Positive Hits")
+    #' @param hiddenColumns Column indices to hide (0-indexed after expand column)
+    #' @param expandableColumn Column index containing expandable content
+    #' @param filter DT filter type ("none", "top", "bottom")
+    #' @param exportExcludeColumns Columns to exclude from export
+    renderResultsTableInternal = function(output, shinyOutputId, data, caption, fileName,
+                                           mode, hiddenColumns, expandableColumn,
+                                           filter = 'none', exportExcludeColumns = c(0, 11)) {
+      output[[shinyOutputId]] <- DT::renderDataTable({
+        tableData <- cbind(' ' = '&oplus;', data)
+
+        dt <- DT::datatable(
+          tableData,
+          escape = FALSE,
+          rownames = FALSE,
+          selection = 'none',
+          filter = filter,
+          extensions = c('Buttons'),
+          caption = caption,
+          options = list(
+            scrollX = TRUE,
+            "dom" = 'T<"clear">lBfrtip',
+            buttons = createExportButtons(fileName, exportExcludeColumns),
+            columnDefs = list(
+              list(visible = FALSE, targets = hiddenColumns),
+              list(orderable = FALSE, searchable = FALSE,
+                   className = 'details-control', targets = 0)
+            ),
+            initComplete = htmlwidgets::JS(
+              "function(settings, json) {",
+              "  $(this.api().table().container()).find('thead tr:eq(1) td:eq(0)').find('input,select').hide();",
+              "}"
+            )
+          ),
+          callback = htmlwidgets::JS(paste0(
+            "table.column(0).nodes().to$().css({cursor: 'pointer'});
+            let format = function(d) {
+              return '<div style=\"background-color:#eee; padding: .5em;\"> <b>", mode, ":</b> ' +
+                      d[", expandableColumn, "] + '</div>';
+            };
+            table.on('click', 'td.details-control', function() {
+              let td = $(this), row = table.row(td.closest('tr'));
+              if (row.child.isShown()) {
+                row.child.hide();
+                td.html('&oplus;');
+              } else {
+                row.child(format(row.data())).show();
+                td.html('&CircleMinus;');
+              }
+            });"
+          ))
+        )
+
+        # Format P-value column to show 3 significant figures
+        dt <- DT::formatSignif(dt, columns = 'P-value', digits = 3)
+        dt
+      }, server = FALSE)
     }
   )
 )

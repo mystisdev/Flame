@@ -2,6 +2,9 @@
 # Enrichment Types Configuration
 # ============================================================================
 
+# Default enrichment tool for form
+DEFAULT_TOOL <- "STRING"
+
 # Central registry for enrichment type behavior and capabilities.
 # This enables config-driven architecture for multi-run enrichment handling.
 #
@@ -22,7 +25,7 @@ ENRICHMENT_TYPES_CONFIG <- list(
     tabsetPanelId = "toolTabsPanel",
     resultsPanelId = "functionalEnrichmentResultsPanel",
     # NOTE: clearButtonId uses namespaced ID format: {moduleId}-{inputId}
-    # The EnrichmentFormSession uses ModuleIds$ENRICH_FORM = "enrich_form"
+    # The EnrichmentController uses ModuleIds$ENRICH_FORM = "enrich_form"
     clearButtonId = "enrich_form-enrichment_all_clear",
     closeEvent = "closeRunTab",
 
@@ -31,11 +34,8 @@ ENRICHMENT_TYPES_CONFIG <- list(
     tools = c("gProfiler", "WebGestalt", "enrichR", "PANTHER", "GeneCodis"),
 
     # Logic Flags
-    supportsCombination = TRUE,
-    hasManhattanPlot = TRUE,  # gProfiler-specific
-
-    # Tab Content Generator
-    generateTabContent = "generateToolPanelForRun"
+    supportsCombination = TRUE
+    # generateTabContent REMOVED - UI generation now owned by ORAEnrichmentSession.ui()
   )
 
   # FUTURE: Add GSEA without modifying existing code
@@ -50,7 +50,6 @@ ENRICHMENT_TYPES_CONFIG <- list(
   #   datasources = c("GO", "KEGG", "REACTOME"),
   #   tools = c("fgsea", "clusterProfiler"),
   #   supportsCombination = TRUE,
-  #   hasManhattanPlot = FALSE,
   #   requiresRanking = TRUE,
   #   rankingMetrics = c("log2FC", "stat", "pvalue"),
   #   generateTabContent = "generateToolPanelForGseaRun"
@@ -105,4 +104,31 @@ supportsCombination <- function(type) {
 #' @return Character vector of registered type IDs
 getEnrichmentTypes <- function() {
   return(names(ENRICHMENT_TYPES_CONFIG))
+}
+
+#' Get Default Target Namespace for a Tool
+#'
+#' Returns the appropriate gene ID namespace for each enrichment tool.
+#' Used during parameter matching before a session is created, and
+#' by ORAEnrichmentSession for gene ID conversion.
+#'
+#' @param toolName Character. The enrichment tool name.
+#' @param organism Integer. The organism taxid.
+#' @return Character. The namespace string (e.g., "ENSP", "ENTREZGENE")
+getDefaultTargetNamespace <- function(toolName, organism) {
+  shortName <- ORGANISMS[ORGANISMS$taxid == organism, ]$short_name
+  switch(
+    toolName,
+    "STRING" = "ENSP",
+    "gProfiler" = "USERINPUT",
+    "WebGestalt" = "ENTREZGENE_ACC",
+    "PANTHER" = "PANTHER_ACC",
+    "GeneCodis" = "USERINPUT",
+    "enrichR" = {
+      if (shortName == "scerevisiae" || shortName == "dmelanogaster")
+        "USERINPUT"
+      else
+        "ENTREZGENE"
+    }
+  )
 }

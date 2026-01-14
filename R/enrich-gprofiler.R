@@ -21,39 +21,6 @@ mapWPIds <- function(df) {
   return(df)
 }
 
-# Check if gProfiler result is valid for a given run
-isGprofilerResultValid <- function(runKey = NULL) {
-  # Check per-run cache first (multi-run architecture)
-  if (!is.null(runKey) && !is.null(gprofilerResults[[runKey]])) {
-    result <- gprofilerResults[[runKey]]
-    return(!is.null(result) && length(result) > 0)
-  }
-  # Fallback to legacy global (backward compatibility)
-  return(!is.null(gprofilerResult) && length(gprofilerResult) > 0)
-}
-
-getGprofilerBackgroundSize <- function(runKey = NULL) {
-  # Check per-run cache first (multi-run architecture)
-  if (!is.null(runKey) && !is.null(gprofilerResults[[runKey]])) {
-    result <- gprofilerResults[[runKey]]
-  } else {
-    # Fallback to legacy global
-    result <- gprofilerResult
-  }
-
-  if (!is.null(result) && length(result) > 0) {
-    metadata <- result$meta$result_metadata
-    bsizes <- lapply(names(metadata), function(i) {
-      return(metadata[[i]]$domain_size)
-    })
-    size <- max(unlist(bsizes))
-  } else {
-    size <- NULL
-  }
-  return(size)
-}
-
-
 # =============================================================================
 # GProfilerStrategy - Tool Strategy Implementation
 # =============================================================================
@@ -119,8 +86,7 @@ GProfilerStrategy <- R6::R6Class("GProfilerStrategy",
       # Return structured result (no global writes)
       return(list(
         result = private$parseResult(result),
-        backgroundSize = backgroundSize,
-        rawResult = result  # For Manhattan plot
+        backgroundSize = backgroundSize
       ))
     },
 

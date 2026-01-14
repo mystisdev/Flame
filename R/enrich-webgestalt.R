@@ -104,8 +104,7 @@ WebGestaltStrategy <- R6::R6Class("WebGestaltStrategy",
       # Return structured result (no global writes)
       return(list(
         result = result,
-        backgroundSize = backgroundSize,
-        rawResult = NULL
+        backgroundSize = backgroundSize
       ))
     },
 

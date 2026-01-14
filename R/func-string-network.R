@@ -5,7 +5,8 @@
 # Stateless wrappers for STRING-db.org network API calls.
 # Used by NetworkAnalysisSession.
 #
-# Note: stringPOSTConvertENSP() remains in enrich-main.R (shared with enrichment)
+# Note: Gene ID conversion is now a private method in NetworkAnalysisSession
+# (convertToStringIds) - no longer shared with enrichment.
 #
 # =============================================================================
 

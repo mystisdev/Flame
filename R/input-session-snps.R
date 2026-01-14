@@ -8,7 +8,6 @@
 # - input-session-base.R (for InputSession)
 # - input-analytelist-registry.R (for AnalyteListRegistry)
 # - func-gsnpense.R (for gsnpense_convert)
-# - func-links.R (for attachVariantTableLinks)
 #
 # =============================================================================
 
@@ -311,7 +310,7 @@ SNPsInputSession <- R6::R6Class(
         result_formatted <- subset(result,
                                    select = c(rs_id, gene_names, ensgs, chromosome,
                                               start, end, strand, effect))
-        result_formatted <- attachVariantTableLinks(result_formatted)
+        result_formatted <- private$attachVariantTableLinks(result_formatted)
         names(result_formatted) <- c("SNP", "Gene", "ENSEMBL ID", "Chromosome",
                                      "Start", "End", "Strand", "Effect Type")
         output$snpViewer <- DT::renderDataTable(
@@ -331,6 +330,32 @@ SNPsInputSession <- R6::R6Class(
         )
         private$.currentVariantResults <- result
       }
+    },
+
+    # Attach database links to variant results (Ensembl and dbSNP)
+    attachVariantTableLinks = function(df) {
+      df$rs_id_noLinks <- df$rs_id
+      df$ensgs_noLinks <- df$ensgs
+      df$ensgs[grep("^ENS", df$ensgs_noLinks)] <-
+        paste0(
+          "<a href='",
+          sprintf('https://www.ensembl.org/id/%s',
+                  df$ensgs_noLinks[grep("^ENS", df$ensgs_noLinks)]),
+          "' target = '_blank'>",
+          df$ensgs_noLinks[grep("^ENS", df$ensgs_noLinks)],
+          "</a>"
+        )
+      df$rs_id[grep("^rs", df$rs_id_noLinks)] <-
+        paste0(
+          "<a href='",
+          sprintf('https://www.ncbi.nlm.nih.gov/snp/%s',
+                  df$rs_id_noLinks[grep("^rs", df$rs_id_noLinks)]),
+          "' target = '_blank'>",
+          df$rs_id_noLinks[grep("^rs", df$rs_id_noLinks)],
+          "</a>"
+        )
+      df <- subset(df, select = -c(rs_id_noLinks, ensgs_noLinks))
+      return(df)
     },
 
     isInputNotEmpty = function(inputVal) {

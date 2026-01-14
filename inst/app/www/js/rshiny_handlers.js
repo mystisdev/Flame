@@ -1,57 +1,3 @@
-const hideSourceTabs = (prefix, retryCount = 0) => {
-  const elementId = prefix.concat("_sources_panel");
-  const element = document.getElementById(elementId);
-  if (!element) {
-    // Element not ready yet (DOM not updated), retry after a short delay
-    if (retryCount < 10) {
-      setTimeout(() => hideSourceTabs(prefix, retryCount + 1), 100);
-      return false;
-    }
-    return false;
-  }
-  // Find the nav tabs (ul element) inside the sources panel
-  const navTabs = element.querySelector("ul.nav-tabs");
-  if (!navTabs) {
-    // Try retrying in case the inner structure isn't ready
-    if (retryCount < 10) {
-      setTimeout(() => hideSourceTabs(prefix, retryCount + 1), 100);
-      return false;
-    }
-    return false;
-  }
-  const navbar_li_children = navTabs.children;
-  for (let i = 0; i < navbar_li_children.length; i++){
-    navbar_li_children[i].style.display = "none";
-  }
-  return true;
-};
-
-const showSourceTab = (args, retryCount = 0) => {
-  const { prefix, tabPosition } = args;
-  const elementId = prefix.concat("_sources_panel");
-  const element = document.getElementById(elementId);
-  if (!element) {
-    if (retryCount < 10) {
-      setTimeout(() => showSourceTab(args, retryCount + 1), 100);
-      return false;
-    }
-    return false;
-  }
-  const navTabs = element.querySelector("ul.nav-tabs");
-  if (!navTabs) {
-    if (retryCount < 10) {
-      setTimeout(() => showSourceTab(args, retryCount + 1), 100);
-      return false;
-    }
-    return false;
-  }
-  const tabLi = navTabs.children[tabPosition];
-  if (tabLi) {
-    tabLi.style.display = "inline-block";
-  }
-  return true;
-};
-
 const browseUrl = url => {
   window.open(url, "_blank");
 };
@@ -141,8 +87,6 @@ const updateCharCount = (data) => {
 
 Shiny.addCustomMessageHandler("handler_showRenameError", showRenameError);
 Shiny.addCustomMessageHandler("handler_updateCharCount", updateCharCount);
-Shiny.addCustomMessageHandler("handler_hideSourceTabs", hideSourceTabs);
-Shiny.addCustomMessageHandler("handler_showSourceTab", showSourceTab);
 Shiny.addCustomMessageHandler("handler_browseUrl", browseUrl);
 Shiny.addCustomMessageHandler("handler_pulseUpsetTab", pulseUpsetTab);
 Shiny.addCustomMessageHandler("handler_pulseTab", pulseTab);

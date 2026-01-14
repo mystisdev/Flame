@@ -9,7 +9,6 @@
 # - input-analytelist-unranked.R (for UnrankedAnalyteList)
 # - infrastructure-config.R (for AnalyteType)
 # - func-string-network.R (for API wrappers)
-# - enrich-main.R (for stringPOSTConvertENSP)
 #
 # =============================================================================
 
@@ -272,6 +271,31 @@ NetworkAnalysisSession <- R6::R6Class(
     .networkData = NULL,
 
     # =========================================================================
+    # STRING API METHODS
+    # =========================================================================
+
+    #' Convert gene IDs to STRING ENSP format via STRING API
+    #'
+    #' @param geneList Character vector of gene identifiers
+    #' @param taxid STRING taxonomy ID for the organism
+    #' @return Data frame with input/target/name columns, or NULL on failure
+    convertToStringIds = function(geneList, taxid) {
+      url <- "https://string-db.org/api/json/get_string_ids"
+      params <- list(
+        "identifiers" = paste0(geneList, collapse = "%0d"),
+        "species" = taxid
+      )
+      request <- httr::POST(url, body = params)
+      if (isPOSTResponseValid(request)) {
+        result <- jsonlite::fromJSON(rawToChar(httr::content(request, "raw")))
+        result <- result[, c("queryItem", "stringId", "preferredName")]
+        colnames(result) <- c("input", "target", "name")
+        return(result)
+      }
+      NULL
+    },
+
+    # =========================================================================
     # HANDLER METHODS
     # =========================================================================
 
@@ -435,7 +459,7 @@ NetworkAnalysisSession <- R6::R6Class(
 
     parseInputsForRequest = function(selectedListItems, string_taxid) {
       # Convert to STRING ENSP format
-      conversionResult <- stringPOSTConvertENSP(selectedListItems, string_taxid)
+      conversionResult <- private$convertToStringIds(selectedListItems, string_taxid)
       if (is.null(conversionResult)) {
         return(NULL)
       }

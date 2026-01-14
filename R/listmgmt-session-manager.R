@@ -7,7 +7,7 @@
 #
 # Dependencies:
 # - input-analytelist-registry.R (for AnalyteListRegistry)
-# - func-general.R (for renderModal, removeModal, renderWarning, renderError)
+# - aaa-utilities.R (for renderModal, renderWarning, renderError)
 #
 # Note: Module ID is defined in infrastructure-config.R (ModuleIds):
 # - ModuleIds$LISTMGMT_MANAGER

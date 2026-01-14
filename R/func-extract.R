@@ -11,7 +11,7 @@
 # - httr package (for HTTP requests)
 # - httpuv package (for URL encoding)
 # - data.table package (for parsing TSV responses)
-# - func-general.R (for isPOSTResponseValid)
+# - aaa-utilities.R (for isPOSTResponseValid)
 #
 # =============================================================================
 

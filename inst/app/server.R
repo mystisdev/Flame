@@ -39,23 +39,20 @@ function(input, output, session) {
   source(file.path(pkgRoot, "R", "utilities-session-network.R"), local = TRUE)
 
   # Source configuration files (letter prefixes ensure correct load order)
-  source(file.path(pkgRoot, "R", "config-a-global_settings.R"), local = TRUE)
+  # config-a DELETED - shiny option moved to run_app.R
   source(file.path(pkgRoot, "R", "config-b-global_variables.R"), local = TRUE)
   source(file.path(pkgRoot, "R", "config-c-enrichment_types.R"), local = TRUE)
   source(file.path(pkgRoot, "R", "config-d-server_variables.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "config-e-static_variables.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "config-f-ui_variables.R"), local = TRUE)
+  # config-e DELETED - was only migration documentation
+  # config-f DELETED - constants moved to their owning classes
 
   # Source core functions
-  source(file.path(pkgRoot, "R", "func-general.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "func-init.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "func-render.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "func-update.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "func-reset.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "func-runs.R"), local = TRUE)
-  # Note: func-run.R deleted in Part 2 refactoring (replaced by enrich-session-ora.R)
+  source(file.path(pkgRoot, "R", "aaa-utilities.R"), local = TRUE)
+  # func-init.R DELETED - initializeDatasources() moved to config-d, hide calls inlined
+  # func-reset.R DELETED - was only comments
+  # func-runs.R DELETED - parseFullRunKey() removed (sessions own their identity)
   source(file.path(pkgRoot, "R", "core-tool_registry.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "func-observers.R"), local = TRUE)
+  # func-observers.R DELETED - all observers now handled by OutputSession classes
 
   # Source input functions
   # Note: input-main.R replaced by ListInputSession
@@ -69,12 +66,20 @@ function(input, output, session) {
   # Source enrichment session classes (in dependency order)
   source(file.path(pkgRoot, "R", "enrich-session-registry.R"), local = TRUE)
   source(file.path(pkgRoot, "R", "enrich-session-base.R"), local = TRUE)
+  # Output sessions must be sourced BEFORE ORAEnrichmentSession (which creates them)
+  source(file.path(pkgRoot, "R", "output-session-base.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "output-session-barchart.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "output-session-scatter.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "output-session-dotplot.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "output-session-heatmap.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "output-session-network.R"), local = TRUE)
   source(file.path(pkgRoot, "R", "enrich-session-ora.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "enrich-form.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "enrich-session-combination.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "enrich-controller.R"), local = TRUE)
 
   # Source enrichment functions
   source(file.path(pkgRoot, "R", "enrich-inputs_panel.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "enrich-main.R"), local = TRUE)
+  # enrich-main.R REMOVED - functions moved to ORAEnrichmentSession and EnrichmentController
   source(file.path(pkgRoot, "R", "enrich-general.R"), local = TRUE)
   source(file.path(pkgRoot, "R", "enrich-gprofiler.R"), local = TRUE)
   source(file.path(pkgRoot, "R", "enrich-webgestalt.R"), local = TRUE)
@@ -82,30 +87,17 @@ function(input, output, session) {
   source(file.path(pkgRoot, "R", "enrich-string.R"), local = TRUE)
   source(file.path(pkgRoot, "R", "enrich-panther.R"), local = TRUE)
   source(file.path(pkgRoot, "R", "enrich-genecodis.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "enrich-combination.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "func-links.R"), local = TRUE)
+  # enrich-combination.R REMOVED - replaced by CombinationSession
 
-  # Source plot functions
-  source(file.path(pkgRoot, "R", "plot-general.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "plot-networks.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "plot-heatmaps.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "plot-barchart.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "plot-scatter.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "plot-dotplot.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "plot-manhattan.R"), local = TRUE)
+  # Note: All plot-*.R files REMOVED - now handled by OutputSession classes
   source(file.path(pkgRoot, "R", "func-arena.R"), local = TRUE)
 
   # Source remaining functions
   # Note: func-stringNetwork.R replaced by NetworkAnalysisSession
   # Note: func-conversion.R replaced by ConversionSession/OrthologySession
-  source(file.path(pkgRoot, "R", "func-tabGeneration.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "func-registry.R"), local = TRUE)
-
-  # Output Registry for cleanup management (per-session)
-  outputRegistry <- OutputRegistry$new()
-
-  # Observer Registry for cleanup management (per-session)
-  observerRegistry <- ObserverRegistry$new()
+  # func-tabGeneration.R DELETED - UI generation moved to ORAEnrichmentSession.ui()
+  # func-registry.R DELETED - OutputRegistry/ObserverRegistry no longer needed
+  # Sessions now track their own outputs and observers
 
   # AnalyteList Registry for managing input lists (per-session)
   # Must be created in reactive context (server function)
@@ -161,13 +153,20 @@ function(input, output, session) {
   networkSession <- NetworkAnalysisSession$new(ModuleIds$UTILITIES_NETWORK, analyteListRegistry)
   networkSession$server(input, session)
 
-  # Enrichment Form Session - manages enrichment form and creates run sessions
-  enrichmentFormSession <- EnrichmentFormSession$new(
+  # Enrichment Controller - manages enrichment form and creates run sessions
+  enrichmentController <- EnrichmentController$new(
     ModuleIds$ENRICH_FORM,
     enrichmentSessionRegistry,
     analyteListRegistry
   )
-  enrichmentFormSession$server(input, output, session)
+  enrichmentController$server(session)
+
+  # Combination Session - manages combination tab for comparing enrichment runs
+  combinationSession <- CombinationSession$new(enrichmentSessionRegistry)
+  combinationSession$server(input, output, session)
+
+  # Connect EnrichmentController to CombinationSession (deferred to avoid circular deps)
+  enrichmentController$setCombinationSession(combinationSession)
 
   # Clean up all session objects when the Shiny session ends
   # Order: dependent sessions first, then sessions they depend on
@@ -182,7 +181,8 @@ function(input, output, session) {
     conversionSession$cleanup()
     orthologySession$cleanup()
     networkSession$cleanup()
-    enrichmentFormSession$cleanup()
+    combinationSession$cleanup()
+    enrichmentController$cleanup()
     analyteListManager$cleanup()
   })
 
@@ -204,15 +204,11 @@ function(input, output, session) {
     # Get list names reactively - this will re-run when registry changes
     listNames <- analyteListRegistry$getNamesReactive()
 
-    # BACKWARD COMPATIBILITY: Sync registry to userInputLists for code that
-    # hasn't been migrated yet (plot handlers, etc.)
-    # This will be removed once all code is migrated to use the registry directly.
-    userInputLists <<- lapply(analyteListRegistry$getAll(), function(analyteList) {
-      analyteList$toDataFrame()
-    })
+    # NOTE: userInputLists sync REMOVED - was never read, only written
+    # All code now uses analyteListRegistry directly
 
-    # Update enrichment form selectors (now handled by EnrichmentFormSession)
-    enrichmentFormSession$updateFileChoices(listNames)
+    # Update enrichment form selectors (now handled by EnrichmentController)
+    enrichmentController$updateFileChoices(listNames)
 
     # Update utility selectors (preserving current selection if still valid)
     updateSelectPreserving("selectUpset", listNames)
@@ -223,8 +219,10 @@ function(input, output, session) {
     # UpSet tab visibility is now managed by AnalyteListSetOperationsSession
   })
 
-  # Initialize server app
-  initializeServerApp()
+  # Initialize server app - hide enrichment results panel until first run
+  # (was func-init.R, now inlined)
+  shinyjs::hide("functionalEnrichmentResultsPanel")
+  hideTab(inputId = "toolTabsPanel", target = "Combination")
 
   # Welcome page observers
   observeEvent(input$link_to_fileinput, {
@@ -249,21 +247,26 @@ function(input, output, session) {
   # 2D Reduction observers are now handled by ReductionInputSession
   # (see reductionInputSession$server() call above)
 
-  # ENRICHMENT observers are now handled by EnrichmentFormSession
-  # (see enrichmentFormSession$server() call above)
+  # ENRICHMENT observers are now handled by EnrichmentController
+  # (see enrichmentController$server() call above)
   # This includes: organism cascade, tool cascade, file change, background mode,
   # submit button, and clear all button.
 
   # Close individual run tab (via X button)
   # NOTE: This remains here because it's triggered by the tab close button,
-  # not by the form. The clear all button is handled by EnrichmentFormSession.
+  # not by the form. The clear all button is handled by EnrichmentController.
   observeEvent(input$closeRunTab, {
     runId <- input$closeRunTab
     fullRunKey <- paste("functional", runId, sep = "_")
-    toolName <- parseFullRunKey(fullRunKey)$toolName
-    clearEnrichmentRun(fullRunKey)
+
+    # Get toolName from session (not by parsing the key string)
+    enrichSession <- enrichmentSessionRegistry$get(fullRunKey)
+    toolName <- if (!is.null(enrichSession)) enrichSession$toolName else NULL
+
+    enrichmentController$clearRun(fullRunKey)
+
     # Use registry for counting
-    if (enrichmentSessionRegistry$countByTool(toolName) == 0) {
+    if (!is.null(toolName) && enrichmentSessionRegistry$countByTool(toolName) == 0) {
       enrichmentSessionRegistry$resetDisplayCounter(toolName)
     }
     if (enrichmentSessionRegistry$count() == 0) {
@@ -271,110 +274,16 @@ function(input, output, session) {
       # Hide the clear all button using the namespaced ID
       shinyjs::hide(paste0(ModuleIds$ENRICH_FORM, "-enrichment_all_clear"))
     }
-    prepareCombinationTab()
+    # Update combination tab (refresh from remaining sessions)
+    combinationSession$refresh()
+    combinationSession$updateUI(session)
   }, ignoreInit = TRUE)
 
-  # Combination observers
-  observeEvent(input$combo_datasources, {
-    handleComboSourceSelect()
-  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+  # NOTE: Combination observers now handled by CombinationSession
+  # (see combinationSession$server() call above)
 
-  observeEvent(input$upsetjsCombo_click, {
-    handleComboUpsetClick()
-  }, ignoreInit = TRUE)
-
-  observeEvent(input$combo_visNetwork_run, {
-    handleComboNetwork()
-  }, ignoreInit = TRUE)
-
-  # Manhattan plot observers
-  observeEvent(event_data("plotly_click", source = "A"), {
-    triggeredEvent <- event_data("plotly_click", source = "A")
-    if (isEventFromManhattan(triggeredEvent))
-      handleManhattanClick(triggeredEvent$key)
-  }, ignoreInit = TRUE)
-
-  observeEvent(event_data("plotly_selected", source = "A"), {
-    triggeredEvent <- event_data("plotly_selected", source = "A")
-    if (isEventFromManhattan(triggeredEvent))
-      handleManhattanSelect(triggeredEvent$key)
-  }, ignoreInit = TRUE)
-
-  # Plot click observers
-  observeEvent(event_data("plotly_click", source = "Barchart", priority = "event"), {
-    handlePlotClick("barchart", "Barchart", session = session)
-  }, ignoreInit = TRUE, ignoreNULL = TRUE)
-
-  observeEvent(event_data("plotly_click", source = "Scatter", priority = "event"), {
-    handlePlotClick("scatterPlot", "Scatter", session = session)
-  }, ignoreInit = TRUE, ignoreNULL = TRUE)
-
-  observeEvent(event_data("plotly_click", source = "DotPlot", priority = "event"), {
-    handlePlotClick("dotPlot", "DotPlot", session = session)
-  }, ignoreInit = TRUE, ignoreNULL = TRUE)
-
-  # Zoom/relayout observers
-  observeEvent(event_data("plotly_relayout", source = "Barchart"), {
-    handlePlotZoom("barchart", "Barchart")
-  }, ignoreInit = TRUE, ignoreNULL = TRUE)
-
-  observeEvent(event_data("plotly_relayout", source = "Scatter"), {
-    handlePlotZoom("scatterPlot", "Scatter")
-  }, ignoreInit = TRUE, ignoreNULL = TRUE)
-
-  observeEvent(event_data("plotly_relayout", source = "DotPlot"), {
-    handlePlotZoom("dotPlot", "DotPlot")
-  }, ignoreInit = TRUE, ignoreNULL = TRUE)
-
-  # Selection observers
-  observeEvent(event_data("plotly_selected", source = "Barchart", priority = "event"), {
-    handlePlotSelection("barchart", "Barchart", session = session)
-  }, ignoreInit = TRUE, ignoreNULL = TRUE)
-
-  observeEvent(event_data("plotly_selected", source = "Scatter", priority = "event"), {
-    handlePlotSelection("scatterPlot", "Scatter", session = session)
-  }, ignoreInit = TRUE, ignoreNULL = TRUE)
-
-  observeEvent(event_data("plotly_selected", source = "DotPlot", priority = "event"), {
-    handlePlotSelection("dotPlot", "DotPlot", session = session)
-  }, ignoreInit = TRUE, ignoreNULL = TRUE)
-
-  # Heatmap observers
-  observeEvent(event_data("plotly_click", source = "Heatmap1", priority = "event"), {
-    handlePlotClick("heatmap1", "Heatmap1", session = session)
-  }, ignoreInit = TRUE, ignoreNULL = TRUE)
-
-  observeEvent(event_data("plotly_relayout", source = "Heatmap1"), {
-    handlePlotZoom("heatmap1", "Heatmap1")
-  }, ignoreInit = TRUE, ignoreNULL = TRUE)
-
-  observeEvent(event_data("plotly_selected", source = "Heatmap1"), {
-    handlePlotSelection("heatmap1", "Heatmap1", session = session)
-  }, ignoreInit = TRUE, ignoreNULL = TRUE)
-
-  observeEvent(event_data("plotly_click", source = "Heatmap2", priority = "event"), {
-    handlePlotClick("heatmap2", "Heatmap2", session = session)
-  }, ignoreInit = TRUE, ignoreNULL = TRUE)
-
-  observeEvent(event_data("plotly_relayout", source = "Heatmap2"), {
-    handlePlotZoom("heatmap2", "Heatmap2")
-  }, ignoreInit = TRUE, ignoreNULL = TRUE)
-
-  observeEvent(event_data("plotly_selected", source = "Heatmap2"), {
-    handlePlotSelection("heatmap2", "Heatmap2", session = session)
-  }, ignoreInit = TRUE, ignoreNULL = TRUE)
-
-  observeEvent(event_data("plotly_click", source = "Heatmap3", priority = "event"), {
-    handlePlotClick("heatmap3", "Heatmap3", session = session)
-  }, ignoreInit = TRUE, ignoreNULL = TRUE)
-
-  observeEvent(event_data("plotly_relayout", source = "Heatmap3"), {
-    handlePlotZoom("heatmap3", "Heatmap3")
-  }, ignoreInit = TRUE, ignoreNULL = TRUE)
-
-  observeEvent(event_data("plotly_selected", source = "Heatmap3"), {
-    handlePlotSelection("heatmap3", "Heatmap3", session = session)
-  }, ignoreInit = TRUE, ignoreNULL = TRUE)
+  # NOTE: Barchart, Scatter, DotPlot observers now inside OutputSession classes
+  # NOTE: Heatmap observers now inside HeatmapOutputSession classes
 
   # NOTE: STRING observers replaced by NetworkAnalysisSession (utilities-session-network.R)
   # NOTE: Conversion observers replaced by ConversionSession (utilities-session-conversion.R)

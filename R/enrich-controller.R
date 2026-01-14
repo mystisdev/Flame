@@ -1,28 +1,27 @@
 # =============================================================================
-# FLAME Enrichment Form Session
+# FLAME Enrichment Controller
 # =============================================================================
 #
-# Handles the enrichment form UI and server logic.
-# One-to-many pattern: this form creates multiple ORAEnrichmentSession instances.
+# Controls the enrichment workflow: form handling, session creation, and
+# coordination. One-to-many pattern: creates multiple ORAEnrichmentSession
+# instances from a single form.
+#
+# Responsibilities:
+# - Form UI definition (enrichmentFormUI)
+# - Input cascade logic (organism -> tools -> datasources -> namespaces -> metrics)
+# - Form validation and submission handling
+# - Run matching (exact match -> pulse, datasources differ -> update, no match -> new)
+# - Session lifecycle coordination (create, update, clear)
+# - UI orchestration (tab insertion, panel visibility)
 #
 # Pattern:
 # - Static UI: enrichmentFormUI() standalone function
-# - Server logic: EnrichmentFormSession R6 class with moduleServer()
-#
-# The form owns:
-# - Form UI with all inputs (file, organism, tools, datasources, etc.)
-# - Cascade observers (tool -> datasources -> namespaces -> metrics)
-# - Submit button observer
-# - Run matching logic (exact match -> pulse, datasources differ -> update)
-#
-# On submit, it creates an ORAEnrichmentSession, calls execute(), and
-# registers it in the EnrichmentSessionRegistry.
+# - Controller: EnrichmentController R6 class with moduleServer()
 #
 # Dependencies:
 # - enrich-session-registry.R (for EnrichmentSessionRegistry)
 # - enrich-session-ora.R (for ORAEnrichmentSession)
 # - input-analytelist-registry.R (for AnalyteListRegistry)
-# - func-runs.R (for parametersMatch, parametersMatchIgnoringDatasources)
 #
 # =============================================================================
 
@@ -161,12 +160,13 @@ GeneCodis: User Input"
 }
 
 # =============================================================================
-# R6 SESSION CLASS
+# R6 CONTROLLER CLASS
 # =============================================================================
 
-#' Enrichment Form Session Class
+#' Enrichment Controller Class
 #'
-#' Manages the enrichment form server logic. Creates ORAEnrichmentSession
+#' Controls the enrichment workflow: handles form input, creates enrichment
+#' sessions, and coordinates UI updates. Creates ORAEnrichmentSession
 #' instances on submit and handles run matching.
 #'
 #' @section Lifecycle:
@@ -174,18 +174,20 @@ GeneCodis: User Input"
 #' 2. server() sets up form observers via moduleServer()
 #' 3. On submit: creates ORAEnrichmentSession, executes, registers
 #'
-EnrichmentFormSession <- R6::R6Class(
-  "EnrichmentFormSession",
+EnrichmentController <- R6::R6Class(
+  "EnrichmentController",
 
   public = list(
     #' @field id Module namespace ID
     id = NULL,
 
-    #' Initialize an EnrichmentFormSession
+    #' Initialize an EnrichmentController
     #' @param id Character. Module namespace ID.
     #' @param enrichmentRegistry EnrichmentSessionRegistry. Registry for sessions.
     #' @param analyteListRegistry AnalyteListRegistry. Registry for gene lists.
-    initialize = function(id, enrichmentRegistry, analyteListRegistry) {
+    #' @param combinationSession CombinationSession. Session for combination tab (optional, set later via setCombinationSession).
+    initialize = function(id, enrichmentRegistry, analyteListRegistry,
+                          combinationSession = NULL) {
       if (!inherits(enrichmentRegistry, "EnrichmentSessionRegistry")) {
         stop("enrichmentRegistry must be an EnrichmentSessionRegistry")
       }
@@ -196,7 +198,17 @@ EnrichmentFormSession <- R6::R6Class(
       self$id <- id
       private$.enrichmentRegistry <- enrichmentRegistry
       private$.analyteListRegistry <- analyteListRegistry
+      private$.combinationSession <- combinationSession
       private$.observers <- list()
+    },
+
+    #' Set the combination session (for deferred initialization)
+    #' @param combinationSession CombinationSession instance
+    setCombinationSession = function(combinationSession) {
+      if (!inherits(combinationSession, "CombinationSession")) {
+        stop("combinationSession must be a CombinationSession")
+      }
+      private$.combinationSession <- combinationSession
     },
 
     #' Set up server logic using moduleServer
@@ -208,12 +220,11 @@ EnrichmentFormSession <- R6::R6Class(
     #' - Submit button
     #' - Clear all button
     #'
-    #' @param input Shiny input object (from parent)
-    #' @param output Shiny output object (from parent)
-    #' @param session Shiny session object (from parent)
-    server = function(input, output, session) {
-      # Store parent session for operations outside moduleServer scope
-      private$.parentSession <- session
+    #' @param parentSession Shiny session object (from parent/root)
+    server = function(parentSession) {
+      # Store parent session for UI operations outside moduleServer scope
+      # (e.g., updateTabsetPanel, sendCustomMessage)
+      private$.parentSession <- parentSession
 
       shiny::moduleServer(self$id, function(input, output, session) {
         # Store module session
@@ -280,6 +291,16 @@ EnrichmentFormSession <- R6::R6Class(
       }
     },
 
+    #' Clear an enrichment run
+    #'
+    #' Public method to clear a specific run. Called from server.R when
+    #' the tab close button is clicked.
+    #'
+    #' @param fullRunKey Full run key (e.g., "functional_gProfiler_5")
+    clearRun = function(fullRunKey) {
+      private$clearRunInternal(fullRunKey)
+    },
+
     #' Clean up observers
     cleanup = function() {
       for (obs in private$.observers) {
@@ -297,8 +318,9 @@ EnrichmentFormSession <- R6::R6Class(
     .analyteListRegistry = NULL,
 
     # Session references
-    .parentSession = NULL,
-    .moduleSession = NULL,
+    .parentSession = NULL,  # Parent/root session for UI operations (updateTabsetPanel, etc.)
+    .moduleSession = NULL,  # Module session from moduleServer()
+    .combinationSession = NULL,  # CombinationSession for managing combination tab
 
     # List of observers for cleanup
     .observers = list(),
@@ -562,9 +584,10 @@ EnrichmentFormSession <- R6::R6Class(
       })
 
       # Update combination tab after UI is flushed
-      if (config$supportsCombination) {
+      if (config$supportsCombination && !is.null(private$.combinationSession)) {
         private$.parentSession$onFlushed(function() {
-          prepareCombinationTab()
+          private$.combinationSession$refresh()
+          private$.combinationSession$updateUI(private$.parentSession)
         }, once = TRUE)
       }
     },
@@ -639,14 +662,15 @@ EnrichmentFormSession <- R6::R6Class(
 
       for (existingSession in sessions) {
         existingParams <- existingSession$getParameters()
+        diffs <- private$findParameterDifferences(existingParams, currentParams)
 
-        # First check: Do ALL parameters match (exact match)?
-        if (parametersMatch(existingParams, currentParams)) {
+        if (length(diffs) == 0) {
+          # Exact match - no differences
           return(list(matchType = "exact", session = existingSession))
         }
 
-        # Second check: Do parameters match EXCEPT datasources?
-        if (parametersMatchIgnoringDatasources(existingParams, currentParams)) {
+        if (identical(diffs, "datasources")) {
+          # Only datasources differ - can update existing tab
           return(list(matchType = "datasources_differ", session = existingSession))
         }
       }
@@ -669,14 +693,13 @@ EnrichmentFormSession <- R6::R6Class(
         " (Run ", existingSession$displayNumber, ") - datasources changed.</p>"
       ))
 
-      # Clear existing results and UI state
+      # Clear existing results (but keep OutputSessions alive - they have moduleServer bindings)
       existingSession$clearResults()
-      clearPlotStateForRun(existingSession$id)
-      outputRegistry$clearOutputs(existingSession$id, private$.parentSession$output)
-      hideAllSourceTabsForRun(existingSession$id, private$.parentSession)
 
-      # Update parameters and re-execute
-      existingSession$updateParameters(newParams)
+      # Replace tab content with new UI (handles output clearing, parameter update, and UI replacement)
+      existingSession$updateContent(newParams, private$.parentSession$output, private$.parentSession)
+
+      # Re-execute enrichment with new datasources
       existingSession$execute()
 
       # Check for results
@@ -688,19 +711,31 @@ EnrichmentFormSession <- R6::R6Class(
         return()
       }
 
-      # Re-print result tables using updated session data - MUST wait for UI flush after clearOutputs
+      # Re-render display elements that depend on results
+      # (Parameters show datasources from results, no-hit genes depend on result hits)
       local({
-        sessionForTables <- existingSession
-        private$.parentSession$onFlushed(function() {
-          printResultTablesFromSession(sessionForTables)
-        }, once = TRUE)
-      })
+        sessionForUI <- existingSession
+        parentOutput <- private$.parentSession$output
+        # Determine check list based on rollback setting
+        rollbackChoice <- input$enrichment_inputConversion
+        noHitCheckList <- if (rollbackChoice == "Original input names") {
+          sessionForUI$rollbackNames()
+        } else {
+          sessionForUI$getConvertedIds()
+        }
+        listName <- newParams$geneListName
 
-      # Update plot control panels after UI flush
-      local({
-        runKeyForUpdate <- existingSession$id
         private$.parentSession$onFlushed(function() {
-          updatePlotControlPanelsForRun(runKeyForUpdate)
+          # Update parameters (datasources display changes)
+          sessionForUI$printParameters(listName)
+          # Update no-hit genes (different results = different hits)
+          sessionForUI$printNoHitGenes(noHitCheckList)
+          # Render result tables
+          sessionForUI$renderResultsTables(parentOutput)
+          # Refresh output sessions (clear state, update controls) - NO destroy/recreate
+          # This keeps moduleServer bindings intact and avoids Shiny rebinding issues
+          sessionForUI$refreshOutputSessions()
+          # NOTE: updatePlotControlPanelsForRun() REMOVED - OutputSessions update their own controls
         }, once = TRUE)
       })
 
@@ -797,11 +832,10 @@ EnrichmentFormSession <- R6::R6Class(
 
     #' Handle UI for a new session
     handleNewSessionUI = function(enrichSession, config, listName, input) {
-      # Insert dynamic tab for this session (must use parentSession for UI outside module)
-      insertEnrichmentTabForSession(enrichSession, config, private$.parentSession)
+      # Insert dynamic tab for this session (session owns its UI)
+      private$insertTab(enrichSession, config)
 
-      # Register outputs for cleanup
-      registerOutputsForRun(enrichSession$id)
+      # No longer need registerOutputsForRun() - session tracks its own outputs
 
       # Show the results panel if this is the first run
       if (private$.enrichmentRegistry$count() == 1) {
@@ -814,11 +848,13 @@ EnrichmentFormSession <- R6::R6Class(
         }
       }
 
-      # Register dynamic observers AFTER UI is flushed
+      # Create output sessions AFTER UI is flushed
       local({
-        runKeyForObservers <- enrichSession$id
+        sessionForOutputs <- enrichSession
         private$.parentSession$onFlushed(function() {
-          registerObserversForRun(runKeyForObservers)
+          # Create output sessions (uses moduleServer internally)
+          sessionForOutputs$createOutputSessions()
+          # NOTE: registerObserversForRun() REMOVED - OutputSessions handle all observers now
         }, once = TRUE)
       })
 
@@ -835,29 +871,21 @@ EnrichmentFormSession <- R6::R6Class(
         sessionForParams <- enrichSession
         listNameForParams <- listName
         private$.parentSession$onFlushed(function() {
-          printParametersForSession(sessionForParams, listNameForParams)
+          sessionForParams$printParameters(listNameForParams)
         }, once = TRUE)
       })
 
-      # Hide all source tabs initially (needs parent session for correct context)
-      hideAllSourceTabsForRun(enrichSession$id, private$.parentSession)
+      # NOTE: hideSourceTabs() removed - tabs are now created only for selected datasources
 
       # Print conversion tables and unconverted genes
       namespace <- input$enrichment_namespace
       if (namespace != "USERINPUT") {
         local({
-          sessionId <- enrichSession$id
-          convTable <- enrichSession$getConversionTable()
-          bgConvTable <- enrichSession$getBackgroundConversionTable()
-          origInputs <- enrichSession$getInput()$getIds()
-          bgList <- enrichSession$background
-          origBackground <- if (!is.null(bgList)) bgList$getIds() else NULL
-
+          sessionForConv <- enrichSession
           private$.parentSession$onFlushed(function() {
-            shinyjs::show(paste(sessionId, "conversionBoxes", sep = "_"))
-            printUnconvertedGenes(convTable, bgConvTable, runKey = sessionId,
-                                  originalInputs = origInputs, originalBackground = origBackground)
-            printConversionTable(convTable, bgConvTable, runKey = sessionId)
+            shinyjs::show(paste(sessionForConv$id, "conversionBoxes", sep = "_"))
+            sessionForConv$printUnconvertedGenes()
+            sessionForConv$printConversionTables()
           }, once = TRUE)
         })
       }
@@ -866,19 +894,15 @@ EnrichmentFormSession <- R6::R6Class(
       local({
         sessionForTables <- enrichSession
         noHitCheckList <- noHitGenesCheckList
+        parentOutput <- private$.parentSession$output
         private$.parentSession$onFlushed(function() {
-          findAndPrintNoHitGenesFromSession(noHitCheckList, sessionForTables)
-          printResultTablesFromSession(sessionForTables)
+          sessionForTables$printNoHitGenes(noHitCheckList)
+          sessionForTables$renderResultsTables(parentOutput)
         }, once = TRUE)
       })
 
-      # Update plot control panels after UI is flushed
-      local({
-        runKeyForUpdate <- enrichSession$id
-        private$.parentSession$onFlushed(function() {
-          updatePlotControlPanelsForRun(runKeyForUpdate)
-        }, once = TRUE)
-      })
+      # NOTE: updatePlotControlPanelsForRun() REMOVED - OutputSessions update their own controls
+      # when created via createOutputSessions() which calls their server() methods
 
       # Select the new tab
       shiny::updateTabsetPanel(private$.parentSession, config$tabsetPanelId,
@@ -890,13 +914,16 @@ EnrichmentFormSession <- R6::R6Class(
 
     #' Handle Clear All button
     handleClearAll = function(input, session) {
-      resetCombination()
+      # Reset combination session
+      if (!is.null(private$.combinationSession)) {
+        private$.combinationSession$reset(private$.parentSession)
+      }
 
       # Clear ALL active functional runs
       allSessions <- private$.enrichmentRegistry$getAll()
       for (fullRunKey in names(allSessions)) {
         if (startsWith(fullRunKey, "functional_")) {
-          clearEnrichmentRun(fullRunKey)
+          private$clearRunInternal(fullRunKey)
         }
       }
 
@@ -910,7 +937,116 @@ EnrichmentFormSession <- R6::R6Class(
       # Hide the results panel and clear all button
       shinyjs::hide("functionalEnrichmentResultsPanel")
       shinyjs::hide(session$ns("enrichment_all_clear"))
-      prepareCombinationTab()
+
+      # Update combination tab (will hide since no sessions remain)
+      if (!is.null(private$.combinationSession)) {
+        private$.combinationSession$refresh()
+        private$.combinationSession$updateUI(private$.parentSession)
+      }
+    },
+
+    # =========================================================================
+    # TAB MANAGEMENT
+    # =========================================================================
+
+    #' Insert enrichment tab for a session
+    #'
+    #' Creates and inserts the results tab for an enrichment session.
+    #'
+    #' @param enrichSession ORAEnrichmentSession
+    #' @param config Enrichment config from getEnrichmentConfig()
+    insertTab = function(enrichSession, config) {
+      runId <- enrichSession$runId
+      tabTitle <- paste0(enrichSession$toolName, " (", enrichSession$displayNumber, ")")
+
+      # Generate tab content - session owns its UI
+      tabContent <- enrichSession$ui()
+
+      # Create tab title with close button
+      tabTitleHtml <- shiny::tags$span(
+        tabTitle,
+        shiny::tags$button(
+          class = "close-run-tab",
+          type = "button",
+          onclick = paste0("event.stopPropagation(); Shiny.setInputValue('",
+                           config$closeEvent, "', '", runId, "', {priority: 'event'});"),
+          shiny::icon("times")
+        )
+      )
+
+      # Insert the tab - must use parentSession since toolTabsPanel is in parent UI
+      shiny::insertTab(
+        inputId = config$tabsetPanelId,
+        tab = shiny::tabPanel(
+          title = tabTitleHtml,
+          value = runId,
+          tabContent
+        ),
+        select = TRUE,
+        session = private$.parentSession
+      )
+    },
+
+    #' Clear an enrichment run completely (internal implementation)
+    #'
+    #' Clears all data, destroys observers, removes UI tab.
+    #'
+    #' @param fullRunKey Full run key (e.g., "functional_gProfiler_5")
+    clearRunInternal = function(fullRunKey) {
+      # Get session from registry - session owns all identity information
+      enrichSession <- private$.enrichmentRegistry$get(fullRunKey)
+      if (is.null(enrichSession)) return()
+
+      # Get identity from session (not by parsing the key string)
+      config <- getEnrichmentConfig(enrichSession$enrichmentType)
+      runId <- enrichSession$runId
+
+      # Session handles its own cleanup
+      enrichSession$cleanup(private$.parentSession$output)
+
+      # Remove the tab (using config for panel ID)
+      shiny::removeTab(inputId = config$tabsetPanelId, target = runId,
+                       session = private$.parentSession)
+
+      # Remove from enrichment session registry
+      private$.enrichmentRegistry$remove(fullRunKey)
+    },
+
+    # =========================================================================
+    # PARAMETER COMPARISON
+    # =========================================================================
+
+    #' Find which parameters differ between two parameter sets
+    #'
+    #' Returns a character vector of parameter names that differ.
+    #' Empty vector = exact match. Single "datasources" = can update existing tab.
+    #'
+    #' @param params1 First parameter set
+    #' @param params2 Second parameter set
+    #' @return Character vector of differing parameter names
+    findParameterDifferences = function(params1, params2) {
+      if (is.null(params1) || is.null(params2)) return("null_params")
+
+      diffs <- character(0)
+
+      if (!identical(params1$geneListName, params2$geneListName))
+        diffs <- c(diffs, "geneListName")
+      if (!identical(params1$organism, params2$organism))
+        diffs <- c(diffs, "organism")
+      if (!identical(params1$threshold, params2$threshold))
+        diffs <- c(diffs, "threshold")
+      if (!identical(sort(params1$datasources), sort(params2$datasources)))
+        diffs <- c(diffs, "datasources")
+      if (!identical(params1$namespace, params2$namespace))
+        diffs <- c(diffs, "namespace")
+      if (!identical(params1$backgroundMode, params2$backgroundMode))
+        diffs <- c(diffs, "backgroundMode")
+      if (!identical(params1$backgroundList, params2$backgroundList))
+        diffs <- c(diffs, "backgroundList")
+      if (!identical(params1$metric, params2$metric))
+        diffs <- c(diffs, "metric")
+
+      return(diffs)
     }
   )
 )

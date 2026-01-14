@@ -6,7 +6,6 @@
 # to add, retrieve, remove, and query analyte lists.
 #
 # This registry is instantiated per-session in server.R (NOT global.R).
-# It will eventually replace the current userInputLists mechanism.
 #
 # Dependencies:
 # - input-analytelist.R (for AnalyteList base class)
@@ -19,7 +18,6 @@
 #' to add, retrieve, remove, and query analyte lists.
 #'
 #' This registry is instantiated per-session in server.R (NOT global.R).
-#' It will eventually replace the current userInputLists mechanism.
 #'
 #' ## Reactive Integration
 #'

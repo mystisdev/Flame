@@ -16,6 +16,9 @@
 #'
 #' @export
 run_flame <- function(launch.browser = TRUE, port = NULL) {
+  # Set max upload file size (1MB)
+  options(shiny.maxRequestSize = 1.0 * 1024^2)
+
   # Find app directory (works both installed and during development)
   appDir <- system.file("app", package = "flame")
 

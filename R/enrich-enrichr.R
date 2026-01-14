@@ -170,8 +170,7 @@ EnrichRStrategy <- R6::R6Class("EnrichRStrategy",
       # Return structured result (no global writes)
       return(list(
         result = enrichrResult,
-        backgroundSize = backgroundSize,
-        rawResult = NULL
+        backgroundSize = backgroundSize
       ))
     },
 

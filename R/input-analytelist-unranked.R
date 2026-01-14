@@ -51,7 +51,11 @@ UnrankedAnalyteList <- R6::R6Class(
       private$.ids
     },
 
-    #' Convert to data frame (compatible with existing userInputLists format)
+    #' Convert to data frame for display and export
+    #'
+    #' Used by AnalyteListManagerSession to render list contents in a DataTable
+    #' and enable export to CSV/Excel/PDF.
+    #'
     #' @return Data frame with one column named after the list
     toDataFrame = function() {
       df <- data.frame(ids = self$getIds(), stringsAsFactors = FALSE)

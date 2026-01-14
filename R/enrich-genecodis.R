@@ -331,8 +331,7 @@ GeneCodisStrategy <- R6::R6Class("GeneCodisStrategy",
       # Return structured result (no global writes)
       return(list(
         result = result,
-        backgroundSize = getSimpleBackgroundSize(backgroundList),
-        rawResult = NULL
+        backgroundSize = getSimpleBackgroundSize(backgroundList)
       ))
     },
 
