@@ -1,26 +1,30 @@
-getWebgestaltBackgroundSize <- function(organism = "hsapiens", referenceSet = "genome_protein-coding") {
-  url <- sprintf("https://www.webgestalt.org/api/reference?organism=%s&referenceSet=%s", organism, referenceSet)
-  x <- read.csv(url(url), header=F)
-  return(length(x$V1))
-}
-
-
 # =============================================================================
-# WebGestaltStrategy - Tool Strategy Implementation
+# WebGestalt ORA Strategy
+# =============================================================================
+#
+# Implements Over-Representation Analysis using the WebGestalt API.
+#
+# Dependencies:
+#   - config.R (for ToolId, ParadigmId, ORGANISMS, TOOLS, ENRICHMENT_DF_COLNAMES)
+#   - enrich-strategy-base.R (for EnrichmentStrategy, strategyRegistry)
+#   - WebGestaltR package
+#
 # =============================================================================
 
-WebGestaltStrategy <- R6::R6Class("WebGestaltStrategy",
+WebGestaltORAStrategy <- R6::R6Class("WebGestaltORAStrategy",
 
-  inherit = ToolStrategy,
+  inherit = EnrichmentStrategy,
 
   public = list(
     initialize = function() {
-      super$initialize("WebGestalt")
+      super$initialize(ToolId$WEBGESTALT, ParadigmId$ORA)
     },
 
     run = function(inputList, organism, backgroundList, params) {
-      # Get datasource codes
-      datasources <- as.character(DATASOURCES_CODES[["WEBGESTALT"]][params$datasources])
+      # Get datasource codes from tool config
+      toolConfig <- TOOLS[[self$toolId]]
+      datasourceCodes <- toolConfig$datasourceCodes
+      datasources <- as.character(datasourceCodes[params$datasources])
       datasources <- datasources[!is.na(datasources)]
 
       if (length(datasources) == 0) {
@@ -78,21 +82,21 @@ WebGestaltStrategy <- R6::R6Class("WebGestaltStrategy",
         hostName = "https://www.webgestalt.org/"
       ))
 
-      # Calculate background size before validation (need organismName var)
+      # Calculate background size
       backgroundSize <- if (is.null(backgroundList)) {
-        getWebgestaltBackgroundSize(organism = organismName)
+        private$getWebgestaltBackgroundSize(organism = organismName)
       } else {
         length(backgroundList)
       }
 
-      if (!isResultValid(result)) {
+      if (!private$isResultValid(result)) {
         return(NULL)
       }
 
-      # Parse result (includes link attachment inline to avoid timing issues)
+      # Parse result
       result <- private$parseResult(result, length(inputList), params$datasources)
 
-      # Filter by datasources using params (no global dependency)
+      # Filter by datasources
       if (!is.null(params$datasources) && length(params$datasources) > 0) {
         result <- result[result$Source %in% params$datasources, ]
       }
@@ -101,7 +105,7 @@ WebGestaltStrategy <- R6::R6Class("WebGestaltStrategy",
         return(NULL)
       }
 
-      # Return structured result (no global writes)
+      # Return structured result
       return(list(
         result = result,
         backgroundSize = backgroundSize
@@ -110,23 +114,18 @@ WebGestaltStrategy <- R6::R6Class("WebGestaltStrategy",
 
     convertIDs = function(geneList, organism, targetNamespace) {
       return(geneList)
-    },
-
-    getValidDatasources = function(organism) {
-      return(names(DATASOURCES_CODES[["WEBGESTALT"]]))
-    },
-
-    getDefaultMetric = function(hasBackground) {
-      return("BH")
     }
   ),
 
   private = list(
     parseResult = function(result, numInputs, selectedDatasources) {
+      toolConfig <- TOOLS[[self$toolId]]
+      datasourceCodes <- toolConfig$datasourceCodes
+
       if (is.null(result$database)) {
-        result$database <- as.character(DATASOURCES_CODES[["WEBGESTALT"]][selectedDatasources])
+        result$database <- as.character(datasourceCodes[selectedDatasources])
       }
-      result$database <- unlistDatasourceCodes(result$database, DATASOURCES_CODES[["WEBGESTALT"]])
+      result$database <- private$unlistDatasourceCodes(result$database, datasourceCodes)
 
       if (is.null(result$userId)) {
         result$userId <- result$overlapId
@@ -143,7 +142,7 @@ WebGestaltStrategy <- R6::R6Class("WebGestaltStrategy",
           "<a href='", result$link, "' target='_blank'>",
           result$geneSet, "</a>"
         )
-        # Handle DISGENET special case (same as attachWebgestaltLinks)
+        # Handle DISGENET special case
         if ("DISGENET" %in% result$database) {
           disgenetMask <- result$database == "DISGENET"
           linkedTermId[disgenetMask] <- paste0(
@@ -160,15 +159,25 @@ WebGestaltStrategy <- R6::R6Class("WebGestaltStrategy",
         "size", "querySize", "overlap", "userId"
       )]
       colnames(result) <- ENRICHMENT_DF_COLNAMES
-      result <- mapKEGGIds(result)
+      result <- private$mapKEGGIds(result)
 
       # Add Term_ID_noLinks column (formatResultTable checks for this)
       result$Term_ID_noLinks <- termIdNoLinks
 
       return(result)
+    },
+
+    # -------------------------------------------------------------------------
+    # WebGestalt-specific helper methods
+    # -------------------------------------------------------------------------
+
+    getWebgestaltBackgroundSize = function(organism = "hsapiens", referenceSet = "genome_protein-coding") {
+      url <- sprintf("https://www.webgestalt.org/api/reference?organism=%s&referenceSet=%s", organism, referenceSet)
+      x <- read.csv(url(url), header = FALSE)
+      return(length(x$V1))
     }
   )
 )
 
 # Register the strategy
-toolRegistry$register("functional", "WebGestalt", WebGestaltStrategy$new())
+strategyRegistry$register(ToolId$WEBGESTALT, ParadigmId$ORA, WebGestaltORAStrategy$new())

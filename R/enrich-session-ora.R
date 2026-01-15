@@ -9,7 +9,7 @@
 # 1. Created by EnrichmentController on submit
 # 2. execute() runs full enrichment flow:
 #    - Gene conversion
-#    - Strategy execution via toolRegistry
+#    - Strategy execution via strategyRegistry
 #    - Result transformation
 #    - DB link attachment
 # 3. EnrichmentController$insertTab() adds tab to results panel
@@ -23,7 +23,7 @@
 #
 # Dependencies:
 # - enrich-session-base.R (for EnrichmentSession)
-# - core-tool_registry.R (for toolRegistry)
+# - enrich-strategy-base.R (for strategyRegistry, ParadigmId)
 # - func-tabGeneration.R (for UI generation, temporarily)
 #
 # =============================================================================
@@ -75,7 +75,7 @@ ORAEnrichmentSession <- R6::R6Class(
     #'
     #' Full enrichment flow:
     #' 1. Convert gene IDs to tool-specific format
-    #' 2. Call toolRegistry strategy
+    #' 2. Call strategyRegistry strategy
     #' 3. Transform results (add columns, format)
     #' 4. Sort by -log10Pvalue
     #' 5. Attach database links
@@ -113,17 +113,17 @@ ORAEnrichmentSession <- R6::R6Class(
         }
       }
 
-      # Step 2: Call toolRegistry strategy
+      # Step 2: Call strategyRegistry strategy
       convertedInputIds <- inputConversionTable$target
 
       # Check if we have a strategy
-      if (!toolRegistry$hasStrategy("functional", self$toolName)) {
+      if (!strategyRegistry$hasStrategy(self$toolName, ParadigmId$ORA)) {
         warning(sprintf("No strategy registered for %s", self$toolName))
         return(invisible(self))
       }
 
       strategyResult <- tryCatch({
-        strategy <- toolRegistry$get("functional", self$toolName)
+        strategy <- strategyRegistry$get(self$toolName, ParadigmId$ORA)
         strategy$run(
           convertedInputIds,
           self$organism,
@@ -143,7 +143,7 @@ ORAEnrichmentSession <- R6::R6Class(
       private$.backgroundSize <- strategyResult$backgroundSize
 
       # Step 3: Transform results
-      results <- transformEnrichmentResultTable(strategyResult$result)
+      results <- private$transformResultTable(strategyResult$result)
 
       # Step 4: Sort by -log10Pvalue descending
       results <- results[order(-results$`-log10Pvalue`), ]
@@ -307,9 +307,12 @@ ORAEnrichmentSession <- R6::R6Class(
       self$updateParameters(newParams)
 
       # 4. Remove old content
+      # Must use immediate=TRUE so removal happens BEFORE insertion
+      # Otherwise insertUI(immediate=TRUE) runs first, creating duplicate IDs
       shiny::removeUI(
         selector = paste0("#", self$id, "_content"),
-        session = parentSession
+        session = parentSession,
+        immediate = TRUE
       )
 
       # 5. Generate and insert new content
@@ -323,11 +326,13 @@ ORAEnrichmentSession <- R6::R6Class(
         )
       )
 
+      # NOTE: Using immediate=TRUE to ensure content is available before onFlushed
       shiny::insertUI(
         selector = paste0("#", self$id, "_content_wrapper"),
         where = "afterBegin",
         ui = newContent,
-        session = parentSession
+        session = parentSession,
+        immediate = TRUE
       )
 
       invisible(self)
@@ -436,11 +441,28 @@ ORAEnrichmentSession <- R6::R6Class(
 
     #' Create output sessions for plots
     #'
-    #' Creates OutputSessions for each plot type.
-    #' Uses proper Shiny module pattern - each OutputSession owns its UI and server.
+    #' Dynamically creates OutputSessions based on PARADIGMS config.
+    #' Uses OUTPUT_TYPES_CONFIG for class lookup and container IDs.
     #' Call this after the tab is inserted (the container div exists).
-    #' Only called for NEW sessions - for datasources-differ, use refreshOutputSessions().
-    createOutputSessions = function() {
+    #'
+    #' UI insertion and server setup are split into two phases with
+    #' a flush cycle in between. This prevents Shiny from auto-binding inputs
+    #' for the visible tab before moduleServer can claim them.
+    #'
+    #' @param parentSession Shiny session for scheduling deferred server setup
+    createOutputSessions = function(parentSession = NULL) {
+      # Increment instance counter to ensure unique moduleServer IDs
+      # This prevents conflicts when OutputSessions are destroyed and recreated
+      private$.outputSessionInstance <- private$.outputSessionInstance + 1
+      instanceNum <- private$.outputSessionInstance
+
+      # Get outputs from PARADIGMS config
+      outputTypes <- PARADIGMS[[ParadigmId$ORA]]$outputs
+      if (is.null(outputTypes) || length(outputTypes) == 0) {
+        warning("No outputs configured for ORA paradigm")
+        return(invisible(self))
+      }
+
       # Helper to insert UI into container
       insertIntoContainer <- function(containerId, sessionUI) {
         shiny::insertUI(
@@ -451,86 +473,53 @@ ORAEnrichmentSession <- R6::R6Class(
         )
       }
 
-      # Create BarchartOutputSession
-      private$.outputSessions$barchart <- BarchartOutputSession$new(
-        runKey = self$id,
-        enrichSession = self
-      )
-      insertIntoContainer(paste(self$id, "barchart_container", sep = "_"),
-                          private$.outputSessions$barchart$ui())
-      private$.outputSessions$barchart$server()
+      # PHASE 1: Create all sessions and insert all UI (but don't call server yet)
+      for (outputType in outputTypes) {
+        config <- OUTPUT_TYPES_CONFIG[[outputType]]
+        if (is.null(config)) {
+          warning(paste("No config for output type:", outputType))
+          next
+        }
 
-      # Create ScatterOutputSession
-      private$.outputSessions$scatter <- ScatterOutputSession$new(
-        runKey = self$id,
-        enrichSession = self
-      )
-      insertIntoContainer(paste(self$id, "scatterPlot_container", sep = "_"),
-                          private$.outputSessions$scatter$ui())
-      private$.outputSessions$scatter$server()
+        # Get class and instantiate - outputType from config (single source of truth)
+        SessionClass <- getOutputSessionClass(config$class)
+        session <- SessionClass$new(
+          runKey = self$id,
+          enrichSession = self,
+          outputType = config$key,
+          instance = instanceNum
+        )
 
-      # Create DotPlotOutputSession
-      private$.outputSessions$dotplot <- DotPlotOutputSession$new(
-        runKey = self$id,
-        enrichSession = self
-      )
-      insertIntoContainer(paste(self$id, "dotPlot_container", sep = "_"),
-                          private$.outputSessions$dotplot$ui())
-      private$.outputSessions$dotplot$server()
+        # Store session
+        private$.outputSessions[[config$key]] <- session
 
-      # Create Heatmap1OutputSession (Function vs Gene)
-      private$.outputSessions$heatmap1 <- Heatmap1OutputSession$new(
-        runKey = self$id,
-        enrichSession = self
-      )
-      insertIntoContainer(paste(self$id, "heatmap1_container", sep = "_"),
-                          private$.outputSessions$heatmap1$ui())
-      private$.outputSessions$heatmap1$server()
+        # Insert UI only (server setup deferred)
+        insertIntoContainer(
+          paste(self$id, config$containerId, sep = "_"),
+          session$ui()
+        )
+      }
 
-      # Create Heatmap2OutputSession (Function vs Function)
-      private$.outputSessions$heatmap2 <- Heatmap2OutputSession$new(
-        runKey = self$id,
-        enrichSession = self
-      )
-      insertIntoContainer(paste(self$id, "heatmap2_container", sep = "_"),
-                          private$.outputSessions$heatmap2$ui())
-      private$.outputSessions$heatmap2$server()
+      # PHASE 2: Set up servers after flush (ensures UI is fully processed)
+      # This prevents Shiny from auto-binding visible inputs before moduleServer
+      setupServers <- function() {
+        for (key in names(private$.outputSessions)) {
+          session <- private$.outputSessions[[key]]
+          if (!is.null(session)) {
+            session$server()
+          }
+        }
+      }
 
-      # Create Heatmap3OutputSession (Gene vs Gene)
-      private$.outputSessions$heatmap3 <- Heatmap3OutputSession$new(
-        runKey = self$id,
-        enrichSession = self
-      )
-      insertIntoContainer(paste(self$id, "heatmap3_container", sep = "_"),
-                          private$.outputSessions$heatmap3$ui())
-      private$.outputSessions$heatmap3$server()
+      if (!is.null(parentSession)) {
+        # Defer server setup to after UI is fully flushed
+        parentSession$onFlushed(setupServers, once = TRUE)
+      } else {
+        # Fallback: immediate setup (may have timing issues for visible tabs)
+        setupServers()
+      }
 
-      # Create Network1OutputSession (Function vs Gene)
-      private$.outputSessions$network1 <- Network1OutputSession$new(
-        runKey = self$id,
-        enrichSession = self
-      )
-      insertIntoContainer(paste(self$id, "network1_container", sep = "_"),
-                          private$.outputSessions$network1$ui())
-      private$.outputSessions$network1$server()
-
-      # Create Network2OutputSession (Function vs Function)
-      private$.outputSessions$network2 <- Network2OutputSession$new(
-        runKey = self$id,
-        enrichSession = self
-      )
-      insertIntoContainer(paste(self$id, "network2_container", sep = "_"),
-                          private$.outputSessions$network2$ui())
-      private$.outputSessions$network2$server()
-
-      # Create Network3OutputSession (Gene vs Gene)
-      private$.outputSessions$network3 <- Network3OutputSession$new(
-        runKey = self$id,
-        enrichSession = self
-      )
-      insertIntoContainer(paste(self$id, "network3_container", sep = "_"),
-                          private$.outputSessions$network3$ui())
-      private$.outputSessions$network3$server()
+      invisible(self)
     },
 
     #' Get an output session by type
@@ -553,24 +542,6 @@ ORAEnrichmentSession <- R6::R6Class(
         }
       }
       private$.outputSessions <- list()
-    },
-
-    #' Refresh all output sessions (keep alive, clear state)
-    #'
-    #' Used when datasources change. Unlike destroyOutputSessions(), this keeps
-    #' the sessions alive with their moduleServer bindings intact. It just clears
-    #' their state and rendered outputs, then updates their controls for new data.
-    refreshOutputSessions = function() {
-      for (session in private$.outputSessions) {
-        if (!is.null(session)) {
-          tryCatch({
-            session$clearForRefresh()
-            session$updateControls()
-          }, error = function(e) {
-            cat("[refreshOutputSessions] Error:", conditionMessage(e), "\n")
-          })
-        }
-      }
     },
 
     #' Clean up all resources
@@ -787,6 +758,10 @@ ORAEnrichmentSession <- R6::R6Class(
     # Output sessions (BarchartOutputSession, etc.)
     .outputSessions = list(),
 
+    # Instance counter for unique OutputSession IDs (prevents moduleServer conflicts)
+    # Incremented each time createOutputSessions is called
+    .outputSessionInstance = 0,
+
     # Background conversion table (separate from input conversion table)
     .backgroundConversionTable = NULL,
 
@@ -929,102 +904,77 @@ ORAEnrichmentSession <- R6::R6Class(
 
     #' Generate the Plots panel with OutputSession containers
     #'
-    #' Creates tabs for: Barchart, Dot Plot, Scatter Plot, Heatmap (3 sub-tabs),
-    #' Network (3 sub-tabs). No external config - method is source of truth.
+    #' Dynamically generates tabs based on PARADIGMS config.
+    #' Handles grouping (Heatmap/Network with sub-tabs) automatically.
     generatePlotsPanel = function() {
       runKey <- self$id
       uiTermKeyword <- stringr::str_to_title(
         UI_TERM_KEYWORD[[self$enrichmentType]]
       )
 
+      # Get outputs from PARADIGMS config
+      outputTypes <- PARADIGMS[[ParadigmId$ORA]]$outputs
+
+      # Separate top-level vs grouped tabs
+      topLevel <- list()
+      grouped <- list()  # grouped[["Heatmap"]][[outputType]] = config
+
+      for (ot in outputTypes) {
+        config <- OUTPUT_TYPES_CONFIG[[ot]]
+        if (is.null(config$group)) {
+          topLevel[[ot]] <- config
+        } else {
+          if (is.null(grouped[[config$group]])) grouped[[config$group]] <- list()
+          grouped[[config$group]][[ot]] <- config
+        }
+      }
+
+      # Helper to create container div
+      makeContainer <- function(containerId) {
+        shiny::tags$div(
+          id = paste(runKey, containerId, sep = "_"),
+          class = "output-session-container"
+        )
+      }
+
+      # Helper to format sub-tab title (replace %s with uiTermKeyword)
+      formatTitle <- function(template) {
+        gsub("%s", uiTermKeyword, template, fixed = TRUE)
+      }
+
+      # Build tabs list
+      tabs <- list()
+
+      # Add top-level tabs
+      for (config in topLevel) {
+        tabs[[length(tabs) + 1]] <- shiny::tabPanel(
+          title = config$tabTitle,
+          shiny::tags$br(),
+          makeContainer(config$containerId)
+        )
+      }
+
+      # Add grouped tabs (Heatmap, Network)
+      for (groupName in names(grouped)) {
+        subTabs <- lapply(grouped[[groupName]], function(config) {
+          shiny::tabPanel(
+            title = formatTitle(config$subTabTitle),
+            makeContainer(config$containerId)
+          )
+        })
+
+        tabs[[length(tabs) + 1]] <- shiny::tabPanel(
+          title = groupName,
+          shiny::tags$br(),
+          do.call(shiny::tabsetPanel, unname(subTabs))
+        )
+      }
+
+      # Build final Plots panel
       shiny::tabPanel(
         title = "Plots",
         icon = shiny::icon("chart-bar"),
-        shiny::tabsetPanel(
-          # Barchart tab
-          shiny::tabPanel(
-            title = "Barchart",
-            shiny::tags$br(),
-            shiny::tags$div(
-              id = paste(runKey, "barchart_container", sep = "_"),
-              class = "output-session-container"
-            )
-          ),
-          # Dot Plot tab
-          shiny::tabPanel(
-            title = "Dot Plot",
-            shiny::tags$br(),
-            shiny::tags$div(
-              id = paste(runKey, "dotPlot_container", sep = "_"),
-              class = "output-session-container"
-            )
-          ),
-          # Scatter Plot tab
-          shiny::tabPanel(
-            title = "Scatter Plot",
-            shiny::tags$br(),
-            shiny::tags$div(
-              id = paste(runKey, "scatterPlot_container", sep = "_"),
-              class = "output-session-container"
-            )
-          ),
-          # Heatmap tab with 3 sub-tabs
-          shiny::tabPanel(
-            title = "Heatmap",
-            shiny::tags$br(),
-            shiny::tabsetPanel(
-              shiny::tabPanel(
-                title = paste0(uiTermKeyword, " Vs Genes"),
-                shiny::tags$div(
-                  id = paste(runKey, "heatmap1_container", sep = "_"),
-                  class = "output-session-container"
-                )
-              ),
-              shiny::tabPanel(
-                title = paste0(uiTermKeyword, " Vs ", uiTermKeyword),
-                shiny::tags$div(
-                  id = paste(runKey, "heatmap2_container", sep = "_"),
-                  class = "output-session-container"
-                )
-              ),
-              shiny::tabPanel(
-                title = "Genes Vs Genes",
-                shiny::tags$div(
-                  id = paste(runKey, "heatmap3_container", sep = "_"),
-                  class = "output-session-container"
-                )
-              )
-            )
-          ),
-          # Network tab with 3 sub-tabs
-          shiny::tabPanel(
-            title = "Network",
-            shiny::tags$br(),
-            shiny::tabsetPanel(
-              shiny::tabPanel(
-                title = paste0(uiTermKeyword, " Vs Genes"),
-                shiny::tags$div(
-                  id = paste(runKey, "network1_container", sep = "_"),
-                  class = "output-session-container"
-                )
-              ),
-              shiny::tabPanel(
-                title = paste0(uiTermKeyword, " Vs ", uiTermKeyword),
-                shiny::tags$div(
-                  id = paste(runKey, "network2_container", sep = "_"),
-                  class = "output-session-container"
-                )
-              ),
-              shiny::tabPanel(
-                title = "Genes Vs Genes",
-                shiny::tags$div(
-                  id = paste(runKey, "network3_container", sep = "_"),
-                  class = "output-session-container"
-                )
-              )
-            )
-          )
-        )
+        do.call(shiny::tabsetPanel, unname(tabs))
       )
     },
 
@@ -1187,6 +1137,9 @@ ORAEnrichmentSession <- R6::R6Class(
       # Pharmacogenomics
       df <- private$attachLinksToDF(df, "PharmGKB", "https://www.clinpgx.org/chemical/")
 
+      # Literature (PUBMED from STRING)
+      df <- private$attachLinksToDF(df, "PUBMED", "https://pubmed.ncbi.nlm.nih.gov/", gSub = "PMID:")
+
       # KEGG (special handling)
       df <- private$attachKEGGLinksToDF(df)
 
@@ -1253,6 +1206,55 @@ ORAEnrichmentSession <- R6::R6Class(
         )
       }
       df
+    },
+
+    # -------------------------------------------------------------------------
+    # Result Transformation (encapsulated from enrich-general.R)
+    # -------------------------------------------------------------------------
+
+    #' Transform enrichment result table to standard display format
+    #'
+    #' Adds calculated columns (-log10Pvalue, Enrichment Score) and selects
+    #' display columns in standard order.
+    #'
+    #' @param df Data frame from strategy with ENRICHMENT_DF_COLNAMES
+    #' @return Transformed data frame ready for display
+    transformResultTable = function(df) {
+      df$`-log10Pvalue` <- as.numeric(
+        format(
+          -log10(df$`P-value`),
+          format = "e", digits = 3
+        )
+      )
+      # Keep P-value as numeric for DT slider filter; formatSignif() handles display formatting
+      df$`P-value` <- as.numeric(df$`P-value`)
+      df$`Enrichment Score %` <- private$calculateEnrichmentScore(
+        df$`Intersection Size`,
+        df$`Term Size`
+      )
+
+      # Define base columns to keep
+      baseColumns <- c(
+        "Source", "Term_ID", "Function", "P-value", "-log10Pvalue",
+        "Term Size", "Query size", "Intersection Size",
+        "Enrichment Score %", "Positive Hits"
+      )
+
+      # Preserve Term_ID_noLinks if it exists (WebGestalt includes links pre-attached)
+      if ("Term_ID_noLinks" %in% colnames(df)) {
+        baseColumns <- c(baseColumns, "Term_ID_noLinks")
+      }
+
+      df[, baseColumns]
+    },
+
+    #' Calculate enrichment score as percentage
+    #'
+    #' @param hitGenesCount Integer. Number of genes in intersection.
+    #' @param databaseGenesCount Integer. Total genes in term.
+    #' @return Numeric. Enrichment score as percentage.
+    calculateEnrichmentScore = function(hitGenesCount, databaseGenesCount) {
+      round((hitGenesCount / databaseGenesCount) * 100, 2)
     },
 
     # -------------------------------------------------------------------------

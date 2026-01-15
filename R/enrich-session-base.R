@@ -16,7 +16,7 @@
 #
 # Dependencies:
 # - enrich-session-registry.R (for EnrichmentSessionRegistry)
-# - infrastructure-config.R (for config)
+# - config.R (for enums and config)
 #
 # =============================================================================
 

@@ -34,8 +34,9 @@ NetworkOutputSession <- R6::R6Class(
     #' @param runKey Parent run key (e.g., "functional_gProfiler_1")
     #' @param enrichSession Parent ORAEnrichmentSession object
     #' @param outputType Type of network (e.g., "network1")
-    initialize = function(runKey, enrichSession, outputType) {
-      super$initialize(runKey, enrichSession, outputType)
+    #' @param instance Instance number for unique moduleServer ID
+    initialize = function(runKey, enrichSession, outputType, instance = 1) {
+      super$initialize(runKey, enrichSession, outputType, instance = instance)
 
       # Network-specific state (4 components like heatmaps have pairs/cells)
       private$.enrichmentData <- shiny::reactiveVal(NULL)
@@ -596,32 +597,6 @@ NetworkOutputSession <- R6::R6Class(
       stop("Subclass must implement renderNetworkFromFilteredEdgelist()")
     },
 
-    #' Initialize picker and slider controls
-    #'
-    #' Populates datasource picker and sets term count slider range.
-    #' Uses multi-select with all sources selected by default.
-    initializeControls = function(session) {
-      results <- self$enrichSession$getResults()
-      if (is.null(results) || nrow(results) == 0) return()
-
-      sources <- unique(as.character(results$Source))
-
-      shinyWidgets::updatePickerInput(
-        session,
-        "sourceSelect",
-        choices = sources,
-        selected = sources  # Multi-select: select all by default
-      )
-
-      maxRows <- nrow(results)
-      shiny::updateSliderInput(
-        session,
-        "termCountSlider",
-        max = min(maxRows, private$.maxSliderValue),
-        value = min(10, maxRows)
-      )
-    },
-
     # Not used for networks (base class abstract method)
     renderBothFromCurrentView = function() {
       private$renderNetworkFromState()
@@ -678,8 +653,9 @@ Network1OutputSession <- R6::R6Class(
 
   public = list(
     #' Initialize
-    initialize = function(runKey, enrichSession) {
-      super$initialize(runKey, enrichSession, outputType = "network1")
+    #' @param outputType Output type identifier from config (e.g., "network1")
+    initialize = function(runKey, enrichSession, outputType, instance = 1) {
+      super$initialize(runKey, enrichSession, outputType = outputType, instance = instance)
     },
 
     #' Generate namespaced UI
@@ -909,9 +885,6 @@ Network1OutputSession <- R6::R6Class(
 
         # Register common observers from base class (datasource picker updates slider)
         self$registerCommonObservers(input, session)
-
-        # Initialize controls (populates picker, sets slider range)
-        private$initializeControls(session)
 
         # Generate button
         private$.observers$generate <- shiny::observeEvent(
@@ -1166,8 +1139,9 @@ Network2OutputSession <- R6::R6Class(
 
   public = list(
     #' Initialize
-    initialize = function(runKey, enrichSession) {
-      super$initialize(runKey, enrichSession, outputType = "network2")
+    #' @param outputType Output type identifier from config (e.g., "network2")
+    initialize = function(runKey, enrichSession, outputType, instance = 1) {
+      super$initialize(runKey, enrichSession, outputType = outputType, instance = instance)
     },
 
     #' Generate namespaced UI
@@ -1403,9 +1377,6 @@ Network2OutputSession <- R6::R6Class(
         # Register common observers from base class (datasource picker updates slider)
         self$registerCommonObservers(input, session)
 
-        # Initialize controls (populates picker, sets slider range)
-        private$initializeControls(session)
-
         # Generate button
         private$.observers$generate <- shiny::observeEvent(
           input$generateBtn,
@@ -1481,19 +1452,6 @@ Network2OutputSession <- R6::R6Class(
   ),
 
   private = list(
-    #' Initialize picker and slider controls (override to include similarityCutoff)
-    initializeControls = function(session) {
-      # Call parent to initialize sourceSelect and termCountSlider
-      super$initializeControls(session)
-
-      # Also reset similarityCutoff to default
-      shiny::updateSliderInput(
-        session,
-        "similarityCutoff",
-        value = 10  # Default value
-      )
-    },
-
     #' Extract Function vs Function edgelist with similarity calculation
     extractFunctionVsFunctionEdgelist = function(enrichmentData, similarityCutoff, simplifyForNetwork = FALSE) {
       functionsEdgelist <- enrichmentData[, c("Term_ID_noLinks", "Positive Hits")]
@@ -1765,8 +1723,34 @@ Network3OutputSession <- R6::R6Class(
 
   public = list(
     #' Initialize
-    initialize = function(runKey, enrichSession) {
-      super$initialize(runKey, enrichSession, outputType = "network3")
+    #' @param outputType Output type identifier from config (e.g., "network3")
+    initialize = function(runKey, enrichSession, outputType, instance = 1) {
+      super$initialize(runKey, enrichSession, outputType = outputType, instance = instance)
+    },
+
+    #' Generate min common functions slider UI fragment
+    #'
+    #' Unique to Network3. Calculates dynamic max/value from results at creation time.
+    #'
+    #' @param ns Namespace function from NS(self$id)
+    #' @param uiTermKeyword Label term (e.g., "functions")
+    #' @return Shiny sliderInput element
+    minCommonFunctionsSliderUI = function(ns, uiTermKeyword) {
+      # Calculate dynamic max from results (available at UI creation time)
+      maxValue <- 10
+      defaultValue <- 3
+
+      results <- self$enrichSession$getResults()
+      if (!is.null(results) && nrow(results) > 0) {
+        maxValue <- max(1, private$computeMaxCommonFunctions(results))
+        defaultValue <- max(1, round(sqrt(maxValue)))
+      }
+
+      shiny::sliderInput(
+        inputId = ns("minCommonFunctions"),
+        label = paste0("Number of common ", uiTermKeyword, ":"),
+        min = 1, max = maxValue, value = defaultValue, step = 1
+      )
     },
 
     #' Generate namespaced UI
@@ -1791,15 +1775,7 @@ Network3OutputSession <- R6::R6Class(
         shiny::fluidRow(
           shiny::column(4, self$arenaButtonUI(ns)),
           shiny::column(4, self$layoutPickerUI(ns)),
-          shiny::column(
-            4,
-            # Min common functions - unique to Network3
-            shiny::sliderInput(
-              inputId = ns("minCommonFunctions"),
-              label = paste0("Number of common ", uiTermKeyword, ":"),
-              min = 1, max = 100, value = 5, step = 1
-            )
-          )
+          shiny::column(4, self$minCommonFunctionsSliderUI(ns, uiTermKeyword))
         ),
         # Row 3: Generate, Reset (NO drawFormat for network3)
         shiny::fluidRow(
@@ -1986,9 +1962,6 @@ Network3OutputSession <- R6::R6Class(
         # Register common observers from base class (datasource picker updates slider)
         self$registerCommonObservers(input, session)
 
-        # Initialize controls (populates picker, sets slider range)
-        private$initializeControls(session)
-
         # Generate button
         private$.observers$generate <- shiny::observeEvent(
           input$generateBtn,
@@ -2078,23 +2051,6 @@ Network3OutputSession <- R6::R6Class(
   ),
 
   private = list(
-    #' Initialize picker and slider controls (override to include minCommonFunctions)
-    initializeControls = function(session) {
-      # Call parent to initialize sourceSelect and termCountSlider
-      super$initializeControls(session)
-
-      # Initialize minCommonFunctions with dynamic range
-      # NOTE: Get sources from results directly, not from input (avoids async race condition)
-      results <- self$enrichSession$getResults()
-      if (!is.null(results) && nrow(results) > 0) {
-        sources <- unique(as.character(results$Source))
-        private$updateMinCommonFunctionsRange(sources, session)
-      } else {
-        # Fallback: set safe defaults (sqrt(10) ≈ 3)
-        shiny::updateSliderInput(session, "minCommonFunctions", max = 10, value = 3)
-      }
-    },
-
     #' Update minCommonFunctions slider range based on selected datasources
     #'
     #' Computes the maximum number of common functions possible for gene pairs

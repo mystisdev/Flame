@@ -18,8 +18,10 @@ DotPlotOutputSession <- R6::R6Class(
     #'
     #' @param runKey Parent run key (e.g., "functional_gProfiler_1")
     #' @param enrichSession Parent ORAEnrichmentSession object
-    initialize = function(runKey, enrichSession) {
-      super$initialize(runKey, enrichSession, outputType = "dotPlot")
+    #' @param outputType Output type identifier from config (e.g., "dotplot")
+    #' @param instance Instance number for unique moduleServer ID
+    initialize = function(runKey, enrichSession, outputType, instance = 1) {
+      super$initialize(runKey, enrichSession, outputType = outputType, instance = instance)
     },
 
     #' Generate namespaced UI for the dot plot panel
@@ -245,9 +247,6 @@ DotPlotOutputSession <- R6::R6Class(
 
         # Register common observers from base class (datasource picker updates slider)
         self$registerCommonObservers(input, session)
-
-        # Initialize controls from base class (populates picker, sets slider range)
-        private$initializeControls(session)
 
         # Generate button observer
         private$.observers$generate <- shiny::observeEvent(
@@ -554,7 +553,5 @@ DotPlotOutputSession <- R6::R6Class(
       plotly::plotlyProxyInvoke(proxy, "restyle",
                                 "marker.line.width", list(lineWidths), 0)
     }
-
-    # NOTE: initializeControls and updateSliderMax removed - now in OutputSession base class
   )
 )

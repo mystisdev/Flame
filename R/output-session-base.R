@@ -37,10 +37,13 @@ OutputSession <- R6::R6Class(
     #' @param runKey Parent run key (e.g., "functional_gProfiler_1")
     #' @param enrichSession Parent ORAEnrichmentSession object
     #' @param outputType Type of output (e.g., "barchart")
-    initialize = function(runKey, enrichSession, outputType) {
+    #' @param instance Instance number for unique moduleServer ID (prevents conflicts on recreation)
+    initialize = function(runKey, enrichSession, outputType, instance = 1) {
       self$runKey <- runKey
       self$outputType <- outputType
-      self$id <- paste(runKey, outputType, sep = "_")
+      # Include instance number in ID to ensure unique moduleServer namespaces
+      # This prevents binding conflicts when OutputSessions are destroyed and recreated
+      self$id <- paste(runKey, outputType, instance, sep = "_")
       self$enrichSession <- enrichSession
 
       # Initialize reactive state
@@ -101,14 +104,6 @@ OutputSession <- R6::R6Class(
 
       # Subclass should implement renderBothFromCurrentView()
       private$renderBothFromCurrentView()
-    },
-
-    #' Initialize the picker with datasources from enrichment results
-    #' Called externally after results are updated (e.g., datasources changed)
-    updateControls = function() {
-      if (!is.null(private$.moduleSession)) {
-        private$initializeControls(private$.moduleSession)
-      }
     },
 
     #' Clear state and rendered content for refresh (datasources changed)
@@ -217,13 +212,28 @@ OutputSession <- R6::R6Class(
     #' Multi-select picker for choosing datasources to include.
     #' All plots now use multi-select for consistency.
     #'
+    #' Populates choices directly from enrichment results.
+    #' This avoids timing issues with updatePickerInput() on dynamically
+    #' inserted UI - the picker is created with correct values from the start.
+    #'
     #' @param ns Namespace function from NS(self$id)
     #' @return Shiny pickerInput element
     datasourcePickerUI = function(ns) {
+      # Get datasources from enrichment results (available when ui() is called)
+      choices <- NULL
+      selected <- NULL
+
+      results <- self$enrichSession$getResults()
+      if (!is.null(results) && nrow(results) > 0) {
+        choices <- unique(as.character(results$Source))
+        selected <- choices  # Select all by default
+      }
+
       shinyWidgets::pickerInput(
         inputId = ns("sourceSelect"),
         label = "Select term datasource(s):",
-        choices = NULL,
+        choices = choices,
+        selected = selected,
         multiple = TRUE,
         options = list('actions-box' = TRUE)
       )
@@ -232,15 +242,23 @@ OutputSession <- R6::R6Class(
     #' Generate term count slider UI fragment
     #'
     #' Slider for filtering top N terms, with info tooltip.
+    #' Populates max value directly from enrichment results.
     #'
     #' @param ns Namespace function from NS(self$id)
     #' @param uiTermKeyword Label term (e.g., "functions", "terms")
     #' @return Shiny sliderInput element with tooltip
     termCountSliderUI = function(ns, uiTermKeyword = "functions") {
+      # Get max from results (available when ui() is called)
+      maxValue <- 10
+      results <- self$enrichSession$getResults()
+      if (!is.null(results) && nrow(results) > 0) {
+        maxValue <- min(nrow(results), private$.maxSliderValue)
+      }
+
       shiny::sliderInput(
         inputId = ns("termCountSlider"),
         label = paste0("Filter number of top ", uiTermKeyword, ":"),
-        min = 1, max = 10, value = 10, step = 1
+        min = 1, max = maxValue, value = min(10, maxValue), step = 1
       ) %>%
         bsplus::shinyInput_label_embed(
           bsplus::shiny_iconlink("circle-info") %>%
@@ -446,39 +464,6 @@ OutputSession <- R6::R6Class(
       return(timeSince < 0.2)
     },
 
-    # -------------------------------------------------------------------------
-    # Shared Control Initialization (used by all plots with shared controls)
-    # -------------------------------------------------------------------------
-
-    #' Initialize shared controls with data from enrichment results
-    #'
-    #' Populates datasource picker and sets term count slider range.
-    #' Called from subclass initializeControls() via super$initializeControls().
-    #'
-    #' @param session Shiny session object
-    initializeControls = function(session) {
-      results <- self$enrichSession$getResults()
-      if (is.null(results) || nrow(results) == 0) return()
-
-      # Populate datasource picker with available sources, select all by default
-      sources <- unique(as.character(results$Source))
-      shinyWidgets::updatePickerInput(
-        session,
-        "sourceSelect",
-        choices = sources,
-        selected = sources
-      )
-
-      # Set term count slider range based on total results
-      maxRows <- nrow(results)
-      shiny::updateSliderInput(
-        session,
-        "termCountSlider",
-        max = min(maxRows, private$.maxSliderValue),
-        value = min(10, maxRows)
-      )
-    },
-
     #' Update term count slider range based on selected datasources
     #'
     #' Called when user changes datasource selection.
@@ -487,10 +472,14 @@ OutputSession <- R6::R6Class(
     #' @param selectedSources Character vector of selected datasources
     #' @param session Shiny session object
     updateTermCountSliderRange = function(selectedSources, session) {
-      if (is.null(selectedSources) || length(selectedSources) == 0) return()
+      if (is.null(selectedSources) || length(selectedSources) == 0) {
+        return()
+      }
 
       results <- self$enrichSession$getResults()
-      if (is.null(results)) return()
+      if (is.null(results)) {
+        return()
+      }
 
       # Calculate max rows for selected sources
       maxRows <- nrow(subset(results, Source %in% selectedSources))
@@ -500,11 +489,14 @@ OutputSession <- R6::R6Class(
       currentValue <- shiny::isolate(private$.moduleSession$input$termCountSlider)
       if (is.null(currentValue)) currentValue <- 10
 
+      newMax <- min(maxRows, private$.maxSliderValue)
+      newValue <- min(currentValue, maxRows)
+
       shiny::updateSliderInput(
         session,
         "termCountSlider",
-        max = min(maxRows, private$.maxSliderValue),
-        value = min(currentValue, maxRows)
+        max = newMax,
+        value = newValue
       )
     },
 

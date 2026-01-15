@@ -10,7 +10,7 @@
 #
 # Dependencies:
 # - input-analytelist.R (for AnalyteList base class)
-# - infrastructure-config.R (for ScoreDirection)
+# - config.R (for ScoreDirection)
 #
 # =============================================================================
 

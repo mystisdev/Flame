@@ -7,7 +7,7 @@
 # Dependencies:
 # - input-analytelist-registry.R (for AnalyteListRegistry)
 # - input-analytelist-unranked.R (for UnrankedAnalyteList)
-# - infrastructure-config.R (for AnalyteType)
+# - config.R (for AnalyteType)
 # - func-gconvert.R (for gconvert_ids)
 #
 # =============================================================================
@@ -56,7 +56,7 @@ conversionUI <- function(id) {
           label = "3. Select target namespace:",
           selected = "ENTREZGENE",
           width = "80%",
-          choices = c(NAMESPACES[["CORE"]], unlist(NAMESPACES[["SPECIAL"]]))
+          choices = c(CORE_NAMESPACES, unlist(ORGANISM_NAMESPACES))
         )
       )
     ),

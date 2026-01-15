@@ -5,8 +5,8 @@ function(input, output, session) {
   pkgRoot <- normalizePath(file.path(getwd(), "..", ".."))
   source(file.path(pkgRoot, "R", "aaa-helpers.R"), local = TRUE)
 
-  # Source R6 infrastructure classes
-  source(file.path(pkgRoot, "R", "infrastructure-config.R"), local = TRUE)
+  # Source configuration
+  source(file.path(pkgRoot, "R", "config.R"), local = TRUE)
 
   # Source AnalyteList classes (in dependency order)
   source(file.path(pkgRoot, "R", "input-analytelist.R"), local = TRUE)
@@ -38,20 +38,21 @@ function(input, output, session) {
   source(file.path(pkgRoot, "R", "utilities-session-orthology.R"), local = TRUE)
   source(file.path(pkgRoot, "R", "utilities-session-network.R"), local = TRUE)
 
-  # Source configuration files (letter prefixes ensure correct load order)
+  # Source configuration files
+  # NOTE: config.R consolidates all config (replaces config-b, config-c, config-d)
   # config-a DELETED - shiny option moved to run_app.R
-  source(file.path(pkgRoot, "R", "config-b-global_variables.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "config-c-enrichment_types.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "config-d-server_variables.R"), local = TRUE)
+  # config-b-global_variables.R DELETED - consolidated into config.R
+  # config-c-enrichment_types.R DELETED - consolidated into config.R
+  # config-d-server_variables.R DELETED - consolidated into config.R
   # config-e DELETED - was only migration documentation
   # config-f DELETED - constants moved to their owning classes
 
   # Source core functions
   source(file.path(pkgRoot, "R", "aaa-utilities.R"), local = TRUE)
-  # func-init.R DELETED - initializeDatasources() moved to config-d, hide calls inlined
+  # func-init.R DELETED - initializeDatasources() moved to config.R
   # func-reset.R DELETED - was only comments
   # func-runs.R DELETED - parseFullRunKey() removed (sessions own their identity)
-  source(file.path(pkgRoot, "R", "core-tool_registry.R"), local = TRUE)
+  # core-tool_registry.R DELETED - replaced by enrich-strategy-registry.R
   # func-observers.R DELETED - all observers now handled by OutputSession classes
 
   # Source input functions
@@ -80,13 +81,14 @@ function(input, output, session) {
   # Source enrichment functions
   source(file.path(pkgRoot, "R", "enrich-inputs_panel.R"), local = TRUE)
   # enrich-main.R REMOVED - functions moved to ORAEnrichmentSession and EnrichmentController
-  source(file.path(pkgRoot, "R", "enrich-general.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "enrich-gprofiler.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "enrich-webgestalt.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "enrich-enrichr.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "enrich-string.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "enrich-panther.R"), local = TRUE)
-  source(file.path(pkgRoot, "R", "enrich-genecodis.R"), local = TRUE)
+  # enrich-general.R REMOVED - functions moved to ORAEnrichmentSession private methods
+  source(file.path(pkgRoot, "R", "enrich-strategy-base.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "enrich-strategy-gprofiler.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "enrich-strategy-webgestalt.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "enrich-strategy-enrichr.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "enrich-strategy-string.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "enrich-strategy-panther.R"), local = TRUE)
+  source(file.path(pkgRoot, "R", "enrich-strategy-genecodis.R"), local = TRUE)
   # enrich-combination.R REMOVED - replaced by CombinationSession
 
   # Note: All plot-*.R files REMOVED - now handled by OutputSession classes
@@ -106,6 +108,10 @@ function(input, output, session) {
   # Enrichment Session Registry for managing enrichment runs (per-session)
   # Must be created in reactive context (server function)
   enrichmentSessionRegistry <- EnrichmentSessionRegistry$new()
+
+  # Initialize OutputSession class registry (maps class names to R6 classes)
+  # Must be called after all output-session-*.R files are sourced
+  initOutputSessionClasses()
 
   # AnalyteList Manager Session - manages sidebar and view panel for ALL lists
   analyteListManager <- AnalyteListManagerSession$new(

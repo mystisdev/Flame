@@ -9,12 +9,12 @@
 # - input-session-base.R (for InputSession)
 # - input-analytelist-registry.R (for AnalyteListRegistry)
 # - input-analytelist-unranked.R (for UnrankedAnalyteList)
-# - infrastructure-config.R (for AnalyteType)
+# - config.R (for AnalyteType)
 # - listmgmt-session-manager.R (for AnalyteListManagerSession)
 # - aaa-utilities.R (for renderModal, renderWarning, renderError)
 # - upsetjs package
 #
-# Note: Module ID is defined in infrastructure-config.R (ModuleIds):
+# Note: Module ID is defined in config.R (ModuleIds):
 # - ModuleIds$LISTMGMT_SETOPS
 #
 # =============================================================================

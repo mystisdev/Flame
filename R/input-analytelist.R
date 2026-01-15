@@ -7,7 +7,7 @@
 # can be used as input for enrichment analysis.
 #
 # Dependencies:
-# - infrastructure-config.R (for AnalyteType)
+# - config.R (for AnalyteType)
 #
 # Subclasses (in separate files):
 # - input-analytelist-unranked.R (UnrankedAnalyteList)

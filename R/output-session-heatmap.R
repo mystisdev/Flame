@@ -30,8 +30,9 @@ HeatmapOutputSession <- R6::R6Class(
     #' @param runKey Parent run key (e.g., "functional_gProfiler_1")
     #' @param enrichSession Parent ORAEnrichmentSession object
     #' @param outputType Type of heatmap (e.g., "heatmap1")
-    initialize = function(runKey, enrichSession, outputType) {
-      super$initialize(runKey, enrichSession, outputType)
+    #' @param instance Instance number for unique moduleServer ID
+    initialize = function(runKey, enrichSession, outputType, instance = 1) {
+      super$initialize(runKey, enrichSession, outputType, instance = instance)
 
       # Initialize heatmap-specific state (pair selection instead of term selection)
       private$.selectedPairs <- shiny::reactiveVal(
@@ -335,8 +336,6 @@ HeatmapOutputSession <- R6::R6Class(
       filteredData$`Positive Hits` <- gsub(",", ", ", filteredData$`Positive Hits`)
       return(filteredData)
     }
-
-    # NOTE: initializeControls removed - now uses base class OutputSession version
   )
 )
 
@@ -351,8 +350,9 @@ Heatmap1OutputSession <- R6::R6Class(
 
   public = list(
     #' Initialize
-    initialize = function(runKey, enrichSession) {
-      super$initialize(runKey, enrichSession, outputType = "heatmap1")
+    #' @param outputType Output type identifier from config (e.g., "heatmap1")
+    initialize = function(runKey, enrichSession, outputType, instance = 1) {
+      super$initialize(runKey, enrichSession, outputType = outputType, instance = instance)
     },
 
     #' Generate namespaced UI
@@ -493,9 +493,6 @@ Heatmap1OutputSession <- R6::R6Class(
 
         # Register common observers from base class (datasource picker updates slider)
         self$registerCommonObservers(input, session)
-
-        # Initialize controls from base class (populates picker, sets slider range)
-        private$initializeControls(session)
 
         # Generate button
         private$.observers$generate <- shiny::observeEvent(
@@ -734,8 +731,9 @@ Heatmap2OutputSession <- R6::R6Class(
 
   public = list(
     #' Initialize
-    initialize = function(runKey, enrichSession) {
-      super$initialize(runKey, enrichSession, outputType = "heatmap2")
+    #' @param outputType Output type identifier from config (e.g., "heatmap2")
+    initialize = function(runKey, enrichSession, outputType, instance = 1) {
+      super$initialize(runKey, enrichSession, outputType = outputType, instance = instance)
     },
 
     #' Generate namespaced UI
@@ -848,9 +846,6 @@ Heatmap2OutputSession <- R6::R6Class(
 
         # Register common observers from base class (datasource picker updates slider)
         self$registerCommonObservers(input, session)
-
-        # Initialize controls from base class (populates picker, sets slider range)
-        private$initializeControls(session)
 
         # Generate button
         private$.observers$generate <- shiny::observeEvent(
@@ -1147,8 +1142,9 @@ Heatmap3OutputSession <- R6::R6Class(
 
   public = list(
     #' Initialize
-    initialize = function(runKey, enrichSession) {
-      super$initialize(runKey, enrichSession, outputType = "heatmap3")
+    #' @param outputType Output type identifier from config (e.g., "heatmap3")
+    initialize = function(runKey, enrichSession, outputType, instance = 1) {
+      super$initialize(runKey, enrichSession, outputType = outputType, instance = instance)
     },
 
     #' Generate namespaced UI
@@ -1245,9 +1241,6 @@ Heatmap3OutputSession <- R6::R6Class(
 
         # Register common observers from base class (datasource picker updates slider)
         self$registerCommonObservers(input, session)
-
-        # Initialize controls from base class (populates picker, sets slider range)
-        private$initializeControls(session)
 
         # Generate button
         private$.observers$generate <- shiny::observeEvent(

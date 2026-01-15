@@ -9,7 +9,7 @@
 # - input-analytelist-registry.R (for AnalyteListRegistry)
 # - aaa-utilities.R (for renderModal, renderWarning, renderError)
 #
-# Note: Module ID is defined in infrastructure-config.R (ModuleIds):
+# Note: Module ID is defined in config.R (ModuleIds):
 # - ModuleIds$LISTMGMT_MANAGER
 #
 # =============================================================================

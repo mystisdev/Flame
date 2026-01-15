@@ -83,7 +83,7 @@ enrichmentFormUI <- function(id) {
         shinyWidgets::pickerInput(
           inputId = ns("enrichment_tool"),
           label = "4. Select enrichment tool:",
-          choices = ENRICHMENT_TOOLS,
+          choices = names(TOOLS),
           selected = DEFAULT_TOOL,
           multiple = TRUE,
           width = "89.5%",
@@ -101,7 +101,7 @@ enrichmentFormUI <- function(id) {
         shiny::selectInput(
           inputId = ns("enrichment_namespace"),
           label = "6. Select namespace conversion:",
-          choices = NAMESPACES[["STRING"]],
+          choices = TOOLS[[DEFAULT_TOOL]]$namespaces,
           width = "80%"
         ) %>%
           bsplus::shinyInput_label_embed(
@@ -358,56 +358,37 @@ EnrichmentController <- R6::R6Class(
 
     #' Update available datasources based on selected tools
     updateAvailableDatasources = function(input, session) {
-      toolCapitalNames <- toupper(input$enrichment_tool)
-      choices <- private$getChoicesUnion(toolCapitalNames, input)
+      toolNames <- input$enrichment_tool
+      choices <- private$getChoicesUnion(toolNames, input)
       shinyWidgets::updatePickerInput(session, "enrichment_datasources",
                                       choices = choices, selected = DATASOURCES_DEFAULT_SELECTED)
     },
 
     #' Get union of datasources for selected tools
-    getChoicesUnion = function(toolCapitalNames, input) {
+    #' Uses TOOLS config to get datasources, handling organism-specific datasources
+    getChoicesUnion = function(toolNames, input) {
       choices <- c()
-      for (tool in toolCapitalNames) {
-        prefix <- ""
-        if (tool == "ENRICHR") {
-          prefix <- private$getEnrichrVariablePrefix(input)
+      organismShortName <- ORGANISMS[ORGANISMS$print_name == input$enrichment_organism, ]$short_name
+
+      for (toolName in toolNames) {
+        toolConfig <- TOOLS[[toolName]]
+        if (is.null(toolConfig)) next
+
+        # Check for organism-specific datasources (enrichR, GeneCodis)
+        if (!is.null(toolConfig$organismDatasources)) {
+          toolDatasources <- toolConfig$organismDatasources[[organismShortName]]
+          # Fall back to hsapiens if organism not found
+          if (is.null(toolDatasources)) {
+            toolDatasources <- toolConfig$organismDatasources[["hsapiens"]]
+          }
+        } else {
+          toolDatasources <- toolConfig$datasources
         }
-        if (tool == "GENECODIS") {
-          prefix <- private$getGeneCodisVariablePrefix(input)
-        }
-        choices <- c(choices, DATASOURCES[[paste0(prefix, tool)]])
+
+        choices <- c(choices, toolDatasources)
       }
       choices <- private$filterDatasourcePrintChoices(unique(choices))
       return(choices)
-    },
-
-    #' Get enrichR variable prefix based on organism
-    getEnrichrVariablePrefix = function(input) {
-      organismShortName <- ORGANISMS[ORGANISMS$print_name == input$enrichment_organism, ]$short_name
-      prefix <- switch(
-        organismShortName,
-        "mmusculus" = "MOUSE_",
-        "drerio" = "FISH_",
-        "dmelanogaster" = "FLY_",
-        "scerevisiae" = "YEAST_",
-        "celegans" = "WORM_",
-        "btaurus" = "OX_",
-        ""
-      )
-      if (is.null(prefix)) prefix <- ""
-      return(prefix)
-    },
-
-    #' Get GeneCodis variable prefix based on organism
-    getGeneCodisVariablePrefix = function(input) {
-      organismShortName <- ORGANISMS[ORGANISMS$print_name == input$enrichment_organism, ]$short_name
-      prefix <- switch(
-        organismShortName,
-        "athaliana" = "PLANT_",
-        ""
-      )
-      if (is.null(prefix)) prefix <- ""
-      return(prefix)
     },
 
     #' Filter datasource choices to only those available
@@ -425,11 +406,11 @@ EnrichmentController <- R6::R6Class(
     updateAvailableNamespaces = function(input, session) {
       organismShortName <- ORGANISMS[ORGANISMS$print_name == input$enrichment_organism, ]$short_name
       if (!is.null(organismShortName) && !is.na(organismShortName)) {
-        toolCapitalNames <- toupper(input$enrichment_tool)
-        choices <- private$getNamespaceChoices(toolCapitalNames, input, session)
+        toolNames <- input$enrichment_tool
+        choices <- private$getNamespaceChoices(toolNames, input, session)
         selected <- choices[1]
         if (private$isSpecialOrganism(organismShortName) &&
-            all(toolCapitalNames == "ENRICHR")) {
+            length(toolNames) == 1 && toolNames[1] == ToolId$ENRICHR) {
           selected <- SPECIAL_PREFERRED_NAMESPACE[[organismShortName]]
         }
         shiny::updateSelectInput(session, "enrichment_namespace",
@@ -443,20 +424,33 @@ EnrichmentController <- R6::R6Class(
     },
 
     #' Get namespace choices for selected tools
-    getNamespaceChoices = function(toolCapitalNames, input, session) {
-      if (length(toolCapitalNames) == 1) {
+    #' @param toolNames Character vector of selected tool names (from input$enrichment_tool)
+    getNamespaceChoices = function(toolNames, input, session) {
+      if (length(toolNames) == 1) {
         shinyjs::enable(session$ns("enrichment_namespace"))
-        prefix <- private$getNamespacePrefix(toolCapitalNames, input)
-        choices <- NAMESPACES[[paste0(prefix, toolCapitalNames)]]
+        toolName <- toolNames[1]
+        organismShortName <- ORGANISMS[ORGANISMS$print_name == input$enrichment_organism, ]$short_name
 
-        # If tool doesn't have specific namespaces, use CORE namespaces
-        if (is.null(choices)) {
-          choices <- NAMESPACES[["CORE"]]
+        # Get tool-specific namespaces from TOOLS config
+        toolConfig <- TOOLS[[toolName]]
+        choices <- toolConfig$namespaces
+
+        # For enrichR, check organism-specific namespaces
+        if (toolName == ToolId$ENRICHR && !is.null(toolConfig$namespacesSpecial)) {
+          orgNamespaces <- toolConfig$namespacesSpecial[[organismShortName]]
+          if (!is.null(orgNamespaces)) {
+            choices <- orgNamespaces
+          }
         }
 
-        organismShortName <- ORGANISMS[ORGANISMS$print_name == input$enrichment_organism, ]$short_name
-        if (private$isSpecialOrganism(organismShortName) && toolCapitalNames == "GPROFILER") {
-          choices <- c(NAMESPACES[["SPECIAL"]][[organismShortName]], choices)
+        # Fallback to core namespaces if tool has none defined
+        if (is.null(choices)) {
+          choices <- CORE_NAMESPACES
+        }
+
+        # Add organism-specific namespaces for gProfiler
+        if (toolName == ToolId$GPROFILER && !is.null(ORGANISM_NAMESPACES[[organismShortName]])) {
+          choices <- c(ORGANISM_NAMESPACES[[organismShortName]], choices)
         }
       } else {
         shinyjs::disable(session$ns("enrichment_namespace"))
@@ -465,40 +459,23 @@ EnrichmentController <- R6::R6Class(
       return(choices)
     },
 
-    #' Get namespace prefix for a tool
-    getNamespacePrefix = function(toolCapitalNames, input) {
-      prefix <- ""
-      if (toolCapitalNames == "ENRICHR") {
-        organismShortName <- ORGANISMS[ORGANISMS$print_name == input$enrichment_organism, ]$short_name
-        prefix <- switch(
-          organismShortName,
-          "dmelanogaster" = "FLY_",
-          "scerevisiae" = "YEAST_",
-          ""
-        )
-        if (is.null(prefix)) prefix <- ""
-      }
-      return(prefix)
-    },
-
     #' Update available significance metrics based on selected tools
     updateAvailableSignificanceMetrics = function(input, session) {
-      toolCapitalNames <- toupper(input$enrichment_tool)
-      options <- private$getAvailableSignificanceMetrics(toolCapitalNames, input, session)
+      toolNames <- input$enrichment_tool
+      options <- private$getAvailableSignificanceMetrics(toolNames, input, session)
       shiny::updateSelectInput(session, "enrichment_metric",
                                choices = options[["choices"]], selected = options[["selected"]])
     },
 
     #' Get available significance metrics for selected tools
-    getAvailableSignificanceMetrics = function(toolCapitalNames, input, session) {
-      if (length(toolCapitalNames) == 1) {
+    #' Uses TOOLS config via helper functions from config.R
+    getAvailableSignificanceMetrics = function(toolNames, input, session) {
+      if (length(toolNames) == 1) {
         shinyjs::enable(session$ns("enrichment_metric"))
-        choices <- METRICS[[toolCapitalNames]]
-        if (input$enrichment_background_choice == "genome") {
-          selected <- DEFAULT_METRICS_GENOME[[toolCapitalNames[1]]]
-        } else {
-          selected <- DEFAULT_METRICS_USERBACKGROUND[[toolCapitalNames[1]]]
-        }
+        toolName <- toolNames[1]
+        choices <- getMetricsForTool(toolName)
+        hasBackground <- input$enrichment_background_choice != "genome"
+        selected <- getDefaultMetric(toolName, hasBackground)
       } else {
         shinyjs::disable(session$ns("enrichment_metric"))
         choices <- DEFAULT_METRIC_TEXT
@@ -513,7 +490,7 @@ EnrichmentController <- R6::R6Class(
         shinyjs::hide(session$ns("enrichment_background_container"))
         # Genome background: All enrichment tools are available
         shinyWidgets::updatePickerInput(session, "enrichment_tool",
-                                        choices = ENRICHMENT_TOOLS, selected = DEFAULT_TOOL)
+                                        choices = names(TOOLS), selected = DEFAULT_TOOL)
       } else {
         shinyjs::show(session$ns("enrichment_background_container"))
         # Custom background: Only tools that support user-provided background lists
@@ -635,11 +612,8 @@ EnrichmentController <- R6::R6Class(
       backgroundMode <- input$enrichment_background_choice
       rawMetric <- input$enrichment_metric
       resolvedMetric <- if (rawMetric == DEFAULT_METRIC_TEXT) {
-        if (backgroundMode == "genome") {
-          DEFAULT_METRICS_GENOME[[toupper(toolName)]]
-        } else {
-          DEFAULT_METRICS_USERBACKGROUND[[toupper(toolName)]]
-        }
+        hasBackground <- backgroundMode != "genome"
+        getDefaultMetric(toolName, hasBackground)
       } else {
         rawMetric
       }
@@ -693,7 +667,13 @@ EnrichmentController <- R6::R6Class(
         " (Run ", existingSession$displayNumber, ") - datasources changed.</p>"
       ))
 
-      # Clear existing results (but keep OutputSessions alive - they have moduleServer bindings)
+      # Destroy OutputSessions BEFORE replacing UI
+      # OutputSessions have moduleServer bindings to current DOM elements.
+      # When updateContent() replaces the UI, those bindings become stale.
+      # We must destroy them first, then recreate after new UI is flushed.
+      existingSession$destroyOutputSessions()
+
+      # Clear existing results
       existingSession$clearResults()
 
       # Replace tab content with new UI (handles output clearing, parameter update, and UI replacement)
@@ -716,7 +696,8 @@ EnrichmentController <- R6::R6Class(
       local({
         sessionForUI <- existingSession
         parentOutput <- private$.parentSession$output
-        # Determine check list based on rollback setting
+        parentSession <- private$.parentSession
+        # Determine check list based to rollback setting
         rollbackChoice <- input$enrichment_inputConversion
         noHitCheckList <- if (rollbackChoice == "Original input names") {
           sessionForUI$rollbackNames()
@@ -725,17 +706,19 @@ EnrichmentController <- R6::R6Class(
         }
         listName <- newParams$geneListName
 
-        private$.parentSession$onFlushed(function() {
+        parentSession$onFlushed(function() {
           # Update parameters (datasources display changes)
           sessionForUI$printParameters(listName)
           # Update no-hit genes (different results = different hits)
           sessionForUI$printNoHitGenes(noHitCheckList)
           # Render result tables
           sessionForUI$renderResultsTables(parentOutput)
-          # Refresh output sessions (clear state, update controls) - NO destroy/recreate
-          # This keeps moduleServer bindings intact and avoids Shiny rebinding issues
-          sessionForUI$refreshOutputSessions()
-          # NOTE: updatePlotControlPanelsForRun() REMOVED - OutputSessions update their own controls
+
+          # Recreate OutputSessions with fresh moduleServer bindings
+          # The old OutputSessions were destroyed before UI replacement.
+          # Now that new UI is flushed, create new sessions bound to new DOM.
+          # Pass parentSession for deferred server setup (prevents input binding race)
+          sessionForUI$createOutputSessions(parentSession)
         }, once = TRUE)
       })
 
@@ -851,9 +834,11 @@ EnrichmentController <- R6::R6Class(
       # Create output sessions AFTER UI is flushed
       local({
         sessionForOutputs <- enrichSession
-        private$.parentSession$onFlushed(function() {
+        parentSession <- private$.parentSession
+        parentSession$onFlushed(function() {
           # Create output sessions (uses moduleServer internally)
-          sessionForOutputs$createOutputSessions()
+          # Pass parentSession for deferred server setup (prevents input binding race)
+          sessionForOutputs$createOutputSessions(parentSession)
           # NOTE: registerObserversForRun() REMOVED - OutputSessions handle all observers now
         }, once = TRUE)
       })
@@ -928,7 +913,7 @@ EnrichmentController <- R6::R6Class(
       }
 
       # Reset display counters for all tools
-      for (tool in ENRICHMENT_TOOLS) {
+      for (tool in names(TOOLS)) {
         if (private$.enrichmentRegistry$countByTool(tool) == 0) {
           private$.enrichmentRegistry$resetDisplayCounter(tool)
         }

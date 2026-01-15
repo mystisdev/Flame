@@ -1,44 +1,29 @@
-mapGProfilerIds <- function(gprofilerParsedResult) {
-  gprofilerParsedResult <- mapKEGGIds(gprofilerParsedResult)
-  gprofilerParsedResult <- mapREACIds(gprofilerParsedResult)
-  gprofilerParsedResult <- mapWPIds(gprofilerParsedResult)
-  return(gprofilerParsedResult)
-}
-
-mapREACIds <- function(df) {
-  if (length(df$Source[which(df$Source == "REAC")]) > 0) {
-    df[df$Source == "REAC", ]$Term_ID <-
-      gsub("REAC:", "", df[df$Source == "REAC", ]$Term_ID)
-  }
-  return(df)
-}
-
-mapWPIds <- function(df) {
-  if (length(df$Source[which(df$Source == "WP")]) > 0) {
-    df[df$Source == "WP", ]$Term_ID <-
-      gsub("WP:", "", df[df$Source == "WP", ]$Term_ID)
-  }
-  return(df)
-}
-
 # =============================================================================
-# GProfilerStrategy - Tool Strategy Implementation
+# g:Profiler ORA Strategy
+# =============================================================================
+#
+# Implements Over-Representation Analysis using the g:Profiler API (gprofiler2).
+#
+# Dependencies:
+#   - config.R (for ToolId, ParadigmId, ORGANISMS, ENRICHMENT_DF_COLNAMES)
+#   - enrich-strategy-base.R (for EnrichmentStrategy, strategyRegistry)
+#   - gprofiler2 package
+#
 # =============================================================================
 
-GProfilerStrategy <- R6::R6Class("GProfilerStrategy",
+GProfilerORAStrategy <- R6::R6Class("GProfilerORAStrategy",
 
-  inherit = ToolStrategy,
+  inherit = EnrichmentStrategy,
 
   public = list(
     initialize = function() {
-      super$initialize("gProfiler")
+      super$initialize(ToolId$GPROFILER, ParadigmId$ORA)
     },
 
     run = function(inputList, organism, backgroundList, params) {
       # Filter datasources to only those supported by gProfiler
-      sources <- DATASOURCES[["GPROFILER"]][
-        DATASOURCES[["GPROFILER"]] %in% params$datasources
-      ]
+      toolDatasources <- getDatasourcesForTool(self$toolId)
+      sources <- toolDatasources[toolDatasources %in% params$datasources]
 
       if (identical(sources, character(0))) {
         return(NULL)
@@ -83,25 +68,16 @@ GProfilerStrategy <- R6::R6Class("GProfilerStrategy",
         length(backgroundList)
       }
 
-      # Return structured result (no global writes)
+      # Return structured result
       return(list(
         result = private$parseResult(result),
         backgroundSize = backgroundSize
       ))
     },
 
-    # gProfiler uses its own ID conversion
+    # gProfiler accepts most ID formats directly
     convertIDs = function(geneList, organism, targetNamespace) {
-      # gProfiler accepts most ID formats directly
       return(geneList)
-    },
-
-    getValidDatasources = function(organism) {
-      return(DATASOURCES[["GPROFILER"]])
-    },
-
-    getDefaultMetric = function(hasBackground) {
-      if (hasBackground) "fdr" else "g_SCS"
     }
   ),
 
@@ -112,7 +88,7 @@ GProfilerStrategy <- R6::R6Class("GProfilerStrategy",
         "query_size", "intersection_size", "intersection"
       )]
       colnames(parsed) <- ENRICHMENT_DF_COLNAMES
-      parsed <- mapGProfilerIds(parsed)
+      parsed <- private$mapGProfilerIds(parsed)
       return(parsed)
     },
 
@@ -125,9 +101,36 @@ GProfilerStrategy <- R6::R6Class("GProfilerStrategy",
         return(metadata[[i]]$domain_size)
       })
       return(max(unlist(bsizes)))
+    },
+
+    # -------------------------------------------------------------------------
+    # gProfiler-specific ID mapping helpers
+    # -------------------------------------------------------------------------
+
+    mapGProfilerIds = function(df) {
+      df <- private$mapKEGGIds(df)
+      df <- private$mapREACIds(df)
+      df <- private$mapWPIds(df)
+      return(df)
+    },
+
+    mapREACIds = function(df) {
+      if (length(df$Source[which(df$Source == "REAC")]) > 0) {
+        df[df$Source == "REAC", ]$Term_ID <-
+          gsub("REAC:", "", df[df$Source == "REAC", ]$Term_ID)
+      }
+      return(df)
+    },
+
+    mapWPIds = function(df) {
+      if (length(df$Source[which(df$Source == "WP")]) > 0) {
+        df[df$Source == "WP", ]$Term_ID <-
+          gsub("WP:", "", df[df$Source == "WP", ]$Term_ID)
+      }
+      return(df)
     }
   )
 )
 
 # Register the strategy
-toolRegistry$register("functional", "gProfiler", GProfilerStrategy$new())
+strategyRegistry$register(ToolId$GPROFILER, ParadigmId$ORA, GProfilerORAStrategy$new())

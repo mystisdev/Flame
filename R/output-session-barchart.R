@@ -19,8 +19,10 @@ BarchartOutputSession <- R6::R6Class(
     #'
     #' @param runKey Parent run key (e.g., "functional_gProfiler_1")
     #' @param enrichSession Parent ORAEnrichmentSession object
-    initialize = function(runKey, enrichSession) {
-      super$initialize(runKey, enrichSession, outputType = "barchart")
+    #' @param outputType Output type identifier from config (e.g., "barchart")
+    #' @param instance Instance number for unique moduleServer ID
+    initialize = function(runKey, enrichSession, outputType, instance = 1) {
+      super$initialize(runKey, enrichSession, outputType = outputType, instance = instance)
     },
 
     #' Generate namespaced UI for the barchart panel
@@ -239,9 +241,6 @@ BarchartOutputSession <- R6::R6Class(
 
         # Register common observers from base class (datasource picker updates slider)
         self$registerCommonObservers(input, session)
-
-        # Initialize controls from base class (populates picker, sets slider range)
-        private$initializeControls(session)
 
         # Generate button observer
         private$.observers$generate <- shiny::observeEvent(
@@ -519,7 +518,5 @@ BarchartOutputSession <- R6::R6Class(
                                   "marker.line.width", list(lineWidths), traceIndex)
       }
     }
-
-    # NOTE: initializeControls and updateSliderMax removed - now in OutputSession base class
   )
 )

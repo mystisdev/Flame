@@ -1,4 +1,4 @@
-# Module IDs are now defined in infrastructure-config.R (ModuleIds)
+# Module IDs are defined in config.R (ModuleIds)
 # This ensures a single source of truth shared by both UI and server.
 
 generateInputPage <- function() {

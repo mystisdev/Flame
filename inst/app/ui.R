@@ -2,11 +2,11 @@
 
 # Determine package root and source required files
 pkgRoot <- normalizePath(file.path(getwd(), "..", ".."))
-source(file.path(pkgRoot, "R", "infrastructure-config.R"), local = TRUE)
-source(file.path(pkgRoot, "R", "config-b-global_variables.R"), local = TRUE)
-source(file.path(pkgRoot, "R", "config-c-enrichment_types.R"), local = TRUE)
+source(file.path(pkgRoot, "R", "config.R"), local = TRUE)
+# config-b-global_variables.R DELETED - consolidated into config.R
+# config-c-enrichment_types.R DELETED - consolidated into config.R
 # config-f DELETED - constants moved to their owning classes
-# func-init.R DELETED - initializeDatasources() moved to config-d, hide calls inlined in server.R
+# func-init.R DELETED - initializeDatasources() moved to config.R
 source(file.path(pkgRoot, "R", "view-welcome.R"), local = TRUE)
 source(file.path(pkgRoot, "R", "view-input.R"), local = TRUE)
 source(file.path(pkgRoot, "R", "view-enrichment.R"), local = TRUE)

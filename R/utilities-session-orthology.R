@@ -7,7 +7,7 @@
 # Dependencies:
 # - input-analytelist-registry.R (for AnalyteListRegistry)
 # - input-analytelist-unranked.R (for UnrankedAnalyteList)
-# - infrastructure-config.R (for AnalyteType)
+# - config.R (for AnalyteType)
 # - func-gorth.R (for gorth_ids)
 #
 # =============================================================================
